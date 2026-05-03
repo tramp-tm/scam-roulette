@@ -20,7 +20,7 @@ export class LotManager {
      * @returns The added lot or null if max limit reached
      */
     addLot(name: string, amount: number, color: string): Lot | null {
-        if (this.lots.length >= this.MAX_LOTS) {
+        if (this.lots.length >= LotManager.MAX_LOTS) {
             return null;
         }
 
@@ -131,5 +131,12 @@ export class LotManager {
      */
     getActiveCount(): number {
         return this.getActiveLots().length;
+    }
+
+    /**
+     * Gets all lots (including inactive ones).
+     */
+    getAllLots(): Lot[] {
+        return [...this.lots];
     }
 }

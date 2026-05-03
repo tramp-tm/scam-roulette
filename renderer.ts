@@ -63,6 +63,13 @@ export class Renderer {
     }
 
     /**
+     * Gets the current rotation value.
+     */
+    getCurrentRotation(): number {
+        return this.currentRotation;
+    }
+
+    /**
      * Sets the highlighted lot ID.
      */
     setHighlightedLot(id: string | null): void {

@@ -42,20 +42,20 @@ class App {
 
     constructor() {
         // Get DOM elements
-        this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
-        this.lotForm = document.getElementById('lot-form') as HTMLFormElement;
-        this.lotsList = document.getElementById('lots-list');
-        this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
-        this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
-        this.resultDisplay = document.getElementById('result-display');
-        this.resultText = document.getElementById('result-text');
+        this.canvas = document.getElementById('roulette-canvas')! as HTMLCanvasElement;
+        this.lotForm = document.getElementById('lot-form')! as HTMLFormElement;
+        this.lotsList = document.getElementById('lots-list')!;
+        this.spinBtn = document.getElementById('spin-btn')! as HTMLButtonElement;
+        this.resetBtn = document.getElementById('reset-btn')! as HTMLButtonElement;
+        this.resultDisplay = document.getElementById('result-display')!;
+        this.resultText = document.getElementById('result-text')!;
 
-        this.modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
-        this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
-        this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
-        this.durationValue = document.getElementById('duration-value');
-        this.spinsSlider = document.getElementById('spins-slider') as HTMLInputElement;
-        this.spinsValue = document.getElementById('spins-value');
+        this.modeSelect = document.getElementById('mode-select')! as HTMLSelectElement;
+        this.visualizationSelect = document.getElementById('visualization-select')! as HTMLSelectElement;
+        this.durationSlider = document.getElementById('duration-slider')! as HTMLInputElement;
+        this.durationValue = document.getElementById('duration-value')!;
+        this.spinsSlider = document.getElementById('spins-slider')! as HTMLInputElement;
+        this.spinsValue = document.getElementById('spins-value')!;
 
         // Initialize components
         this.lotManager = new LotManager([]);
@@ -197,7 +197,7 @@ class App {
         console.log(`Selected lot (before animation): ${selectedLot.name}`);
 
         // Calculate final rotation angle based on the selected lot
-        const startRotation = this.renderer.currentRotation || 0;
+        const startRotation = this.renderer.getCurrentRotation() || 0;
         const endRotation = RouletteEngine.calculateFinalAngle(
             activeLots,
             this.settings.mode,
@@ -300,7 +300,7 @@ class App {
      * Updates the lots list and statistics.
      */
     private updateUI(): void {
-        const lots = this.lotManager.lots;
+        const lots = this.lotManager.getAllLots();
         
         // Update lots list
         this.lotsList.innerHTML = '';
