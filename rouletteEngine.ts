@@ -147,28 +147,29 @@ export class RouletteEngine {
         const segment = segments.find(s => s.lot.id === targetLotId);
         if (!segment) return currentRotation;
 
+        // Normalize currentRotation to [0, 2π)
+        const normalizedCurrentRotation = currentRotation % (Math.PI * 2);
+        
         // 1. Pick random point inside the segment (±10% margin from center)
         const segmentSpan = segment.endAngle - segment.startAngle;
         const margin = segmentSpan * 0.1; // allow ±10% deviation from center
         const minOffset = margin;
         const maxOffset = segmentSpan - margin;
         const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
-        const targetSegmentAngle = segment.startAngle + randomOffset;
-
-        // 2. Calculate how many full rotations we've already made
-        const currentFullRotations = Math.floor(currentRotation / (Math.PI * 2));
         
-        // 3. Adjust target angle to be ahead of current rotation
-        let adjustedTargetAngle = targetSegmentAngle;
-        while (adjustedTargetAngle < currentRotation) {
-            adjustedTargetAngle += Math.PI * 2;
+        // Calculate target angle relative to normalized current rotation
+        // This ensures the wheel lands at the correct position regardless of previous rotations
+        let targetSegmentAngle = segment.startAngle + randomOffset;
+        
+        // Adjust so target is always ahead of currentRotation
+        while (targetSegmentAngle < normalizedCurrentRotation) {
+            targetSegmentAngle += Math.PI * 2;
         }
         
-        // Calculate delta from current rotation to the adjusted target angle
-        const deltaToTarget = adjustedTargetAngle - currentRotation;
+        const deltaToTarget = targetSegmentAngle - normalizedCurrentRotation;
 
         // 4. Randomize full spins: 2–5 per second of animation
-        const minSpinsPerSecond = 0.2;
+        const minSpinsPerSecond = 2; // Changed from 0.2 to match your request
         const maxSpinsPerSecond = 5;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
@@ -177,7 +178,7 @@ export class RouletteEngine {
             (Math.floor(Math.random() * (maxFullRotations - minFullRotations + 1)) + minFullRotations) *
             Math.PI * 2;
 
-        // 5. Final rotation = current + full spins + delta to target
+        // Final rotation = currentRotation + full spins + delta
         return currentRotation + randomFullRotations + deltaToTarget;
     }
 

@@ -45,7 +45,7 @@ export const EasingFunctions = {
         // Use a combination that gives smooth deceleration without overshooting
         const base = 1 - Math.pow(1 - t, 3);
         // Apply additional decay only in the last portion without overshooting
-        if (t > 0.8) {
+        if (t > 0.9) {
             return base + (1 - t) * (1 - base) * 2;
         }
         return base;

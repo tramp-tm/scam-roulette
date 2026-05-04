@@ -20,15 +20,6 @@ export interface Settings {
     animationDuration: number; // in milliseconds
 }
 
-// Animation state
-export interface AnimationState {
-    isAnimating: boolean;
-    startTime: number | null;
-    startValue: number;
-    endValue: number;
-    duration: number;
-}
-
 // Application state
 export interface AppState {
     lots: Lot[];
