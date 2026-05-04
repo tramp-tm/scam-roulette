@@ -2,7 +2,7 @@ import { Lot, Mode, Settings, VisualizationType } from './types.js';
 import { LotManager } from './lotManager.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { Renderer } from './renderer.js';
-import { AnimationController, createAnimationController } from './animation.js';
+import { AnimationController, createAnimationController, EasingFunctions } from './animation.js';
 
 /**
  * Main application class that coordinates all components.
@@ -22,8 +22,6 @@ class App {
     private visualizationSelect: HTMLSelectElement;
     private durationSlider: HTMLInputElement;
     private durationValue: HTMLElement;
-    private spinsSlider: HTMLInputElement;
-    private spinsValue: HTMLElement;
 
     // Application state
     private lotManager: LotManager;
@@ -33,8 +31,7 @@ class App {
     private settings: Settings = {
         mode: 'normal',
         visualization: 'wheel',
-        animationDuration: 3000,
-        numSpins: 5
+        animationDuration: 3000
     };
 
     private highlightedLotId: string | null = null;
@@ -54,8 +51,6 @@ class App {
         this.visualizationSelect = document.getElementById('visualization-select')! as HTMLSelectElement;
         this.durationSlider = document.getElementById('duration-slider')! as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value')!;
-        this.spinsSlider = document.getElementById('spins-slider')! as HTMLInputElement;
-        this.spinsValue = document.getElementById('spins-value')!;
 
         // Initialize components
         this.lotManager = new LotManager([]);
@@ -127,14 +122,6 @@ class App {
             }
         });
 
-        this.spinsSlider.addEventListener('input', (e) => {
-            if (!this.isSettingsLocked) {
-                const value = parseInt((e.target as HTMLInputElement).value);
-                this.settings.numSpins = value;
-                this.spinsValue.textContent = value.toString();
-            }
-        });
-
         // Window resize
         window.addEventListener('resize', () => {
             this.renderer.reset();
@@ -196,19 +183,19 @@ class App {
 
         console.log(`Selected lot (before animation): ${selectedLot.name}`);
 
-        // Calculate final rotation angle based on the selected lot
+        // Calculate final rotation angle based on the selected lot with randomized spins
         const startRotation = this.renderer.getCurrentRotation() || 0;
-        const endRotation = RouletteEngine.calculateFinalAngle(
+        const endRotation = RouletteEngine.computeFinalRotation(
             activeLots,
             this.settings.mode,
             selectedLot.id,
-            this.settings.numSpins,
-            this.settings.visualization
+            startRotation,
+            this.settings.animationDuration
         );
 
         // Configure and start animation
         this.animationController.configure({
-            startValue: 0,
+            startValue: startRotation,
             endValue: endRotation,
             duration: this.settings.animationDuration,
             onUpdate: (value) => {
@@ -292,7 +279,6 @@ class App {
         this.modeSelect.disabled = disabled;
         this.visualizationSelect.disabled = disabled;
         this.durationSlider.disabled = disabled;
-        this.spinsSlider.disabled = disabled;
         this.spinBtn.disabled = disabled;
     }
 

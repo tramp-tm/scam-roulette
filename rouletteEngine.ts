@@ -128,57 +128,52 @@ export class RouletteEngine {
     }
 
     /**
-     * Calculates the final rotation angle for animation.
-     * 
-     * For wheel: Rotates so winning segment ends at pointer (top = -PI/2)
-     * For strip: Scrolls so winning item centers on screen
+     * Computes the final rotation angle for animation.
+     *
+     * - Selects a random landing point within the winning lot's segment (not necessarily center).
+     * - Randomizes full rotations proportional to animation duration (e.g., 1–10 spins per second).
+     * - Ensures smooth deceleration by computing total delta from current rotation.
      */
-    static calculateFinalAngle(
-        lots: Lot[], 
-        mode: Mode, 
+    static computeFinalRotation(
+        lots: Lot[],
+        mode: Mode,
         targetLotId: string,
-        numSpins: number,
-        visualization: 'wheel' | 'strip'
+        currentRotation: number,
+        animationDurationMs: number
     ): number {
         const segments = this.calculateSegments(lots, mode);
         
-        // Find the target segment
-        let targetSegmentStart = 0;
-        let targetSegmentEnd = 0;
-        
-        for (const segment of segments) {
-            if (segment.lot.id === targetLotId) {
-                targetSegmentStart = segment.startAngle;
-                targetSegmentEnd = segment.endAngle;
-                break;
-            }
-        }
+        // Find winning segment
+        const segment = segments.find(s => s.lot.id === targetLotId);
+        if (!segment) return currentRotation;
 
-        const segmentCenter = (targetSegmentStart + targetSegmentEnd) / 2;
+        // 1. Pick random point inside the segment (±10% margin from center)
+        const segmentSpan = segment.endAngle - segment.startAngle;
+        const margin = segmentSpan * 0.1; // allow ±10% deviation from center
+        const minOffset = margin;
+        const maxOffset = segmentSpan - margin;
+        const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
+        const targetSegmentAngle = segment.startAngle + randomOffset;
 
-        if (visualization === 'wheel') {
-            // For wheel: pointer is at top (-PI/2 or 3*PI/2)
-            // We need to rotate so the segment center aligns with -PI/2
-            const pointerAngle = -Math.PI / 2;
-            
-            // Calculate rotation needed (negative because we rotate the wheel, not the pointer)
-            let rotation = pointerAngle - segmentCenter;
-            
-            // Add full spins for visual effect
-            rotation -= numSpins * Math.PI * 2;
-            
-            return rotation;
-        } else {
-            // For strip: center of screen is the target
-            // Calculate position to scroll (negative for leftward scroll)
-            const segmentWidth = segments.length > 0 ? Math.PI * 2 : 1;
-            let scrollPosition = -segmentCenter * 100; // Scale factor for visual effect
-            
-            // Add extra distance for animation
-            scrollPosition -= numSpins * 500;
-            
-            return scrollPosition;
-        }
+        // 2. Normalize current rotation to [0, 2π)
+        const normalizedCurrent = ((currentRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+        // 3. Compute delta to reach targetSegmentAngle from current
+        let deltaToTarget = targetSegmentAngle - normalizedCurrent;
+        if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
+
+        // 4. Randomize full spins: 1–10 per second of animation
+        const minSpinsPerSecond = 1;
+        const maxSpinsPerSecond = 10;
+        const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
+        const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
+        const maxFullRotations = Math.ceil(maxSpinsPerSecond * durationSeconds);
+        const randomFullRotations =
+            (Math.floor(Math.random() * (maxFullRotations - minFullRotations + 1)) + minFullRotations) *
+            Math.PI * 2;
+
+        // 5. Final rotation = current + full spins + delta to target
+        return currentRotation + randomFullRotations + deltaToTarget;
     }
 
     /**

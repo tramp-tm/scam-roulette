@@ -18,7 +18,6 @@ export interface Settings {
     mode: Mode;
     visualization: VisualizationType;
     animationDuration: number; // in milliseconds
-    numSpins: number; // for wheel rotation count
 }
 
 // Animation state
