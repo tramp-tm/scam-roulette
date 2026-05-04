@@ -131,7 +131,7 @@ export class RouletteEngine {
      * Computes the final rotation angle for animation.
      *
      * - Selects a random landing point within the winning lot's segment (not necessarily center).
-     * - Randomizes full rotations proportional to animation duration (e.g., 1–10 spins per second).
+     * - Randomizes full rotations proportional to animation duration (e.g., 2–10 spins per second).
      * - Ensures smooth deceleration by computing total delta from current rotation.
      */
     static computeFinalRotation(
@@ -162,9 +162,9 @@ export class RouletteEngine {
         let deltaToTarget = targetSegmentAngle - normalizedCurrent;
         if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
 
-        // 4. Randomize full spins: 0.2–2 per second of animation (reduced start speed)
-        const minSpinsPerSecond = 0.2; // Reduced from 1
-        const maxSpinsPerSecond = 2;
+        // 4. Randomize full spins: 2–10 per second of animation (start speed increased)
+        const minSpinsPerSecond = 2; // Increased from 0.2 to 2
+        const maxSpinsPerSecond = 10;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
         const maxFullRotations = Math.ceil(maxSpinsPerSecond * durationSeconds);
