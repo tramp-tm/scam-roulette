@@ -36,7 +36,21 @@ export class Renderer {
      */
     private setupHighDPI(): void {
         const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
+        let rect = this.canvas.getBoundingClientRect();
+        
+        // Use fallback dimensions if the canvas isn't visible yet
+        if (rect.width === 0 || rect.height === 0) {
+            rect = { 
+                width: 600, 
+                height: 500, 
+                x: 0, 
+                y: 0, 
+                top: 0, 
+                left: 0, 
+                bottom: 0, 
+                right: 0 
+            };
+        }
         
         this.canvas.width = rect.width * dpr;
         this.canvas.height = rect.height * dpr;

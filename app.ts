@@ -377,3 +377,8 @@ export class App {
         this.renderer.render();
     }
 }
+
+// Initialize the app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new App();
+});
