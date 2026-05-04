@@ -155,15 +155,24 @@ export class RouletteEngine {
         const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
         const targetSegmentAngle = segment.startAngle + randomOffset;
 
-        // 2. Normalize current rotation to [0, 2π)
-        const normalizedCurrent = ((currentRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-
-        // 3. Compute delta to reach targetSegmentAngle from current
-        let deltaToTarget = targetSegmentAngle - normalizedCurrent;
-        if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
-
-        // 4. Randomize full spins: 0.2–5 per second of animation
-        const minSpinsPerSecond = 0.2;
+        // 2. Calculate how many full rotations we've already made
+        const currentFullRotations = Math.floor(currentRotation / (Math.PI * 2));
+        
+        // 3. Normalize target angle to be in the same "rotation space" as current rotation
+        // This avoids the jump by not resetting to [0, 2π)
+        let normalizedTarget = targetSegmentAngle;
+        
+        // Adjust target to be ahead of current rotation
+        const currentBaseRotation = currentFullRotations * Math.PI * 2;
+        
+        // Calculate delta from current base position to target
+        let deltaToTarget = normalizedTarget - (currentRotation % (Math.PI * 2));
+        if (deltaToTarget < 0) {
+            deltaToTarget += Math.PI * 2;
+        }
+        
+        // 4. Randomize full spins: 2–5 per second of animation
+        const minSpinsPerSecond = 2;
         const maxSpinsPerSecond = 5;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
@@ -173,7 +182,6 @@ export class RouletteEngine {
             Math.PI * 2;
 
         // 5. Final rotation = current + full spins + delta to target
-        // This ensures we always move forward and don't wrap around incorrectly
         return currentRotation + randomFullRotations + deltaToTarget;
     }
 
