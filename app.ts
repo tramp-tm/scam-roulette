@@ -198,6 +198,7 @@ class App {
             startValue: startRotation,
             endValue: endRotation,
             duration: this.settings.animationDuration,
+            easing: EasingFunctions.rouletteEaseOut, // Changed to rouletteEaseOut for slower decay
             onUpdate: (value) => {
                 this.renderer.setRotation(value);
                 this.render();
