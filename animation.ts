@@ -131,6 +131,11 @@ export class AnimationController {
             if (this.onUpdate) {
                 this.onUpdate(this.endValue, 1);
             }
+            
+            // Clear animation state so isAnimating() returns false
+            this.animationFrameId = null;
+            this.startTime = null;
+            
             if (this.onComplete) {
                 this.onComplete();
             }
