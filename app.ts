@@ -1,29 +1,13 @@
-import { Lot, Mode, Settings, VisualizationType } from './types.js';
 import { LotManager } from './lotManager.js';
-import { RouletteEngine } from './rouletteEngine.js';
 import { Renderer } from './renderer.js';
-import { AnimationController, createAnimationController, EasingFunctions } from './animation.js';
+import { RouletteEngine } from './rouletteEngine.js';
+import { AnimationController, EasingFunctions } from './animation.js';
+import { Settings, Mode, VisualizationType, AppState, Lot } from './types.js';
 
 /**
- * Main application class that coordinates all components.
+ * Main application controller for the roulette game.
  */
-class App {
-    // DOM Elements
-    private canvas: HTMLCanvasElement;
-    private lotForm: HTMLFormElement;
-    private lotsList: HTMLElement;
-    private spinBtn: HTMLButtonElement;
-    private resetBtn: HTMLButtonElement;
-    private resultDisplay: HTMLElement;
-    private resultText: HTMLElement;
-    
-    // Settings elements
-    private modeSelect: HTMLSelectElement;
-    private visualizationSelect: HTMLSelectElement;
-    private durationSlider: HTMLInputElement;
-    private durationValue: HTMLElement;
-
-    // Application state
+export class App {
     private lotManager: LotManager;
     private renderer: Renderer;
     private animationController: AnimationController;
@@ -33,198 +17,174 @@ class App {
         visualization: 'wheel',
         animationDuration: 3000
     };
-
+    
     private highlightedLotId: string | null = null;
     private isSettingsLocked: boolean = false;
+    private endRotation: number = 0;
+
+    // DOM elements
+    private canvas: HTMLCanvasElement;
+    private resultDisplay: HTMLElement;
+    private resultText: HTMLElement;
+    private spinBtn: HTMLButtonElement;
+    private resetBtn: HTMLButtonElement;
+    
+    // Form elements
+    private lotNameInput: HTMLInputElement;
+    private lotAmountInput: HTMLInputElement;
+    private lotColorInput: HTMLInputElement;
+    private lotsList: HTMLUListElement;
+    
+    // Settings elements
+    private modeSelect: HTMLSelectElement;
+    private visualizationSelect: HTMLSelectElement;
+    private durationSlider: HTMLInputElement;
+    private durationValue: HTMLElement;
+    private spinsSlider: HTMLInputElement;
+    private spinsValue: HTMLElement;
 
     constructor() {
-        // Get DOM elements
-        this.canvas = document.getElementById('roulette-canvas')! as HTMLCanvasElement;
-        this.lotForm = document.getElementById('lot-form')! as HTMLFormElement;
-        this.lotsList = document.getElementById('lots-list')!;
-        this.spinBtn = document.getElementById('spin-btn')! as HTMLButtonElement;
-        this.resetBtn = document.getElementById('reset-btn')! as HTMLButtonElement;
-        this.resultDisplay = document.getElementById('result-display')!;
-        this.resultText = document.getElementById('result-text')!;
-
-        this.modeSelect = document.getElementById('mode-select')! as HTMLSelectElement;
-        this.visualizationSelect = document.getElementById('visualization-select')! as HTMLSelectElement;
-        this.durationSlider = document.getElementById('duration-slider')! as HTMLInputElement;
-        this.durationValue = document.getElementById('duration-value')!;
-
-        // Initialize components
         this.lotManager = new LotManager([]);
-        this.renderer = new Renderer(this.canvas);
-        this.animationController = createAnimationController();
+        this.renderer = new Renderer(document.getElementById('roulette-canvas') as HTMLCanvasElement);
+        this.animationController = new AnimationController();
+        
+        // Initialize DOM elements
+        this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
+        this.resultDisplay = document.getElementById('result-display');
+        this.resultText = document.getElementById('result-text');
+        this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
+        this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+        
+        // Form elements
+        this.lotNameInput = document.getElementById('lot-name') as HTMLInputElement;
+        this.lotAmountInput = document.getElementById('lot-amount') as HTMLInputElement;
+        this.lotColorInput = document.getElementById('lot-color') as HTMLInputElement;
+        this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
+        
+        // Settings elements
+        this.modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
+        this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
+        this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
+        this.durationValue = document.getElementById('duration-value');
+        this.spinsSlider = document.getElementById('spins-slider') as HTMLInputElement;
+        this.spinsValue = document.getElementById('spins-value');
 
-        // Add some default lots for demonstration
-        this.addDefaultLots();
-
-        // Bind event handlers
-        this.bindEvents();
-
-        // Initial render
+        // Initialize UI
         this.updateUI();
-        this.render();
+        
+        // Event listeners
+        this.setupEventListeners();
     }
 
-    /**
-     * Adds default lots for demonstration.
-     */
-    private addDefaultLots(): void {
-        const defaultLots = [
-            { name: 'Red Prize', amount: 10, color: '#e74c3c' },
-            { name: 'Blue Prize', amount: 20, color: '#3498db' },
-            { name: 'Green Prize', amount: 15, color: '#2ecc71' },
-            { name: 'Yellow Prize', amount: 8, color: '#f1c40f' },
-            { name: 'Purple Prize', amount: 12, color: '#9b59b6' },
-        ];
-
-        for (const lot of defaultLots) {
-            this.lotManager.addLot(lot.name, lot.amount, lot.color);
+    private setupEventListeners(): void {
+        // Form submission
+        const form = document.getElementById('lot-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.addLot();
+            });
         }
-    }
-
-    /**
-     * Binds all event handlers.
-     */
-    private bindEvents(): void {
-        // Lot form submission
-        this.lotForm.addEventListener('submit', (e) => this.handleAddLot(e));
-
+        
         // Spin button
-        this.spinBtn.addEventListener('click', () => this.startSpin());
-
+        this.spinBtn.addEventListener('click', () => this.spin());
+        
         // Reset button
-        this.resetBtn.addEventListener('click', () => this.handleReset());
-
+        this.resetBtn.addEventListener('click', () => this.reset());
+        
         // Settings changes
         this.modeSelect.addEventListener('change', (e) => {
-            if (!this.isSettingsLocked) {
-                this.settings.mode = (e.target as HTMLSelectElement).value as Mode;
-                this.updateUI();
-            }
-        });
-
-        this.visualizationSelect.addEventListener('change', (e) => {
-            if (!this.isSettingsLocked) {
-                this.settings.visualization = (e.target as HTMLSelectElement).value as VisualizationType;
-                this.renderer.setVisualizationType(this.settings.visualization);
-                this.render();
-            }
-        });
-
-        this.durationSlider.addEventListener('input', (e) => {
-            if (!this.isSettingsLocked) {
-                const value = parseInt((e.target as HTMLInputElement).value);
-                this.settings.animationDuration = value;
-                this.durationValue.textContent = `${(value / 1000).toFixed(1)}s`;
-            }
-        });
-
-        // Window resize
-        window.addEventListener('resize', () => {
-            this.renderer.reset();
-            this.render();
-        });
-    }
-
-    /**
-     * Handles adding a new lot.
-     */
-    private handleAddLot(e: Event): void {
-        e.preventDefault();
-
-        const nameInput = document.getElementById('lot-name') as HTMLInputElement;
-        const amountInput = document.getElementById('lot-amount') as HTMLInputElement;
-        const colorInput = document.getElementById('lot-color') as HTMLInputElement;
-
-        const lot = this.lotManager.addLot(
-            nameInput.value,
-            parseFloat(amountInput.value),
-            colorInput.value
-        );
-
-        if (lot) {
-            // Reset form
-            nameInput.value = '';
-            amountInput.value = '1';
-
-            // Update UI
+            this.settings.mode = e.target.value as Mode;
             this.updateUI();
+        });
+        
+        this.visualizationSelect.addEventListener('change', (e) => {
+            this.settings.visualization = e.target.value as VisualizationType;
+            this.renderer.setVisualizationType(this.settings.visualization);
             this.render();
-        } else {
-            alert('Maximum number of lots (100) reached!');
-        }
+        });
+        
+        // Duration slider
+        this.durationSlider.addEventListener('input', () => {
+            const duration = parseInt(this.durationSlider.value);
+            this.settings.animationDuration = duration;
+            this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+        });
+        
+        // Spins slider
+        this.spinsSlider.addEventListener('input', () => {
+            this.spinsValue.textContent = this.spinsSlider.value;
+        });
     }
 
-    /**
-     * Starts the spin animation.
-     */
-    startSpin(): void {
-        const activeLots = this.lotManager.getActiveLots();
+    private addLot(): void {
+        const name = this.lotNameInput.value.trim();
+        const amount = parseFloat(this.lotAmountInput.value);
+        const color = this.lotColorInput.value;
 
+        if (!name || isNaN(amount)) return;
+
+        this.lotManager.addLot(name, amount, color);
+        
+        // Clear form
+        this.lotNameInput.value = '';
+        this.lotAmountInput.value = '1';
+        
+        this.updateUI();
+    }
+
+    private spin(): void {
+        const activeLots = this.lotManager.getActiveLots();
+        
         if (!RouletteEngine.canSpin(activeLots)) {
-            alert('No active lots available to spin!');
+            alert('Add at least one lot to spin!');
             return;
         }
-
-        // Lock settings during animation
+        
+        // Lock settings
         this.isSettingsLocked = true;
         this.updateControlsState();
-
-        // CRITICAL: Determine result BEFORE animation starts
-        const selectedLot = RouletteEngine.selectWeighted(activeLots, this.settings.mode);
         
-        if (!selectedLot) {
-            this.finishSpin(null);
-            return;
-        }
+        // Select winner
+        const winner = RouletteEngine.selectWeighted(activeLots, this.settings.mode);
+        if (!winner) return;
 
-        console.group('Spin Debug Info');
-        console.log('Active lots:', activeLots.map(l => ({ name: l.name, amount: l.amount })));
-        const segments = RouletteEngine.calculateSegments(activeLots, this.settings.mode);
-        console.log('Calculated segments:', segments.map(s => ({
-            lotName: s.lot.name,
-            startAngle: s.startAngle.toFixed(3),
-            endAngle: s.endAngle.toFixed(3),
-            weight: s.weight.toFixed(4)
-        })));
-        console.log(`Target winner: ${selectedLot.name}`);
-        console.groupEnd();
-
-        // Calculate final rotation angle based on the selected lot with randomized spins
-        const startRotation = this.renderer.getCurrentRotation() || 0;
-        const endRotation = RouletteEngine.computeFinalRotation(
+        // Calculate final rotation
+        const currentRotation = this.renderer.getCurrentRotation();
+        const targetLotId = winner.id;
+        const animationDuration = this.settings.animationDuration;
+        
+        this.endRotation = RouletteEngine.computeFinalRotation(
             activeLots,
             this.settings.mode,
-            selectedLot.id,
-            startRotation,
-            this.settings.animationDuration
+            targetLotId,
+            currentRotation,
+            animationDuration
         );
 
-        // Configure and start animation
+        // Configure animation
         this.animationController.configure({
-            startValue: startRotation,
-            endValue: endRotation,
-            duration: this.settings.animationDuration,
-            easing: EasingFunctions.rouletteEaseOut, // Changed to rouletteEaseOut for slower decay
+            startValue: currentRotation,
+            endValue: this.endRotation,
+            duration: animationDuration,
+            easing: EasingFunctions.rouletteEaseOut,
             onUpdate: (value) => {
                 this.renderer.setRotation(value);
                 this.render();
             },
             onComplete: () => {
-                this.finishSpin(selectedLot);
+                this.finishSpin(winner, this.endRotation);
             }
         });
 
+        // Start animation
         this.animationController.start();
     }
 
     /**
      * Finishes the spin and applies results.
      */
-    private finishSpin(winner: Lot | null): void {
+    private finishSpin(winner: Lot | null, finalRotation?: number): void {
         if (winner) {
             // Highlight the result
             this.highlightedLotId = winner.id;
@@ -255,9 +215,10 @@ class App {
             this.updateUI();
         }
 
+        const rotationToLog = finalRotation ?? this.renderer.getCurrentRotation();
         console.group('Animation Debug Info');
-        console.log(`Final rotation value: ${endRotation.toFixed(6)} rad (${(endRotation * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Normalized final angle: ${(endRotation % (Math.PI * 2)).toFixed(6)} rad (${((endRotation % (Math.PI * 2)) * 180 / Math.PI).toFixed(2)}°)`);
+        console.log(`Final rotation value: ${rotationToLog.toFixed(6)} rad (${(rotationToLog * 180 / Math.PI).toFixed(2)}°)`);
+        console.log(`Normalized final angle: ${(rotationToLog % (Math.PI * 2)).toFixed(6)} rad (${((rotationToLog % (Math.PI * 2)) * 180 / Math.PI).toFixed(2)}°)`);
         console.groupEnd();
 
         // Unlock settings
@@ -269,92 +230,109 @@ class App {
         this.render();
     }
 
-    /**
-     * Handles reset button click.
-     */
-    private handleReset(): void {
-        if (this.animationController.isAnimating()) return;
-
-        if (confirm('Are you sure you want to reset all lots?')) {
-            this.lotManager.resetAll();
-            this.highlightedLotId = null;
-            this.renderer.reset();
-            this.resultDisplay.classList.add('hidden');
-            
-            this.updateUI();
-            this.render();
-        }
-    }
-
-    /**
-     * Updates the UI controls state based on settings lock.
-     */
-    private updateControlsState(): void {
-        const disabled = this.isSettingsLocked || this.animationController.isAnimating();
+    private reset(): void {
+        // Stop any running animation
+        this.animationController.stop();
         
-        this.modeSelect.disabled = disabled;
-        this.visualizationSelect.disabled = disabled;
-        this.durationSlider.disabled = disabled;
-        this.spinBtn.disabled = disabled;
+        // Reset state
+        this.highlightedLotId = null;
+        this.isSettingsLocked = false;
+        this.endRotation = 0;
+        this.lotManager.resetAll();
+        
+        // Reset renderer
+        this.renderer.reset();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        
+        // Hide result display
+        this.resultDisplay.classList.add('hidden');
+        
+        // Update UI
+        this.updateUI();
     }
 
-    /**
-     * Updates the lots list and statistics.
-     */
     private updateUI(): void {
-        const lots = this.lotManager.getAllLots();
-        
         // Update lots list
+        this.renderLotsList();
+        
+        // Update stats
+        document.getElementById('total-lots')!.textContent = this.lotManager.getTotalCount().toString();
+        document.getElementById('active-lots')!.textContent = this.lotManager.getActiveCount().toString();
+        
+        // Update controls state
+        this.updateControlsState();
+    }
+
+    private updateControlsState(): void {
+        const isAnimating = this.animationController.isAnimating();
+        
+        this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
+        this.resetBtn.disabled = isAnimating;
+        
+        // Disable form inputs when locked
+        const formInputs = document.querySelectorAll('#lot-form input');
+        formInputs.forEach(input => {
+            input.disabled = this.isSettingsLocked;
+        });
+    }
+
+    private renderLotsList(): void {
         this.lotsList.innerHTML = '';
+        
+        const lots = this.lotManager.getAllLots();
         
         for (const lot of lots) {
             const li = document.createElement('li');
-            li.className = `lot-item${!lot.active ? ' inactive' : ''}${lot.id === this.highlightedLotId ? ' highlighted' : ''}`;
+            li.className = `lot-item ${lot.active ? '' : 'inactive'} ${lot.id === this.highlightedLotId ? 'highlighted' : ''}`;
             
-            li.innerHTML = `
-                <div class="lot-color-indicator" style="background-color: ${lot.color}"></div>
-                <div class="lot-info">
-                    <div class="lot-name">${this.escapeHtml(lot.name)}</div>
-                    <div class="lot-amount">$${lot.amount.toFixed(2)} • ${lot.active ? 'Active' : 'Inactive'}</div>
-                </div>
-                <div class="lot-actions">
-                    <button class="btn-edit" onclick="app.editLot('${lot.id}')">Edit</button>
-                    <button class="btn-delete" onclick="app.deleteLot('${lot.id}')">Delete</button>
-                </div>
-            `;
+            // Color indicator
+            const colorIndicator = document.createElement('div');
+            colorIndicator.className = 'lot-color-indicator';
+            colorIndicator.style.backgroundColor = lot.color;
+            
+            // Lot info
+            const lotInfo = document.createElement('div');
+            lotInfo.className = 'lot-info';
+            
+            const lotName = document.createElement('div');
+            lotName.className = 'lot-name';
+            lotName.textContent = lot.name;
+            
+            const lotAmount = document.createElement('div');
+            lotAmount.className = 'lot-amount';
+            lotAmount.textContent = `$${lot.amount.toFixed(2)} • ${lot.active ? 'Active' : 'Inactive'}`;
+            
+            lotInfo.appendChild(lotName);
+            lotInfo.appendChild(lotAmount);
+            
+            // Actions
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'lot-actions';
+            
+            if (lot.id !== this.highlightedLotId) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn-edit';
+                editBtn.textContent = 'Edit';
+                editBtn.onclick = () => this.editLot(lot.id);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-delete';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = () => this.deleteLot(lot.id);
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+            }
+            
+            li.appendChild(colorIndicator);
+            li.appendChild(lotInfo);
+            li.appendChild(actionsDiv);
             
             this.lotsList.appendChild(li);
         }
-
-        // Update statistics
-        document.getElementById('total-lots')!.textContent = 
-            this.lotManager.getTotalCount().toString();
-        document.getElementById('active-lots')!.textContent = 
-            this.lotManager.getActiveCount().toString();
-
-        // Update renderer segments
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
-        this.renderer.setHighlightedLot(this.highlightedLotId);
     }
 
-    /**
-     * Escapes HTML to prevent XSS.
-     */
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    /**
-     * Renders the current frame.
-     */
-    render(): void {
-        this.renderer.render();
-    }
-
-    // Public methods for button handlers (attached via onclick)
-    editLot(id: string): void {
+    private editLot(id: string): void {
         const lot = this.lotManager.getLotById(id);
         if (!lot) return;
 
@@ -370,10 +348,9 @@ class App {
         });
 
         this.updateUI();
-        this.render();
     }
 
-    deleteLot(id: string): void {
+    private deleteLot(id: string): void {
         if (!confirm('Are you sure you want to delete this lot?')) return;
 
         this.lotManager.deleteLot(id);
@@ -384,16 +361,9 @@ class App {
         }
 
         this.updateUI();
-        this.render();
+    }
+
+    private render(): void {
+        this.renderer.render();
     }
 }
-
-// Initialize the application when DOM is ready
-let app: App;
-
-document.addEventListener('DOMContentLoaded', () => {
-    app = new App();
-    
-    // Expose app for button handlers
-    (window as any).app = app;
-});
