@@ -1,4 +1,4 @@
-import { Lot } from './types';
+import { Lot } from './types.js';
 
 /**
  * Manages the collection of lots in the roulette application.

@@ -1,8 +1,8 @@
-import { Lot, Mode, Settings, VisualizationType } from './types';
-import { LotManager } from './lotManager';
-import { RouletteEngine } from './rouletteEngine';
-import { Renderer } from './renderer';
-import { AnimationController, createAnimationController } from './animation';
+import { Lot, Mode, Settings, VisualizationType } from './types.js';
+import { LotManager } from './lotManager.js';
+import { RouletteEngine } from './rouletteEngine.js';
+import { Renderer } from './renderer.js';
+import { AnimationController, createAnimationController } from './animation.js';
 
 /**
  * Main application class that coordinates all components.

@@ -1,5 +1,5 @@
-import { Lot, Segment, VisualizationType } from './types';
-import { RouletteEngine } from './rouletteEngine';
+import { Lot, Segment, VisualizationType } from './types.js';
+import { RouletteEngine } from './rouletteEngine.js';
 
 /**
  * Handles all canvas rendering for the roulette visualization.
