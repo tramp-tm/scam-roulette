@@ -20,6 +20,13 @@ export interface Settings {
     animationDuration: number; // in milliseconds
 }
 
+// Animation state interface
+export interface AnimationState {
+    isPlaying: boolean;
+    progress: number;
+    currentValue: number;
+}
+
 // Application state
 export interface AppState {
     lots: Lot[];

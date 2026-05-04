@@ -24,8 +24,8 @@ export class App {
 
     // DOM elements
     private canvas: HTMLCanvasElement;
-    private resultDisplay: HTMLElement;
-    private resultText: HTMLElement;
+    private resultDisplay: HTMLElement | null = null;
+    private resultText: HTMLElement | null = null;
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     
@@ -36,12 +36,12 @@ export class App {
     private lotsList: HTMLUListElement;
     
     // Settings elements
-    private modeSelect: HTMLSelectElement;
-    private visualizationSelect: HTMLSelectElement;
-    private durationSlider: HTMLInputElement;
-    private durationValue: HTMLElement;
-    private spinsSlider: HTMLInputElement;
-    private spinsValue: HTMLElement;
+    private modeSelect: HTMLSelectElement | null = null;
+    private visualizationSelect: HTMLSelectElement | null = null;
+    private durationSlider: HTMLInputElement | null = null;
+    private durationValue: HTMLElement | null = null;
+    private spinsSlider: HTMLInputElement | null = null;
+    private spinsValue: HTMLElement | null = null;
 
     constructor() {
         this.lotManager = new LotManager([]);
@@ -93,27 +93,31 @@ export class App {
         this.resetBtn.addEventListener('click', () => this.reset());
         
         // Settings changes
-        this.modeSelect.addEventListener('change', (e) => {
-            this.settings.mode = e.target.value as Mode;
+        this.modeSelect?.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            this.settings.mode = target.value as Mode;
             this.updateUI();
         });
         
-        this.visualizationSelect.addEventListener('change', (e) => {
-            this.settings.visualization = e.target.value as VisualizationType;
+        this.visualizationSelect?.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            this.settings.visualization = target.value as VisualizationType;
             this.renderer.setVisualizationType(this.settings.visualization);
             this.render();
         });
         
         // Duration slider
-        this.durationSlider.addEventListener('input', () => {
-            const duration = parseInt(this.durationSlider.value);
-            this.settings.animationDuration = duration;
-            this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+        this.durationSlider?.addEventListener('input', () => {
+            if (this.durationSlider) {
+                const duration = parseInt(this.durationSlider.value);
+                this.settings.animationDuration = duration;
+                if (this.durationValue) this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+            }
         });
         
         // Spins slider
-        this.spinsSlider.addEventListener('input', () => {
-            this.spinsValue.textContent = this.spinsSlider.value;
+        this.spinsSlider?.addEventListener('input', () => {
+            if (this.spinsValue) this.spinsValue.textContent = this.spinsSlider ? this.spinsSlider.value : '';
         });
     }
 
@@ -190,11 +194,13 @@ export class App {
             this.highlightedLotId = winner.id;
             
             // Show result display
-            this.resultText.textContent = 
-                this.settings.mode === 'survival' 
-                    ? `Eliminated: ${winner.name}`
-                    : `Winner: ${winner.name}`;
-            this.resultDisplay.classList.remove('hidden');
+            if (this.resultText) {
+                this.resultText.textContent = 
+                    this.settings.mode === 'survival' 
+                        ? `Eliminated: ${winner.name}`
+                        : `Winner: ${winner.name}`;
+            }
+            if (this.resultDisplay) this.resultDisplay.classList.remove('hidden');
 
             // In survival mode, deactivate the eliminated lot
             if (this.settings.mode === 'survival') {
@@ -245,7 +251,7 @@ export class App {
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
         
         // Hide result display
-        this.resultDisplay.classList.add('hidden');
+        if (this.resultDisplay) this.resultDisplay.classList.add('hidden');
         
         // Update UI
         this.updateUI();
@@ -256,8 +262,10 @@ export class App {
         this.renderLotsList();
         
         // Update stats
-        document.getElementById('total-lots')!.textContent = this.lotManager.getTotalCount().toString();
-        document.getElementById('active-lots')!.textContent = this.lotManager.getActiveCount().toString();
+        const totalEl = document.getElementById('total-lots');
+        const activeEl = document.getElementById('active-lots');
+        if (totalEl) totalEl.textContent = this.lotManager.getTotalCount().toString();
+        if (activeEl) activeEl.textContent = this.lotManager.getActiveCount().toString();
         
         // Update controls state
         this.updateControlsState();
@@ -266,13 +274,15 @@ export class App {
     private updateControlsState(): void {
         const isAnimating = this.animationController.isAnimating();
         
-        this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
-        this.resetBtn.disabled = isAnimating;
+        if (this.spinBtn) this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
+        if (this.resetBtn) this.resetBtn.disabled = isAnimating;
         
         // Disable form inputs when locked
         const formInputs = document.querySelectorAll('#lot-form input');
         formInputs.forEach(input => {
-            input.disabled = this.isSettingsLocked;
+            if (input instanceof HTMLElement) {
+                input.disabled = this.isSettingsLocked;
+            }
         });
     }
 
