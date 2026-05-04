@@ -280,7 +280,7 @@ export class App {
         // Disable form inputs when locked
         const formInputs = document.querySelectorAll('#lot-form input');
         formInputs.forEach(input => {
-            if (input instanceof HTMLElement) {
+            if ('disabled' in input && input instanceof HTMLInputElement) {
                 input.disabled = this.isSettingsLocked;
             }
         });
