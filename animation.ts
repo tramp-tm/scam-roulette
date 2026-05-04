@@ -42,13 +42,13 @@ export const EasingFunctions = {
      * Custom roulette easing - combines cubic with extra emphasis on final slowdown
      */
     rouletteEaseOut: (t: number): number => {
-        // Use a combination that gives smooth deceleration
-        const eased = 1 - Math.pow(1 - t, 3);
-        // Add extra slowdown in the last portion
-        if (t > 0.7) {
-            return eased + (1 - t) * 0.3;
+        // Use a combination that gives smooth deceleration without overshooting
+        const base = 1 - Math.pow(1 - t, 3);
+        // Apply additional decay only in the last portion without overshooting
+        if (t > 0.8) {
+            return base + (1 - t) * (1 - base) * 2;
         }
-        return eased;
+        return base;
     }
 };
 

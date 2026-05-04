@@ -162,8 +162,8 @@ export class RouletteEngine {
         let deltaToTarget = targetSegmentAngle - normalizedCurrent;
         if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
 
-        // 4. Randomize full spins: 2–10 per second of animation (start speed increased)
-        const minSpinsPerSecond = 0.2;
+        // 4. Randomize full spins: 2–5 per second of animation
+        const minSpinsPerSecond = 2;
         const maxSpinsPerSecond = 5;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
@@ -173,6 +173,7 @@ export class RouletteEngine {
             Math.PI * 2;
 
         // 5. Final rotation = current + full spins + delta to target
+        // This ensures we always move forward and don't wrap around incorrectly
         return currentRotation + randomFullRotations + deltaToTarget;
     }
 
