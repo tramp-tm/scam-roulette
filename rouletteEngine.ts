@@ -158,7 +158,6 @@ export class RouletteEngine {
         const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
         
         // Calculate target angle relative to normalized current rotation
-        // This ensures the wheel lands at the correct position regardless of previous rotations
         let targetSegmentAngle = segment.startAngle + randomOffset;
         
         // Adjust so target is always ahead of currentRotation

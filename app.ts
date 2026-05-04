@@ -181,7 +181,17 @@ class App {
             return;
         }
 
-        console.log(`Selected lot (before animation): ${selectedLot.name}`);
+        console.group('Spin Debug Info');
+        console.log('Active lots:', activeLots.map(l => ({ name: l.name, amount: l.amount })));
+        const segments = RouletteEngine.calculateSegments(activeLots, this.settings.mode);
+        console.log('Calculated segments:', segments.map(s => ({
+            lotName: s.lot.name,
+            startAngle: s.startAngle.toFixed(3),
+            endAngle: s.endAngle.toFixed(3),
+            weight: s.weight.toFixed(4)
+        })));
+        console.log(`Target winner: ${selectedLot.name}`);
+        console.groupEnd();
 
         // Calculate final rotation angle based on the selected lot with randomized spins
         const startRotation = this.renderer.getCurrentRotation() || 0;
@@ -244,6 +254,11 @@ class App {
             // Update UI to reflect changes
             this.updateUI();
         }
+
+        console.group('Animation Debug Info');
+        console.log(`Final rotation value: ${endRotation.toFixed(6)} rad (${(endRotation * 180 / Math.PI).toFixed(2)}°)`);
+        console.log(`Normalized final angle: ${(endRotation % (Math.PI * 2)).toFixed(6)} rad (${((endRotation % (Math.PI * 2)) * 180 / Math.PI).toFixed(2)}°)`);
+        console.groupEnd();
 
         // Unlock settings
         this.isSettingsLocked = false;
