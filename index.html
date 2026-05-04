@@ -283,6 +283,37 @@
 </head>
 <body>
     <div class="container">
+        <!-- Left Panel: Add Lot, Lots List -->
+        <div class="left-panel">
+            <!-- Add Lot Form -->
+            <div class="panel">
+                <h3>➕ Add New Lot</h3>
+                <form id="lot-form">
+                    <input type="text" id="lot-name" placeholder="Lot Name" required minlength="1" maxlength="50">
+                    <input type="number" id="lot-amount" placeholder="Amount ($)" required min="0.01" step="0.01" value="1">
+                    <input type="color" id="lot-color" value="#3498db">
+                    <button type="submit" class="btn-primary">Add Lot</button>
+                </form>
+            </div>
+
+            <!-- Lots List -->
+            <div class="panel">
+                <h3>📋 Lots</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div id="total-lots" class="stat-value">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="active-lots" class="stat-value">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                </div>
+                <ul id="lots-list"></ul>
+            </div>
+        </div>
+
+        <!-- Center Panel: Canvas and Controls -->
         <div class="main-panel">
             <h1>🎰 Roulette Game 🎰</h1>
             
@@ -303,6 +334,7 @@
             </div>
         </div>
 
+        <!-- Right Panel: Settings -->
         <div class="sidebar">
             <!-- Settings Panel -->
             <div class="panel">
@@ -339,33 +371,6 @@
                         <span id="spins-value" class="slider-value">5</span>
                     </div>
                 </div>
-            </div>
-
-            <!-- Add Lot Form -->
-            <div class="panel">
-                <h3>➕ Add New Lot</h3>
-                <form id="lot-form">
-                    <input type="text" id="lot-name" placeholder="Lot Name" required minlength="1" maxlength="50">
-                    <input type="number" id="lot-amount" placeholder="Amount ($)" required min="0.01" step="0.01" value="1">
-                    <input type="color" id="lot-color" value="#3498db">
-                    <button type="submit" class="btn-primary">Add Lot</button>
-                </form>
-            </div>
-
-            <!-- Lots List -->
-            <div class="panel">
-                <h3>📋 Lots</h3>
-                <div class="stats">
-                    <div class="stat-item">
-                        <div id="total-lots" class="stat-value">0</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="active-lots" class="stat-value">0</div>
-                        <div class="stat-label">Active</div>
-                    </div>
-                </div>
-                <ul id="lots-list"></ul>
             </div>
         </div>
     </div>
