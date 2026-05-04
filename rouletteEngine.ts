@@ -163,8 +163,8 @@ export class RouletteEngine {
         if (deltaToTarget < 0) deltaToTarget += Math.PI * 2;
 
         // 4. Randomize full spins: 2–10 per second of animation (start speed increased)
-        const minSpinsPerSecond = 2; // Increased from 0.2 to 2
-        const maxSpinsPerSecond = 10;
+        const minSpinsPerSecond = 0.2;
+        const maxSpinsPerSecond = 5;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
         const maxFullRotations = Math.ceil(maxSpinsPerSecond * durationSeconds);
