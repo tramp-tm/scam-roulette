@@ -228,6 +228,7 @@ export class App {
         
         if (winner) {
             // Calculate what angle should be under the pointer
+            const activeLots = this.lotManager.getActiveLots();
             const segments = RouletteEngine.calculateSegments(activeLots, this.settings.mode);
             const winningSegment = segments.find(s => s.lot.id === winner.id);
             
