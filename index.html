@@ -266,6 +266,42 @@
             color: #f39c12;
         }
 
+        /* New styles for inline add row and editable amount */
+        .lot-item.add-row {
+            background: rgba(46, 204, 113, 0.1);
+            border: 1px dashed rgba(46, 204, 113, 0.5);
+        }
+
+        .lot-item.add-row input {
+            margin-right: 8px;
+        }
+
+        .btn-add {
+            background: #2ecc71;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }
+
+        .btn-add:hover:not(:disabled) {
+            background: #27ae60;
+        }
+
+        .lot-amount-input {
+            width: 80px;
+            padding: 6px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            text-align: right;
+        }
+
+        .lot-amount-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         @media (max-width: 900px) {
             .container {
                 flex-direction: column;
@@ -283,19 +319,8 @@
 </head>
 <body>
     <div class="container">
-        <!-- Left Panel: Add Lot, Lots List -->
+        <!-- Left Panel: Lots List with Add Row -->
         <div class="left-panel">
-            <!-- Add Lot Form -->
-            <div class="panel">
-                <h3>➕ Add New Lot</h3>
-                <form id="lot-form">
-                    <input type="text" id="lot-name" placeholder="Lot Name" required minlength="1" maxlength="50">
-                    <input type="number" id="lot-amount" placeholder="Amount ($)" required min="0.01" step="0.01" value="1">
-                    <input type="color" id="lot-color" value="#3498db">
-                    <button type="submit" class="btn-primary">Add Lot</button>
-                </form>
-            </div>
-
             <!-- Lots List -->
             <div class="panel">
                 <h3>📋 Lots</h3>
@@ -310,6 +335,14 @@
                     </div>
                 </div>
                 <ul id="lots-list"></ul>
+                
+                <!-- Add New Lot Row (inline at bottom of table) -->
+                <li id="add-lot-row" class="lot-item add-row">
+                    <div id="new-lot-color-indicator" class="lot-color-indicator"></div>
+                    <input type="text" id="new-lot-name" placeholder="Lot Name" style="flex: 1; padding: 8px; border: none; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;">
+                    <input type="number" id="new-lot-amount" placeholder="$" min="0.01" step="0.01" value="1" style="width: 80px; padding: 8px; border: none; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;">
+                    <button id="add-lot-btn" class="btn-add">➕</button>
+                </li>
             </div>
         </div>
 

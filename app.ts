@@ -29,11 +29,14 @@ export class App {
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     
-    // Form elements
+    // Lots list elements
+    private lotsList: HTMLUListElement;
+    
+    // Add row elements (inline at bottom of lots table)
     private lotNameInput: HTMLInputElement;
     private lotAmountInput: HTMLInputElement;
-    private lotColorInput: HTMLInputElement;
-    private lotsList: HTMLUListElement;
+    private addBtn: HTMLButtonElement;
+    private newLotColorIndicator: HTMLElement;
     
     // Settings elements
     private modeSelect: HTMLSelectElement | null = null;
@@ -55,11 +58,15 @@ export class App {
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         
-        // Form elements
-        this.lotNameInput = document.getElementById('lot-name') as HTMLInputElement;
-        this.lotAmountInput = document.getElementById('lot-amount') as HTMLInputElement;
-        this.lotColorInput = document.getElementById('lot-color') as HTMLInputElement;
+        // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
+        
+        // Add row elements (inline at bottom of lots table)
+        const addLotRow = document.getElementById('add-lot-row') as HTMLElement;
+        this.lotNameInput = document.getElementById('new-lot-name') as HTMLInputElement;
+        this.lotAmountInput = document.getElementById('new-lot-amount') as HTMLInputElement;
+        this.addBtn = document.getElementById('add-lot-btn') as HTMLButtonElement;
+        this.newLotColorIndicator = document.getElementById('new-lot-color-indicator') as HTMLElement;
         
         // Settings elements
         this.modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
@@ -72,19 +79,24 @@ export class App {
         // Initialize UI
         this.updateUI();
         
+        // Set initial random color for new lot indicator
+        this.newLotColorIndicator.style.backgroundColor = this.generateRandomReadableColor();
+        
         // Event listeners
         this.setupEventListeners();
     }
 
     private setupEventListeners(): void {
-        // Form submission
-        const form = document.getElementById('lot-form');
-        if (form) {
-            form.addEventListener('submit', (e) => {
+        // Inline add lot button (at bottom of lots table)
+        this.addBtn.addEventListener('click', () => this.addLot());
+        
+        // Allow Enter key to submit in name input
+        this.lotNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 this.addLot();
-            });
-        }
+            }
+        });
         
         // Spin button
         this.spinBtn.addEventListener('click', () => this.spin());
@@ -124,17 +136,32 @@ export class App {
     private addLot(): void {
         const name = this.lotNameInput.value.trim();
         const amount = parseFloat(this.lotAmountInput.value);
-        const color = this.lotColorInput.value;
+        const color = this.newLotColorIndicator.style.backgroundColor;
 
         if (!name || isNaN(amount)) return;
 
         this.lotManager.addLot(name, amount, color);
         
-        // Clear form
+        // Clear form and generate new random color for next lot
         this.lotNameInput.value = '';
         this.lotAmountInput.value = '1';
+        this.newLotColorIndicator.style.backgroundColor = this.generateRandomReadableColor();
+        
+        // Focus back on name input
+        this.lotNameInput.focus();
         
         this.updateUI();
+    }
+
+    /**
+     * Generates a random color with good contrast for white text.
+     * Uses HSL to ensure colors are dark enough (lightness 20-45%).
+     */
+    private generateRandomReadableColor(): string {
+        const hue = Math.floor(Math.random() * 360);
+        const saturation = Math.floor(Math.random() * 40) + 60; // 60-100%
+        const lightness = Math.floor(Math.random() * 25) + 20; // 20-45%
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
     }
 
     private spin(): void {
@@ -351,64 +378,57 @@ export class App {
             colorIndicator.className = 'lot-color-indicator';
             colorIndicator.style.backgroundColor = lot.color;
             
-            // Lot info
-            const lotInfo = document.createElement('div');
-            lotInfo.className = 'lot-info';
-            
-            const lotName = document.createElement('div');
+            // Lot name (non-editable)
+            const lotName = document.createElement('span');
             lotName.className = 'lot-name';
             lotName.textContent = lot.name;
+            lotName.style.flex = '1';
+            lotName.style.overflow = 'hidden';
+            lotName.style.textOverflow = 'ellipsis';
             
-            const lotAmount = document.createElement('div');
-            lotAmount.className = 'lot-amount';
-            lotAmount.textContent = `$${lot.amount.toFixed(2)} • ${lot.active ? 'Active' : 'Inactive'}`;
+            // Editable amount input
+            const amountInput = document.createElement('input');
+            amountInput.type = 'number';
+            amountInput.className = 'lot-amount-input';
+            amountInput.value = lot.amount.toFixed(2);
+            amountInput.min = '0.01';
+            amountInput.step = '0.01';
             
-            lotInfo.appendChild(lotName);
-            lotInfo.appendChild(lotAmount);
+            // Handle amount change with debounce
+            let debounceTimer: number | null = null;
+            amountInput.addEventListener('change', () => {
+                const newAmount = parseFloat(amountInput.value);
+                if (!isNaN(newAmount) && newAmount > 0) {
+                    this.lotManager.updateLot(lot.id, { amount: newAmount });
+                    // Re-render wheel to reflect weight changes
+                    this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+                    this.render();
+                } else {
+                    amountInput.value = lot.amount.toFixed(2);
+                }
+            });
             
-            // Actions
+            // Actions (delete only, no edit button needed)
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'lot-actions';
             
             if (lot.id !== this.highlightedLotId) {
-                const editBtn = document.createElement('button');
-                editBtn.className = 'btn-edit';
-                editBtn.textContent = 'Edit';
-                editBtn.onclick = () => this.editLot(lot.id);
-                
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn-delete';
-                deleteBtn.textContent = 'Delete';
+                deleteBtn.textContent = '×';
+                deleteBtn.style.padding = '6px 10px';
                 deleteBtn.onclick = () => this.deleteLot(lot.id);
                 
-                actionsDiv.appendChild(editBtn);
                 actionsDiv.appendChild(deleteBtn);
             }
             
             li.appendChild(colorIndicator);
-            li.appendChild(lotInfo);
+            li.appendChild(lotName);
+            li.appendChild(amountInput);
             li.appendChild(actionsDiv);
             
             this.lotsList.appendChild(li);
         }
-    }
-
-    private editLot(id: string): void {
-        const lot = this.lotManager.getLotById(id);
-        if (!lot) return;
-
-        const newName = prompt('Enter new name:', lot.name);
-        if (newName === null) return;
-
-        const newAmount = prompt(`Enter new amount (current: ${lot.amount}):`, lot.amount.toString());
-        if (newAmount === null) return;
-
-        this.lotManager.updateLot(id, {
-            name: newName,
-            amount: parseFloat(newAmount) || 1
-        });
-
-        this.updateUI();
     }
 
     private deleteLot(id: string): void {
