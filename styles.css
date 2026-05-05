@@ -125,13 +125,6 @@ h2 {
 /* ========================================
    STATS DISPLAY
    ======================================== */
-.stats {
-    display: flex;
-    justify-content: space-around;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
 .stat-item {
     padding: 15px;
 }
@@ -256,19 +249,6 @@ button:disabled {
     margin-right: 12px;
 }
 
-.lot-info {
-    flex: 1;
-}
-
-.lot-name {
-    font-weight: bold;
-}
-
-.lot-amount {
-    font-size: 0.85em;
-    opacity: 0.7;
-}
-
 /* Editable amount input */
 .lot-amount-input {
     width: 80px;
@@ -288,22 +268,9 @@ button:disabled {
 /* ========================================
    LOT ACTIONS (Edit/Delete Buttons)
    ======================================== */
-.lot-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.btn-edit, .btn-delete {
+.btn-delete {
     padding: 6px 12px;
     font-size: 0.8em;
-}
-
-.btn-edit {
-    background: #3498db;
-    color: white;
-}
-
-.btn-delete {
     background: #e74c3c;
     color: white;
 }
