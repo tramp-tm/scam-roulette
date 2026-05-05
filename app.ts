@@ -222,9 +222,32 @@ export class App {
         }
 
         const rotationToLog = finalRotation ?? this.renderer.getCurrentRotation();
-        console.group('Animation Debug Info');
-        console.log(`Final rotation value: ${rotationToLog.toFixed(6)} rad (${(rotationToLog * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Normalized final angle: ${(rotationToLog % (Math.PI * 2)).toFixed(6)} rad (${((rotationToLog % (Math.PI * 2)) * 180 / Math.PI).toFixed(2)}°)`);
+        console.group('✅ Animation Complete - Final State');
+        console.log(`Final rotation: ${rotationToLog.toFixed(6)} rad (${(rotationToLog * 180 / Math.PI).toFixed(2)}°)`);
+        console.log(`Normalized: ${(rotationToLog % (Math.PI * 2)).toFixed(6)} rad`);
+        
+        if (winner) {
+            // Calculate what angle should be under the pointer
+            const segments = RouletteEngine.calculateSegments(activeLots, this.settings.mode);
+            const winningSegment = segments.find(s => s.lot.id === winner.id);
+            
+            if (winningSegment) {
+                const segmentCenter = (winningSegment.startAngle + winningSegment.endAngle) / 2;
+                const angleUnderPointer = (segmentCenter + rotationToLog) % (Math.PI * 2);
+                const pointerAtTop = -Math.PI / 2;
+                
+                console.log(`\n🎯 Winner Verification:`);
+                console.log(`  Winning lot: "${winner.name}"`);
+                console.log(`  Segment center: ${segmentCenter.toFixed(6)} rad (${(segmentCenter * 180 / Math.PI).toFixed(2)}°)`);
+                console.log(`  Angle under pointer after rotation: ${angleUnderPointer.toFixed(6)} rad (${(angleUnderPointer * 180 / Math.PI).toFixed(2)}°)`);
+                console.log(`  Pointer position (top): ${pointerAtTop.toFixed(4)} rad or ${(pointerAtTop + Math.PI * 2).toFixed(4)} rad`);
+                
+                // Check if aligned (within tolerance)
+                const diff = Math.abs(((angleUnderPointer - pointerAtTop + Math.PI) % (Math.PI * 2)) - Math.PI);
+                console.log(`  Alignment error: ${diff.toFixed(6)} rad (${(diff * 180 / Math.PI).toFixed(4)}°)`);
+                console.log(`  Status: ${diff < 0.1 ? '✓ ALIGNED' : '✗ MISALIGNED'}`);
+            }
+        }
         console.groupEnd();
 
         // Unlock settings
