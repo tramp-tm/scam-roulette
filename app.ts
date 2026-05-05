@@ -26,6 +26,7 @@ export class App {
     private canvas: HTMLCanvasElement;
     private resultDisplay: HTMLElement | null = null;
     private resultText: HTMLElement | null = null;
+    private infoContainer: HTMLElement | null = null;
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     
@@ -55,6 +56,7 @@ export class App {
         this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
         this.resultDisplay = document.getElementById('result-display');
         this.resultText = document.getElementById('result-text');
+        this.infoContainer = document.getElementById('info-container') as HTMLElement;
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         
@@ -223,14 +225,14 @@ export class App {
             // Highlight the result
             this.highlightedLotId = winner.id;
             
-            // Show result display
+            // Show result display (info-container shows both result and stats)
             if (this.resultText) {
                 this.resultText.textContent = 
                     this.settings.mode === 'survival' 
                         ? `Eliminated: ${winner.name}`
                         : `Winner: ${winner.name}`;
             }
-            if (this.resultDisplay) this.resultDisplay.classList.remove('hidden');
+            if (this.infoContainer) this.infoContainer.classList.remove('hidden');
 
             // In survival mode, deactivate the eliminated lot
             if (this.settings.mode === 'survival') {
@@ -331,8 +333,8 @@ export class App {
         this.renderer.reset();
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
         
-        // Hide result display
-        if (this.resultDisplay) this.resultDisplay.classList.add('hidden');
+        // Hide result display (info-container)
+        if (this.infoContainer) this.infoContainer.classList.add('hidden');
         
         // Update UI
         this.updateUI();
