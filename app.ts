@@ -233,20 +233,38 @@ export class App {
             const winningSegment = segments.find(s => s.lot.id === winner.id);
             
             if (winningSegment) {
-                const segmentCenter = (winningSegment.startAngle + winningSegment.endAngle) / 2;
-                const angleUnderPointer = (segmentCenter + rotationToLog) % (Math.PI * 2);
+                // The wheel lands on a RANDOM POINT within the segment (not necessarily center)
+                // So we verify that SOME point in the segment is under the pointer
+                
+                const segmentStart = winningSegment.startAngle;
+                const segmentEnd = winningSegment.endAngle;
                 const pointerAtTop = -Math.PI / 2;
+                
+                // Calculate where the segment boundaries end up after rotation
+                let startUnderPointer = (segmentStart + rotationToLog) % (Math.PI * 2);
+                let endUnderPointer = (segmentEnd + rotationToLog) % (Math.PI * 2);
                 
                 console.log(`\n🎯 Winner Verification:`);
                 console.log(`  Winning lot: "${winner.name}"`);
-                console.log(`  Segment center: ${segmentCenter.toFixed(6)} rad (${(segmentCenter * 180 / Math.PI).toFixed(2)}°)`);
-                console.log(`  Angle under pointer after rotation: ${angleUnderPointer.toFixed(6)} rad (${(angleUnderPointer * 180 / Math.PI).toFixed(2)}°)`);
+                console.log(`  Segment range: ${segmentStart.toFixed(6)} to ${segmentEnd.toFixed(6)} rad`);
+                console.log(`  After rotation, segment spans: ${startUnderPointer.toFixed(6)} to ${endUnderPointer.toFixed(6)} rad`);
                 console.log(`  Pointer position (top): ${pointerAtTop.toFixed(4)} rad or ${(pointerAtTop + Math.PI * 2).toFixed(4)} rad`);
                 
-                // Check if aligned (within tolerance)
-                const diff = Math.abs(((angleUnderPointer - pointerAtTop + Math.PI) % (Math.PI * 2)) - Math.PI);
-                console.log(`  Alignment error: ${diff.toFixed(6)} rad (${(diff * 180 / Math.PI).toFixed(4)}°)`);
-                console.log(`  Status: ${diff < 0.1 ? '✓ ALIGNED' : '✗ MISALIGNED'}`);
+                // Check if pointer is within the segment range (handling wrap-around)
+                const normalizedPointer = ((pointerAtTop % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                const normalizedStart = ((startUnderPointer % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                const normalizedEnd = ((endUnderPointer % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                
+                let isAligned = false;
+                if (normalizedStart < normalizedEnd) {
+                    // No wrap-around case
+                    isAligned = normalizedPointer >= normalizedStart && normalizedPointer <= normalizedEnd;
+                } else {
+                    // Wrap-around case (segment crosses the 0/2π boundary)
+                    isAligned = normalizedPointer >= normalizedStart || normalizedPointer <= normalizedEnd;
+                }
+                
+                console.log(`  Status: ${isAligned ? '✓ ALIGNED (pointer within segment)' : '✗ MISALIGNED'}`);
             }
         }
         console.groupEnd();
