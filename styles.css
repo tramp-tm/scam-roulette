@@ -242,6 +242,31 @@ button:disabled {
     border: 1px dashed rgba(46, 204, 113, 0.5);
 }
 
+/* Add lot input fields */
+.add-lot-input {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.add-lot-amount {
+    width: 80px;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.add-lot-input:focus,
+.add-lot-amount:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .lot-color-indicator {
     width: 20px;
     height: 20px;

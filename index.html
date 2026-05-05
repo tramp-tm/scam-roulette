@@ -15,10 +15,10 @@
                 <ul id="lots-list"></ul>
                 
                 <!-- Add New Lot Row (inline at bottom of table) -->
-                <li id="add-lot-row" class="lot-item add-row">
+                <li class="lot-item add-row">
                     <div id="new-lot-color-indicator" class="lot-color-indicator"></div>
-                    <input type="text" id="new-lot-name" placeholder="Lot Name" style="flex: 1; padding: 8px; border: none; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;">
-                    <input type="number" id="new-lot-amount" placeholder="$" min="0.01" step="0.01" value="1" style="width: 80px; padding: 8px; border: none; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;">
+                    <input type="text" id="new-lot-name" placeholder="Lot Name" class="add-lot-input">
+                    <input type="number" id="new-lot-amount" placeholder="$" min="0.01" step="0.01" value="1" class="add-lot-amount">
                     <button id="add-lot-btn" class="btn-add">➕</button>
                 </li>
             </div>
@@ -85,14 +85,6 @@
                     <div class="slider-container">
                         <input type="range" id="duration-slider" min="1000" max="10000" step="500" value="3000">
                         <span id="duration-value" class="slider-value">3.0s</span>
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <label for="spins-slider">Number of Spins</label>
-                    <div class="slider-container">
-                        <input type="range" id="spins-slider" min="1" max="20" step="1" value="5">
-                        <span id="spins-value" class="slider-value">5</span>
                     </div>
                 </div>
             </div>
