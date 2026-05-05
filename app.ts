@@ -150,7 +150,10 @@ export class App {
         // Focus back on name input
         this.lotNameInput.focus();
         
+        // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.render();
     }
 
     /**
@@ -441,7 +444,10 @@ export class App {
             this.highlightedLotId = null;
         }
 
+        // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.render();
     }
 
     private render(): void {
