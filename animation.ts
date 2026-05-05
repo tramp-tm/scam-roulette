@@ -39,16 +39,13 @@ export const EasingFunctions = {
         t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
 
     /**
-     * Custom roulette easing - combines cubic with extra emphasis on final slowdown
+     * Custom roulette easing - smooth deceleration starting from halfway through
+     * Provides a natural wheel slowdown effect with extended tail
      */
     rouletteEaseOut: (t: number): number => {
-        // Use a combination that gives smooth deceleration without overshooting
-        const base = 1 - Math.pow(1 - t, 3);
-        // Apply additional decay only in the last portion without overshooting
-        if (t > 0.9) {
-            return base + (1 - t) * (1 - base) * 2;
-        }
-        return base;
+        // Use quintic ease out for dramatic, gradual slowdown
+        // This starts slowing down earlier and more smoothly than cubic
+        return 1 - Math.pow(1 - t, 5);
     }
 };
 
