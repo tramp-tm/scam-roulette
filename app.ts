@@ -27,6 +27,28 @@ export class App {
     private isSettingsLocked: boolean = false;
     private endRotation: number = 0;
 
+    /**
+     * Interface for lot data that can be rendered in a list.
+     * Supports both full Lot objects and ParsedLot from CSV import.
+     */
+    interface RenderableLot {
+        name: string;
+        amount: number;
+        id?: string;
+        color?: string;
+        active?: boolean;
+    }
+
+    /**
+     * Options for rendering a lots list.
+     */
+    interface LotsListRenderOptions {
+        showActions?: boolean;  // Show delete/edit buttons
+        highlightId?: string | null;  // ID of lot to highlight
+        editableAmount?: boolean;  // Whether amount input is editable
+        onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
+    }
+
     // DOM elements
     private canvas: HTMLCanvasElement;
     private resultDisplay: HTMLElement | null = null;
@@ -394,20 +416,42 @@ export class App {
         });
     }
 
-    private renderLotsList(): void {
-        this.lotsList.innerHTML = '';
-        
-        const lots = this.lotManager.getAllLots();
-        
+    /**
+     * Renders a list of lots into the specified container element.
+     * Reusable for both main lots list and import preview.
+     * 
+     * @param container - The UL element to render into
+     * @param lots - Array of lot data objects (Lot or ParsedLot)
+     * @param options - Rendering options
+     */
+    private renderLotsListToContainer(
+        container: HTMLUListElement,
+        lots: App.RenderableLot[],
+        options: App.LotsListRenderOptions = {}
+    ): void {
+        const {
+            showActions = false,
+            highlightId = null,
+            editableAmount = true,
+            onAmountChange
+        } = options;
+
+        container.innerHTML = '';
+
         for (const lot of lots) {
             const li = document.createElement('li');
-            li.className = `lot-item ${lot.active ? '' : 'inactive'} ${lot.id === this.highlightedLotId ? 'highlighted' : ''}`;
             
-            // Color indicator
+            // Build class name with conditional classes
+            const classNameParts: string[] = ['lot-item'];
+            if (!lot.active) classNameParts.push('inactive');
+            if (lot.id === highlightId) classNameParts.push('highlighted');
+            li.className = classNameParts.join(' ');
+
+            // Color indicator (use default color if not provided)
             const colorIndicator = document.createElement('div');
             colorIndicator.className = 'lot-color-indicator';
-            colorIndicator.style.backgroundColor = lot.color;
-            
+            colorIndicator.style.backgroundColor = lot.color || '#888';
+
             // Lot name (non-editable)
             const lotName = document.createElement('span');
             lotName.className = 'lot-name';
@@ -415,50 +459,73 @@ export class App {
             lotName.style.flex = '1';
             lotName.style.overflow = 'hidden';
             lotName.style.textOverflow = 'ellipsis';
-            
-            // Editable amount input
+
+            // Amount input (editable or read-only based on options)
             const amountInput = document.createElement('input');
             amountInput.type = 'number';
             amountInput.className = 'lot-amount-input';
             amountInput.value = lot.amount.toFixed(2);
             amountInput.min = '0.01';
             amountInput.step = '0.01';
-            
-            // Handle amount change with debounce
-            let debounceTimer: number | null = null;
-            amountInput.addEventListener('change', () => {
-                const newAmount = parseFloat(amountInput.value);
-                if (!isNaN(newAmount) && newAmount > 0) {
-                    this.lotManager.updateLot(lot.id, { amount: newAmount });
-                    // Re-render wheel to reflect weight changes
-                    this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
-                    this.render();
-                } else {
-                    amountInput.value = lot.amount.toFixed(2);
-                }
-            });
-            
-            // Actions (delete only, no edit button needed)
-            const actionsDiv = document.createElement('div');
-            actionsDiv.className = 'lot-actions';
-            
-            if (lot.id !== this.highlightedLotId) {
+
+            if (!editableAmount) {
+                amountInput.disabled = true;
+            } else if (onAmountChange && lot.id) {
+                // Handle amount change with callback
+                let debounceTimer: number | null = null;
+                amountInput.addEventListener('change', () => {
+                    const newAmount = parseFloat(amountInput.value);
+                    if (!isNaN(newAmount) && newAmount > 0) {
+                        onAmountChange(lot.id, newAmount);
+                    } else {
+                        amountInput.value = lot.amount.toFixed(2);
+                    }
+                });
+            }
+
+            // Actions (delete button only if showActions is true and not highlighted)
+            if (showActions && lot.id !== highlightId) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'lot-actions';
+
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn-delete';
                 deleteBtn.textContent = '×';
                 deleteBtn.style.padding = '6px 10px';
-                deleteBtn.onclick = () => this.deleteLot(lot.id);
                 
+                // Store lot id for deletion callback
+                if (lot.id) {
+                    deleteBtn.onclick = () => this.deleteLot(lot.id);
+                }
+
                 actionsDiv.appendChild(deleteBtn);
+                li.appendChild(actionsDiv);
             }
-            
+
+            // Append all elements to list item
             li.appendChild(colorIndicator);
             li.appendChild(lotName);
             li.appendChild(amountInput);
-            li.appendChild(actionsDiv);
-            
-            this.lotsList.appendChild(li);
+
+            container.appendChild(li);
         }
+    }
+
+    private renderLotsList(): void {
+        const lots = this.lotManager.getAllLots();
+        
+        // Use the reusable rendering method with default options for main lots list
+        this.renderLotsListToContainer(this.lotsList, lots, {
+            showActions: true,
+            highlightId: this.highlightedLotId,
+            editableAmount: true,
+            onAmountChange: (id: string, newAmount: number) => {
+                this.lotManager.updateLot(id, { amount: newAmount });
+                // Re-render wheel to reflect weight changes
+                this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+                this.render();
+            }
+        });
     }
 
     private deleteLot(id: string): void {
