@@ -268,62 +268,10 @@ export class App {
             this.updateUI();
         }
 
-        const rotationToLog = finalRotation ?? this.renderer.getCurrentRotation();
-        console.group('✅ Animation Complete - Final State');
-        console.log(`Final rotation: ${rotationToLog.toFixed(6)} rad (${(rotationToLog * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Normalized: ${(rotationToLog % (Math.PI * 2)).toFixed(6)} rad`);
-        
         if (winner) {
-            // Calculate what angle should be under the pointer
-            const activeLots = this.lotManager.getActiveLots();
-            const segments = RouletteEngine.calculateSegments(activeLots, this.modeConfig);
-            const winningSegment = segments.find(s => s.lot.id === winner.id);
-            
-            if (winningSegment) {
-                // The wheel lands on a RANDOM POINT within the segment (not necessarily center)
-                // So we verify that SOME point in the segment is under the pointer
-                
-                const segmentStart = winningSegment.startAngle;
-                const segmentEnd = winningSegment.endAngle;
-                const pointerAtTop = -Math.PI / 2;
-                
-                console.log(`\n🎯 Winner Verification:`);
-                console.log(`  Winning lot: "${winner.name}"`);
-                console.log(`  Segment range: ${segmentStart.toFixed(6)} to ${segmentEnd.toFixed(6)} rad`);
-                
-                // SPECIAL CASE: If segment covers entire wheel (single lot or full circle), always aligned
-                const segmentSpan = (segmentEnd - segmentStart + Math.PI * 2) % (Math.PI * 2);
-                if (segmentSpan < 0.001 || activeLots.length === 1) {
-                    console.log(`  Segment covers entire wheel (${((segmentSpan / Math.PI * 2) * 360).toFixed(2)}° span)`);
-                    console.log(`  Pointer position (top): ${pointerAtTop.toFixed(4)} rad or ${(pointerAtTop + Math.PI * 2).toFixed(4)} rad`);
-                    console.log(`  Status: ✓ ALIGNED (segment covers entire wheel - pointer must be within it)`);
-                } else {
-                    // Calculate where the segment boundaries end up after rotation
-                    let startUnderPointer = (segmentStart + rotationToLog) % (Math.PI * 2);
-                    let endUnderPointer = (segmentEnd + rotationToLog) % (Math.PI * 2);
-                    
-                    console.log(`  After rotation, segment spans: ${startUnderPointer.toFixed(6)} to ${endUnderPointer.toFixed(6)} rad`);
-                    console.log(`  Pointer position (top): ${pointerAtTop.toFixed(4)} rad or ${(pointerAtTop + Math.PI * 2).toFixed(4)} rad`);
-                    
-                    // Check if pointer is within the segment range (handling wrap-around)
-                    const normalizedPointer = ((pointerAtTop % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-                    const normalizedStart = ((startUnderPointer % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-                    const normalizedEnd = ((endUnderPointer % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-                    
-                    let isAligned = false;
-                    if (normalizedStart < normalizedEnd) {
-                        // No wrap-around case
-                        isAligned = normalizedPointer >= normalizedStart && normalizedPointer <= normalizedEnd;
-                    } else {
-                        // Wrap-around case (segment crosses the 0/2π boundary)
-                        isAligned = normalizedPointer >= normalizedStart || normalizedPointer <= normalizedEnd;
-                    }
-                    
-                    console.log(`  Status: ${isAligned ? '✓ ALIGNED (pointer within segment)' : '✗ MISALIGNED'}`);
-                }
-            }
+            const action = this.settings.modeId === 'survival' ? 'Eliminated' : 'Winning';
+            console.log(`${action} lot: "${winner.name}"`);
         }
-        console.groupEnd();
 
         // Unlock settings
         this.isSettingsLocked = false;
