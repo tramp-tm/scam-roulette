@@ -35,6 +35,7 @@ export class App {
     private infoContainer: HTMLElement | null = null;
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
+    private importBtnControls: HTMLButtonElement;
     
     // Lots list elements
     private lotsList: HTMLUListElement;
@@ -65,6 +66,7 @@ export class App {
         this.infoContainer = document.getElementById('info-container') as HTMLElement;
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+        this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
         
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -125,6 +127,14 @@ export class App {
         
         // Reset button
         this.resetBtn.addEventListener('click', () => this.reset());
+        
+        // Import button - opens import dialog
+        this.importBtnControls.addEventListener('click', () => {
+            const importDialog = document.getElementById('import-dialog') as HTMLElement;
+            if (importDialog) {
+                importDialog.classList.remove('hidden');
+            }
+        });
         
         // Settings changes
         this.modeSelect?.addEventListener('change', (e) => {
@@ -322,6 +332,7 @@ export class App {
         
         if (this.spinBtn) this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
         if (this.resetBtn) this.resetBtn.disabled = isAnimating;
+        if (this.importBtnControls) this.importBtnControls.disabled = isAnimating;
         
         // Disable form inputs when locked
         const formInputs = document.querySelectorAll('#lot-form input');
