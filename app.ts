@@ -2,8 +2,9 @@ import { LotManager } from './lotManager.js';
 import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions } from './types.js';
+import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType } from './types.js';
 import { generateRandomReadableColor } from './utils.js';
+import { parseCSV } from './csvParser.js';
 
 /**
  * Main application controller for the roulette game.
@@ -43,6 +44,19 @@ export class App {
     private csvTabContent: Element | null = null;
     private linkTabContent: Element | null = null;
     
+    // Import dialog input/output elements
+    private importTextarea: HTMLTextAreaElement | null = null;
+    private separatorSelect: HTMLSelectElement | null = null;
+    private previewBtn: HTMLButtonElement | null = null;
+    private importStatus: HTMLElement | null = null;
+    private validCountSpan: HTMLElement | null = null;
+    private errorCountSpan: HTMLElement | null = null;
+    private previewContainer: HTMLElement | null = null;
+    private previewLotsList: HTMLUListElement | null = null;
+    
+    // Store parsed result for import
+    private parsedResult: ParseResult | null = null;
+    
     // Lots list elements
     private lotsList: HTMLUListElement;
     
@@ -79,6 +93,16 @@ export class App {
         this.tabButtons = document.querySelectorAll('.tab-button');
         this.csvTabContent = document.getElementById('tab-csv');
         this.linkTabContent = document.getElementById('tab-link');
+        
+        // Import dialog input/output elements
+        this.importTextarea = document.getElementById('import-textarea') as HTMLTextAreaElement;
+        this.separatorSelect = document.getElementById('separator-select') as HTMLSelectElement;
+        this.previewBtn = document.getElementById('preview-btn') as HTMLButtonElement;
+        this.importStatus = document.getElementById('import-status');
+        this.validCountSpan = document.getElementById('valid-count');
+        this.errorCountSpan = document.getElementById('error-count');
+        this.previewContainer = document.getElementById('preview-container');
+        this.previewLotsList = document.getElementById('preview-lots-list') as HTMLUListElement;
         
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -169,6 +193,45 @@ export class App {
                     }
                 }
             });
+        });
+        
+        // Preview button - parses CSV and shows preview
+        this.previewBtn?.addEventListener('click', () => {
+            if (!this.importTextarea || !this.separatorSelect) return;
+            
+            const csvText = this.importTextarea.value;
+            const separator: SeparatorType = this.separatorSelect.value === 'tab' ? 'tab' : 'comma';
+            
+            // Parse CSV text
+            this.parsedResult = parseCSV(csvText, separator);
+            
+            // Update status line
+            if (this.importStatus && this.validCountSpan && this.errorCountSpan) {
+                this.validCountSpan.textContent = `${this.parsedResult.validLots.length}`;
+                this.errorCountSpan.textContent = `${this.parsedResult.errorCount}`;
+                this.importStatus.classList.remove('hidden');
+            }
+            
+            // Render preview if there are valid lots
+            if (this.previewContainer && this.previewLotsList) {
+                if (this.parsedResult.validLots.length > 0) {
+                    // Generate random colors for preview lots
+                    const previewLots: ParsedLot[] = this.parsedResult.validLots.map(lot => ({
+                        ...lot,
+                        color: generateRandomReadableColor()
+                    }));
+                    
+                    // Render to preview area using reusable method
+                    this.renderLotsListToContainer(this.previewLotsList, previewLots, {
+                        showActions: false,
+                        editableAmount: false
+                    });
+                    
+                    this.previewContainer.classList.remove('hidden');
+                } else {
+                    this.previewContainer.classList.add('hidden');
+                }
+            }
         });
         
         // Settings changes
