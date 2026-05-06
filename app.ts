@@ -473,7 +473,8 @@ export class App {
                 
                 // Store lot id for deletion callback
                 if (lot.id) {
-                    deleteBtn.onclick = () => this.deleteLot(lot.id);
+                    const lotId = lot.id; // Capture the value to avoid undefined in closure
+                    deleteBtn.onclick = () => this.deleteLot(lotId);
                 }
 
                 actionsDiv.appendChild(deleteBtn);
@@ -498,6 +499,7 @@ export class App {
             highlightId: this.highlightedLotId,
             editableAmount: true,
             onAmountChange: (id: string, newAmount: number) => {
+                if (!id) return; // Safety check for undefined id
                 this.lotManager.updateLot(id, { amount: newAmount });
                 // Re-render wheel to reflect weight changes
                 this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
