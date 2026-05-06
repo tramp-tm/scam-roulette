@@ -37,6 +37,12 @@ export class App {
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
     
+    // Import dialog elements
+    private importDialog: HTMLElement | null = null;
+    private tabButtons: NodeListOf<Element> | null = null;
+    private csvTabContent: Element | null = null;
+    private linkTabContent: Element | null = null;
+    
     // Lots list elements
     private lotsList: HTMLUListElement;
     
@@ -67,6 +73,12 @@ export class App {
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
+        
+        // Import dialog elements
+        this.importDialog = document.getElementById('import-dialog');
+        this.tabButtons = document.querySelectorAll('.tab-button');
+        this.csvTabContent = document.getElementById('tab-csv');
+        this.linkTabContent = document.getElementById('tab-link');
         
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -134,6 +146,29 @@ export class App {
             if (importDialog) {
                 importDialog.classList.remove('hidden');
             }
+        });
+        
+        // Tab switching logic for import dialog
+        this.tabButtons?.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = (button as HTMLElement).dataset.tab;
+                if (!targetTab) return;
+                
+                // Update active tab button styling
+                this.tabButtons?.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Show corresponding tab content
+                if (this.csvTabContent && this.linkTabContent) {
+                    if (targetTab === 'csv') {
+                        this.csvTabContent.classList.add('active');
+                        this.linkTabContent.classList.remove('active');
+                    } else if (targetTab === 'link') {
+                        this.linkTabContent.classList.add('active');
+                        this.csvTabContent.classList.remove('active');
+                    }
+                }
+            });
         });
         
         // Settings changes
