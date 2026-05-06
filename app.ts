@@ -3,6 +3,7 @@ import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
 import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions } from './types.js';
+import { generateRandomReadableColor } from './utils.js';
 
 /**
  * Main application controller for the roulette game.
@@ -87,7 +88,7 @@ export class App {
         this.updateUI();
         
         // Set initial random color for new lot indicator
-        this.newLotColorIndicator.style.backgroundColor = this.generateRandomReadableColor();
+        this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
         
         // Update result display with current mode name initially
         if (this.resultText) {
@@ -170,7 +171,7 @@ export class App {
         // Clear form and generate new random color for next lot
         this.lotNameInput.value = '';
         this.lotAmountInput.value = '1';
-        this.newLotColorIndicator.style.backgroundColor = this.generateRandomReadableColor();
+        this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
         
         // Focus back on name input
         this.lotNameInput.focus();
@@ -179,17 +180,6 @@ export class App {
         this.updateUI();
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
-    }
-
-    /**
-     * Generates a random color with good contrast for white text.
-     * Uses HSL to ensure colors are dark enough (lightness 20-45%).
-     */
-    private generateRandomReadableColor(): string {
-        const hue = Math.floor(Math.random() * 360);
-        const saturation = Math.floor(Math.random() * 40) + 60; // 60-100%
-        const lightness = Math.floor(Math.random() * 25) + 20; // 20-45%
-        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
     }
 
     private spin(): void {
