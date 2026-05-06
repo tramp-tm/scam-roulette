@@ -1,4 +1,4 @@
-import { Lot, Mode } from './types';
+import { Lot, ModeConfig, getModeConfig } from './types';
 
 /**
  * Core roulette engine that handles weighted random selection.
@@ -8,33 +8,16 @@ import { Lot, Mode } from './types';
  */
 export class RouletteEngine {
     /**
-     * Calculates the weight for a lot based on the mode.
-     * 
-     * Normal mode: weight = amount
-     * Survival mode: weight = 1 / amount (inverse - lower amounts have higher chance)
+     * Performs weighted random selection using cumulative distribution approach.
+     * Uses mode-specific weight calculation from ModeConfig.
      */
-    static calculateWeight(lot: Lot, mode: Mode): number {
-        if (mode === 'survival') {
-            // In survival mode, lots with smaller amounts have higher probability of being eliminated
-            return 1 / lot.amount;
-        }
-        // Normal mode: weight equals amount
-        return lot.amount;
-    }
-
-    /**
-     * Performs weighted random selection using the alias method for O(1) selection.
-     * 
-     * This implementation uses a simple but correct cumulative distribution approach
-     * that guarantees proper probability distribution without bias.
-     */
-    static selectWeighted(lots: Lot[], mode: Mode): Lot | null {
+    static selectWeighted(lots: Lot[], modeConfig: ModeConfig): Lot | null {
         if (lots.length === 0) return null;
         
-        // Calculate weights for all lots
+        // Calculate weights for all lots using mode's calculateWeight function
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: this.calculateWeight(lot, mode)
+            weight: modeConfig.calculateWeight(lot, lots)
         }));
 
         // Calculate total weight
@@ -63,12 +46,12 @@ export class RouletteEngine {
      */
     static getSegmentCenterAngle(
         lots: Lot[], 
-        mode: Mode, 
+        modeConfig: ModeConfig, 
         targetLotId: string
     ): number {
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: this.calculateWeight(lot, mode)
+            weight: modeConfig.calculateWeight(lot, lots)
         }));
 
         const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
@@ -96,10 +79,10 @@ export class RouletteEngine {
     /**
      * Calculates all segments for rendering.
      */
-    static calculateSegments(lots: Lot[], mode: Mode): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {
+    static calculateSegments(lots: Lot[], modeConfig: ModeConfig): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: this.calculateWeight(lot, mode)
+            weight: modeConfig.calculateWeight(lot, lots)
         }));
 
         const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
@@ -137,12 +120,12 @@ export class RouletteEngine {
      */
     static computeFinalRotation(
         lots: Lot[],
-        mode: Mode,
+        modeConfig: ModeConfig,
         targetLotId: string,
         currentRotation: number,
         animationDurationMs: number
     ): number {
-        const segments = this.calculateSegments(lots, mode);
+        const segments = this.calculateSegments(lots, modeConfig);
         
         // Find winning segment
         const segment = segments.find(s => s.lot.id === targetLotId);
@@ -228,12 +211,5 @@ export class RouletteEngine {
      */
     static canSpin(activeLots: Lot[]): boolean {
         return activeLots.length >= 1;
-    }
-
-    /**
-     * Checks if survival mode is complete (only one lot remains).
-     */
-    static isSurvivalComplete(activeLots: Lot[], totalLots: number): boolean {
-        return activeLots.length === 1 && totalLots > 1;
     }
 }

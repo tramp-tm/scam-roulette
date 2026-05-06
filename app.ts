@@ -2,7 +2,7 @@ import { LotManager } from './lotManager.js';
 import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { Settings, Mode, VisualizationType, AppState, Lot } from './types.js';
+import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES } from './types.js';
 
 /**
  * Main application controller for the roulette game.
@@ -13,10 +13,15 @@ export class App {
     private animationController: AnimationController;
     
     private settings: Settings = {
-        mode: 'normal',
+        modeId: 'normal',
         visualization: 'wheel',
         animationDuration: 3000
     };
+    
+    // Get current mode config (cached for performance)
+    get modeConfig(): ModeConfig {
+        return getModeConfig(this.settings.modeId);
+    }
     
     private highlightedLotId: string | null = null;
     private isSettingsLocked: boolean = false;
@@ -109,8 +114,10 @@ export class App {
         // Settings changes
         this.modeSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
-            this.settings.mode = target.value as Mode;
-            this.updateUI();
+            this.settings.modeId = target.value as Mode;
+            // Re-render wheel with new mode's weight calculation
+            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+            this.render();
         });
         
         this.visualizationSelect?.addEventListener('change', (e) => {
@@ -154,7 +161,7 @@ export class App {
         
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
     }
 
@@ -181,8 +188,8 @@ export class App {
         this.isSettingsLocked = true;
         this.updateControlsState();
         
-        // Select winner
-        const winner = RouletteEngine.selectWeighted(activeLots, this.settings.mode);
+        // Select winner using mode's weight calculation
+        const winner = RouletteEngine.selectWeighted(activeLots, this.modeConfig);
         if (!winner) return;
 
         // Calculate final rotation
@@ -192,7 +199,7 @@ export class App {
         
         this.endRotation = RouletteEngine.computeFinalRotation(
             activeLots,
-            this.settings.mode,
+            this.modeConfig,
             targetLotId,
             currentRotation,
             animationDuration
@@ -225,26 +232,28 @@ export class App {
             // Highlight the result
             this.highlightedLotId = winner.id;
             
-            // Show result display (info-container shows both result and stats)
+            // Show result display using mode's getResultText function
             if (this.resultText) {
-                this.resultText.textContent = 
-                    this.settings.mode === 'survival' 
-                        ? `Eliminated: ${winner.name}`
-                        : `Winner: ${winner.name}`;
+                this.resultText.textContent = this.modeConfig.getResultText(winner);
             }
             if (this.infoContainer) this.infoContainer.classList.remove('hidden');
 
-            // In survival mode, deactivate the eliminated lot
-            if (this.settings.mode === 'survival') {
-                this.lotManager.deactivateLot(winner.id);
+            // Call mode-specific onRollEnd hook if defined
+            const activeLots = this.lotManager.getActiveLots();
+            if (this.modeConfig.onRollEnd) {
+                const rollResult = this.modeConfig.onRollEnd(winner, activeLots, this.lotManager.getTotalCount());
                 
-                // Check if survival is complete
-                const activeLots = this.lotManager.getActiveLots();
-                if (RouletteEngine.isSurvivalComplete(activeLots, this.lotManager.getTotalCount())) {
-                    const survivor = activeLots[0];
+                // Handle lot elimination (e.g., survival mode)
+                if (rollResult.eliminatedLotId) {
+                    this.lotManager.deactivateLot(rollResult.eliminatedLotId);
+                }
+                
+                // Check for completion
+                if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
-                        alert(`🏆 SURVIVAL COMPLETE! 🏆\n\nThe last lot standing is:\n${survivor.name}`);
-                        this.highlightedLotId = survivor.id;
+                        alert(rollResult.completionMessage);
+                        const survivor = activeLots.find(l => l.id !== winner.id);
+                        this.highlightedLotId = survivor?.id || null;
                     }, 500);
                 }
             }
@@ -261,7 +270,7 @@ export class App {
         if (winner) {
             // Calculate what angle should be under the pointer
             const activeLots = this.lotManager.getActiveLots();
-            const segments = RouletteEngine.calculateSegments(activeLots, this.settings.mode);
+            const segments = RouletteEngine.calculateSegments(activeLots, this.modeConfig);
             const winningSegment = segments.find(s => s.lot.id === winner.id);
             
             if (winningSegment) {
@@ -315,7 +324,7 @@ export class App {
         this.updateControlsState();
         
         // Re-render with updated state
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
     }
 
@@ -331,7 +340,7 @@ export class App {
         
         // Reset renderer
         this.renderer.reset();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         
         // Hide result display (info-container)
         if (this.infoContainer) this.infoContainer.classList.add('hidden');
@@ -406,7 +415,7 @@ export class App {
                 if (!isNaN(newAmount) && newAmount > 0) {
                     this.lotManager.updateLot(lot.id, { amount: newAmount });
                     // Re-render wheel to reflect weight changes
-                    this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+                    this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
                     this.render();
                 } else {
                     amountInput.value = lot.amount.toFixed(2);
@@ -448,7 +457,7 @@ export class App {
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.settings.mode);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
     }
 

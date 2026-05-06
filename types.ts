@@ -7,6 +7,63 @@ export interface Lot {
     active: boolean;
 }
 
+// Mode configuration interface - encapsulates all mode-specific behavior
+export interface ModeConfig {
+    id: Mode;
+    name: string;
+    description: string;
+    /** Calculates weight for a lot in this mode */
+    calculateWeight: (lot: Lot, allLots: Lot[]) => number;
+    /** Generates the result text shown after a roll */
+    getResultText: (winner: Lot) => string;
+    /** Optional hook called after each roll completes (for survival elimination, etc.) */
+    onRollEnd?: (winner: Lot, activeLots: Lot[], totalLots: number) => {
+        eliminatedLotId?: string;
+        isComplete?: boolean;
+        completionMessage?: string;
+    };
+}
+
+// Mode configurations - all mode logic lives here
+export const MODES = {
+    normal: {
+        id: 'normal',
+        name: 'Normal',
+        description: 'Higher amount = Higher chance to win',
+        calculateWeight: (lot) => lot.amount,
+        getResultText: (winner) => `Winner: ${winner.name}`,
+    },
+    survival: {
+        id: 'survival',
+        name: 'Survival',
+        description: 'Lower amount = Higher chance to be eliminated',
+        calculateWeight: (lot) => 1 / lot.amount,
+        getResultText: (winner) => `Eliminated: ${winner.name}`,
+        onRollEnd: (winner, activeLots, totalLots) => {
+            // In survival mode, the "winner" is actually eliminated
+            const result = {
+                eliminatedLotId: winner.id,
+                isComplete: false as boolean,
+                completionMessage: '' as string
+            };
+            
+            // Check if only one lot remains (survival complete)
+            if (activeLots.length === 1 && totalLots > 1) {
+                result.isComplete = true;
+                const survivor = activeLots.find(l => l.id !== winner.id);
+                result.completionMessage = `🏆 SURVIVAL COMPLETE! 🏆\n\nThe last lot standing is:\n${survivor?.name}`;
+            }
+            
+            return result;
+        },
+    },
+};
+
+// Helper to get mode config by ID
+export function getModeConfig(modeId: Mode): ModeConfig {
+    return MODES[modeId];
+}
+
 // Application modes
 export type Mode = 'normal' | 'survival';
 
@@ -15,7 +72,7 @@ export type VisualizationType = 'wheel' | 'strip';
 
 // Settings interface
 export interface Settings {
-    mode: Mode;
+    modeId: Mode;  // Changed from 'mode' to 'modeId' for clarity
     visualization: VisualizationType;
     animationDuration: number; // in milliseconds
 }

@@ -1,4 +1,4 @@
-import { Lot, Segment, VisualizationType } from './types.js';
+import { Lot, Segment, VisualizationType, ModeConfig } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 
 /**
@@ -66,8 +66,8 @@ export class Renderer {
     /**
      * Updates the segments to render.
      */
-    updateSegments(lots: Lot[], mode: 'normal' | 'survival'): void {
-        this.segments = RouletteEngine.calculateSegments(lots, mode);
+    updateSegments(lots: Lot[], modeConfig: ModeConfig): void {
+        this.segments = RouletteEngine.calculateSegments(lots, modeConfig);
     }
 
     /**
