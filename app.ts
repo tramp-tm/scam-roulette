@@ -473,7 +473,7 @@ export class App {
                 
                 // Store lot id for deletion callback
                 if (lot.id) {
-                    const lotId = lot.id; // Capture the value to avoid undefined in closure
+                    const lotId: string = lot.id; // Explicitly typed - guaranteed non-undefined here
                     deleteBtn.onclick = () => this.deleteLot(lotId);
                 }
 
