@@ -25,21 +25,21 @@ export interface ModeConfig {
 }
 
 // Mode configurations - all mode logic lives here
-export const MODES = {
+export const MODES: Record<Mode, ModeConfig> = {
     normal: {
         id: 'normal',
         name: 'Normal',
         description: 'Higher amount = Higher chance to win',
-        calculateWeight: (lot) => lot.amount,
-        getResultText: (winner) => `Winner: ${winner.name}`,
+        calculateWeight: (lot: Lot) => lot.amount,
+        getResultText: (winner: Lot) => `Winner: ${winner.name}`,
     },
     survival: {
         id: 'survival',
         name: 'Survival',
         description: 'Lower amount = Higher chance to be eliminated',
-        calculateWeight: (lot) => 1 / lot.amount,
-        getResultText: (winner) => `Eliminated: ${winner.name}`,
-        onRollEnd: (winner, activeLots, totalLots) => {
+        calculateWeight: (lot: Lot) => 1 / lot.amount,
+        getResultText: (winner: Lot) => `Eliminated: ${winner.name}`,
+        onRollEnd: (winner: Lot, activeLots: Lot[], totalLots: number) => {
             // In survival mode, the "winner" is actually eliminated
             const result = {
                 eliminatedLotId: winner.id,
@@ -50,7 +50,7 @@ export const MODES = {
             // Check if only one lot remains (survival complete)
             if (activeLots.length === 1 && totalLots > 1) {
                 result.isComplete = true;
-                const survivor = activeLots.find(l => l.id !== winner.id);
+                const survivor = activeLots.find((l: Lot) => l.id !== winner.id);
                 result.completionMessage = `🏆 SURVIVAL COMPLETE! 🏆\n\nThe last lot standing is:\n${survivor?.name}`;
             }
             
