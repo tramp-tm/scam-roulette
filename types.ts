@@ -103,3 +103,34 @@ export interface Segment {
 
 // Easing function type
 export type EasingFunction = (t: number) => number;
+
+// ========================================
+// IMPORT FEATURE TYPES
+// ========================================
+
+/**
+ * Separator types for CSV import parsing.
+ */
+export type SeparatorType = 'comma' | 'tab';
+
+/**
+ * Represents a lot parsed from CSV input (before being added to the application).
+ */
+export interface ParsedLot {
+    name: string;
+    amount: number;
+}
+
+/**
+ * Result of parsing CSV text.
+ * Contains valid lots that can be imported and count of error rows.
+ */
+export interface ParseResult {
+    validLots: ParsedLot[];
+    errorCount: number;
+}
+
+/**
+ * Strategy for handling conflicts when importing lots into an existing collection.
+ */
+export type ImportStrategy = 'replace' | 'merge' | 'cancel';
