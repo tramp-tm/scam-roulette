@@ -89,8 +89,22 @@ export class App {
         // Set initial random color for new lot indicator
         this.newLotColorIndicator.style.backgroundColor = this.generateRandomReadableColor();
         
+        // Update result display with current mode name initially
+        if (this.resultText) {
+            this.updateResultTextWithModeName();
+        }
+        
         // Event listeners
         this.setupEventListeners();
+    }
+
+    /**
+     * Updates result text to show current mode name when no winner is highlighted.
+     */
+    private updateResultTextWithModeName(): void {
+        if (this.resultText && !this.highlightedLotId) {
+            this.resultText.textContent = this.modeConfig.name;
+        }
     }
 
     private setupEventListeners(): void {
@@ -118,6 +132,8 @@ export class App {
             // Re-render wheel with new mode's weight calculation
             this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
             this.render();
+            // Update result text to show new mode name if no winner highlighted
+            this.updateResultTextWithModeName();
         });
         
         this.visualizationSelect?.addEventListener('change', (e) => {
@@ -342,8 +358,8 @@ export class App {
         this.renderer.reset();
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         
-        // Hide result display (info-container)
-        if (this.infoContainer) this.infoContainer.classList.add('hidden');
+        // Update result text to show mode name after reset
+        this.updateResultTextWithModeName();
         
         // Update UI
         this.updateUI();
