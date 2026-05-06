@@ -5,6 +5,28 @@ import { AnimationController, EasingFunctions } from './animation.js';
 import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES } from './types.js';
 
 /**
+ * Interface for lot data that can be rendered in a list.
+ * Supports both full Lot objects and ParsedLot from CSV import.
+ */
+interface RenderableLot {
+    name: string;
+    amount: number;
+    id?: string;
+    color?: string;
+    active?: boolean;
+}
+
+/**
+ * Options for rendering a lots list.
+ */
+interface LotsListRenderOptions {
+    showActions?: boolean;  // Show delete/edit buttons
+    highlightId?: string | null;  // ID of lot to highlight
+    editableAmount?: boolean;  // Whether amount input is editable
+    onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
+}
+
+/**
  * Main application controller for the roulette game.
  */
 export class App {
@@ -26,28 +48,6 @@ export class App {
     private highlightedLotId: string | null = null;
     private isSettingsLocked: boolean = false;
     private endRotation: number = 0;
-
-    /**
-     * Interface for lot data that can be rendered in a list.
-     * Supports both full Lot objects and ParsedLot from CSV import.
-     */
-    interface RenderableLot {
-        name: string;
-        amount: number;
-        id?: string;
-        color?: string;
-        active?: boolean;
-    }
-
-    /**
-     * Options for rendering a lots list.
-     */
-    interface LotsListRenderOptions {
-        showActions?: boolean;  // Show delete/edit buttons
-        highlightId?: string | null;  // ID of lot to highlight
-        editableAmount?: boolean;  // Whether amount input is editable
-        onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
-    }
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -426,8 +426,8 @@ export class App {
      */
     private renderLotsListToContainer(
         container: HTMLUListElement,
-        lots: App.RenderableLot[],
-        options: App.LotsListRenderOptions = {}
+        lots: RenderableLot[],
+        options: LotsListRenderOptions = {}
     ): void {
         const {
             showActions = false,
