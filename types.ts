@@ -134,3 +134,29 @@ export interface ParseResult {
  * Strategy for handling conflicts when importing lots into an existing collection.
  */
 export type ImportStrategy = 'replace' | 'merge' | 'cancel';
+
+// ========================================
+// UI RENDERING TYPES
+// ========================================
+
+/**
+ * Interface for lot data that can be rendered in a list.
+ * Supports both full Lot objects and ParsedLot from CSV import.
+ */
+export interface RenderableLot {
+    name: string;
+    amount: number;
+    id?: string;
+    color?: string;
+    active?: boolean;
+}
+
+/**
+ * Options for rendering a lots list.
+ */
+export interface LotsListRenderOptions {
+    showActions?: boolean;  // Show delete/edit buttons
+    highlightId?: string | null;  // ID of lot to highlight
+    editableAmount?: boolean;  // Whether amount input is editable
+    onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
+}

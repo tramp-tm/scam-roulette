@@ -2,29 +2,7 @@ import { LotManager } from './lotManager.js';
 import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES } from './types.js';
-
-/**
- * Interface for lot data that can be rendered in a list.
- * Supports both full Lot objects and ParsedLot from CSV import.
- */
-interface RenderableLot {
-    name: string;
-    amount: number;
-    id?: string;
-    color?: string;
-    active?: boolean;
-}
-
-/**
- * Options for rendering a lots list.
- */
-interface LotsListRenderOptions {
-    showActions?: boolean;  // Show delete/edit buttons
-    highlightId?: string | null;  // ID of lot to highlight
-    editableAmount?: boolean;  // Whether amount input is editable
-    onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
-}
+import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions } from './types.js';
 
 /**
  * Main application controller for the roulette game.
