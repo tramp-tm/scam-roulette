@@ -2,7 +2,7 @@ import { LotManager } from './lotManager.js';
 import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType } from './types.js';
+import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy } from './types.js';
 import { generateRandomReadableColor } from './utils.js';
 import { parseCSV } from './csvParser.js';
 
