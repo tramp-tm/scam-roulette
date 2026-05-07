@@ -519,11 +519,12 @@ export class App {
                 amountInput.disabled = true;
             } else if (onAmountChange && lot.id) {
                 // Handle amount change with callback
+                const lotId: string = lot.id; // Capture in closure, guaranteed defined here
                 let debounceTimer: number | null = null;
                 amountInput.addEventListener('change', () => {
                     const newAmount = parseFloat(amountInput.value);
                     if (!isNaN(newAmount) && newAmount > 0) {
-                        onAmountChange(lot.id, newAmount);
+                        onAmountChange(lotId, newAmount);
                     } else {
                         amountInput.value = lot.amount.toFixed(2);
                     }
@@ -542,7 +543,7 @@ export class App {
                 
                 // Store lot id for deletion callback
                 if (lot.id) {
-                    const lotId: string = lot.id; // Explicitly typed - guaranteed non-undefined here
+                    const lotId: string = lot.id; // Capture in closure, guaranteed defined here
                     deleteBtn.onclick = () => this.deleteLot(lotId);
                 }
 
