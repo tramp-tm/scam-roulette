@@ -215,6 +215,11 @@ export class App {
                 this.importStatus.classList.remove('hidden');
             }
             
+            // Disable Import button if there are errors (per spec requirement)
+            if (this.importBtn) {
+                this.importBtn.disabled = this.parsedResult.errorCount > 0;
+            }
+            
             // Render preview if there are valid lots
             if (this.previewContainer && this.previewLotsList) {
                 if (this.parsedResult.validLots.length > 0) {
@@ -247,9 +252,23 @@ export class App {
 
             const validLotCount = this.parsedResult.validLots.length;
 
-            // Check size limit (1000 lots maximum)
+            // Check for zero valid lots (edge case: empty input with no errors)
+            if (validLotCount === 0) {
+                alert('No valid lots to import.');
+                return;
+            }
+
+            // Check size limit (1000 lots maximum) - use confirm for Cancel option
             if (validLotCount > 1000) {
-                alert(`Import blocked: ${validLotCount} lots exceeds the maximum limit of 1000.\n\nPlease reduce the number of lots and try again.`);
+                const confirmed = confirm(
+                    `⚠️ SIZE LIMIT EXCEEDED\n\n` +
+                    `${validLotCount} lots exceeds the maximum limit of 1000.\n\n` +
+                    `Click OK to reduce and retry, or Cancel to abort.`
+                );
+                if (!confirmed) {
+                    // User clicked Cancel - abort import
+                    return;
+                }
                 return;
             }
 
