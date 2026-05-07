@@ -2,6 +2,7 @@ import { ModalDialog } from './modalDialog.js';
 import { SeparatorType, ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
+import { ModalManager } from './modalManager.js';
 
 /** Callback for when user clicks Import button */
 export type ImportCallback = (parsedLots: ParsedLot[]) => void;
@@ -28,8 +29,6 @@ export class ImportDialog extends ModalDialog {
         super();
         this.importCallback = importCallback;
         
-import { ModalManager } from './modalManager.js';
-
         // Set up onClose callback for cleanup when dialog closes
         this.onClose = (data?: unknown) => {
             // Reset parsed result

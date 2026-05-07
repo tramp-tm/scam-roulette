@@ -6,7 +6,7 @@ export class ModalManager {
     private static instance: ModalManager;
     
     private zIndexCounter = 1000;
-    private openModals: HTMLElement[] = [];
+    protected openModals: HTMLElement[] = [];
 
     private constructor() {}
 
