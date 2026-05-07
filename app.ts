@@ -168,27 +168,6 @@ export class App {
         this.spinsSlider?.addEventListener('input', () => {
             if (this.spinsValue) this.spinsValue.textContent = this.spinsSlider ? this.spinsSlider.value : '';
         });
-        
-        // Close import dialog when clicking on overlay (outside content)
-        this.importDialog?.addEventListener('click', (e) => {
-            const target = e.target as HTMLElement;
-            if (target === this.importDialog || target.classList.contains('modal-overlay')) {
-                this.closeImportDialog();
-            }
-        });
-        
-        // Close import dialog when clicking the × button
-        const modalCloseBtn = document.querySelector('.modal-close') as HTMLButtonElement | null;
-        modalCloseBtn?.addEventListener('click', () => {
-            this.closeImportDialog();
-        });
-        
-        // Close import dialog on Escape key press (only if dialog is open)
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.importDialog && !this.importDialog.classList.contains('hidden')) {
-                this.closeImportDialog();
-            }
-        });
     }
 
     private addLot(): void {

@@ -168,8 +168,5 @@ export interface LotsListRenderOptions {
 /** Callback type for ImportDialog import action */
 export type ImportCallback = (parsedLots: ParsedLot[]) => void;
 
-/** Strategy for handling import conflicts */
-export type ImportStrategy = 'replace' | 'merge' | 'cancel';
-
 /** Callback type for conflict resolution */
 export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;
