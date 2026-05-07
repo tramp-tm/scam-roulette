@@ -11,15 +11,15 @@ export type ImportCallback = (parsedLots: ParsedLot[]) => void;
  * Handles preview, parsing, and triggers import callback.
  */
 export class ImportDialog extends ModalDialog {
-    private textarea?: HTMLTextAreaElement;
-    private separatorSelect?: HTMLSelectElement;
-    private previewBtn?: HTMLButtonElement;
-    private importBtn?: HTMLButtonElement;
-    private statusEl?: HTMLElement;
-    private validCountSpan?: HTMLElement;
-    private errorCountSpan?: HTMLElement;
-    private previewContainer?: HTMLElement;
-    private previewList?: HTMLUListElement;
+    private textarea: HTMLTextAreaElement | null = null;
+    private separatorSelect: HTMLSelectElement | null = null;
+    private previewBtn: HTMLButtonElement | null = null;
+    private importBtn: HTMLButtonElement | null = null;
+    private statusEl: HTMLElement | null = null;
+    private validCountSpan: HTMLElement | null = null;
+    private errorCountSpan: HTMLElement | null = null;
+    private previewContainer: HTMLElement | null = null;
+    private previewList: HTMLUListElement | null = null;
 
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
@@ -27,6 +27,26 @@ export class ImportDialog extends ModalDialog {
     constructor(importCallback: ImportCallback) {
         super();
         this.importCallback = importCallback;
+        
+        // Set up onClose callback for cleanup when dialog closes
+        this.onClose = (data?: unknown) => {
+            // Reset parsed result
+            this.parsedResult = null;
+            
+            // Clear textarea and preview
+            if (this.textarea) {
+                this.textarea.value = '';
+            }
+            if (this.previewContainer) {
+                this.previewContainer.classList.add('hidden');
+            }
+            if (this.statusEl) {
+                this.statusEl.classList.add('hidden');
+            }
+            if (this.importBtn) {
+                this.importBtn.disabled = false;
+            }
+        };
         
         // Build the dialog UI
         this.renderHeader('Import Lots');
@@ -252,25 +272,4 @@ export class ImportDialog extends ModalDialog {
         this.importCallback(this.parsedResult.validLots);
     }
 
-    /** Resets dialog state when closed */
-    protected onClose(data?: unknown): void {
-        super.onClose?.(data);
-        
-        // Reset parsed result
-        this.parsedResult = null;
-        
-        // Clear textarea and preview
-        if (this.textarea) {
-            this.textarea.value = '';
-        }
-        if (this.previewContainer) {
-            this.previewContainer.classList.add('hidden');
-        }
-        if (this.statusEl) {
-            this.statusEl.classList.add('hidden');
-        }
-        if (this.importBtn) {
-            this.importBtn.disabled = false;
-        }
-    }
 }
