@@ -5,6 +5,8 @@ import { AnimationController, EasingFunctions } from './animation.js';
 import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy } from './types.js';
 import { generateRandomReadableColor } from './utils.js';
 import { parseCSV } from './csvParser.js';
+import { ImportDialog } from './importDialog.js';
+import { ImportConflictDialog } from './importConflictDialog.js';
 
 /**
  * Main application controller for the roulette game.
@@ -38,26 +40,6 @@ export class App {
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
-    private importBtn: HTMLButtonElement | null = null;
-    
-    // Import dialog elements
-    private importDialog: HTMLElement | null = null;
-    private tabButtons: NodeListOf<Element> | null = null;
-    private csvTabContent: Element | null = null;
-    private linkTabContent: Element | null = null;
-    
-    // Import dialog input/output elements
-    private importTextarea: HTMLTextAreaElement | null = null;
-    private separatorSelect: HTMLSelectElement | null = null;
-    private previewBtn: HTMLButtonElement | null = null;
-    private importStatus: HTMLElement | null = null;
-    private validCountSpan: HTMLElement | null = null;
-    private errorCountSpan: HTMLElement | null = null;
-    private previewContainer: HTMLElement | null = null;
-    private previewLotsList: HTMLUListElement | null = null;
-    
-    // Store parsed result for import
-    private parsedResult: ParseResult | null = null;
     
     // Lots list elements
     private lotsList: HTMLUListElement;
@@ -89,23 +71,6 @@ export class App {
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
-        this.importBtn = document.getElementById('import-btn') as HTMLButtonElement;
-        
-        // Import dialog elements
-        this.importDialog = document.getElementById('import-dialog');
-        this.tabButtons = document.querySelectorAll('.tab-button');
-        this.csvTabContent = document.getElementById('tab-csv');
-        this.linkTabContent = document.getElementById('tab-link');
-        
-        // Import dialog input/output elements
-        this.importTextarea = document.getElementById('import-textarea') as HTMLTextAreaElement;
-        this.separatorSelect = document.getElementById('separator-select') as HTMLSelectElement;
-        this.previewBtn = document.getElementById('preview-btn') as HTMLButtonElement;
-        this.importStatus = document.getElementById('import-status');
-        this.validCountSpan = document.getElementById('valid-count');
-        this.errorCountSpan = document.getElementById('error-count');
-        this.previewContainer = document.getElementById('preview-container');
-        this.previewLotsList = document.getElementById('preview-lots-list') as HTMLUListElement;
         
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -167,12 +132,9 @@ export class App {
         // Reset button
         this.resetBtn.addEventListener('click', () => this.reset());
         
-        // Import button - opens import dialog
+        // Import button - opens import dialog component
         this.importBtnControls.addEventListener('click', () => {
-            const importDialog = document.getElementById('import-dialog') as HTMLElement;
-            if (importDialog) {
-                importDialog.classList.remove('hidden');
-            }
+            this.openImportDialog();
         });
         
         // Tab switching logic for import dialog
@@ -639,58 +601,43 @@ export class App {
         this.renderer.render();
     }
 
-    /**
-     * Handles conflict resolution when importing lots.
-     * Prompts user to choose strategy if existing lots are present.
-     */
-    private handleConflictResolution(parsedLots: ParsedLot[], count: number): void {
-        const existingCount = this.lotManager.getTotalCount();
+    /** Opens the import dialog */
+    private openImportDialog(): void {
+        const importDialog = new ImportDialog((parsedLots: ParsedLot[]) => {
+            // Handle conflict resolution if needed
+            this.handleImportConflict(parsedLots);
+        });
         
-        // If no existing lots, proceed directly with import (merge behavior)
-        if (existingCount === 0) {
-            this.importStrategy = 'merge';
-            this.executeImport(parsedLots);
-            return;
-        }
-        
-        // Show conflict resolution prompt using browser confirm dialogs
-        const choice = prompt(
-            `⚠️ CONFLICT DETECTED\n\nYou have ${existingCount} existing lot(s).\nHow would you like to proceed?\n\n` +
-            `[1] Replace - Remove all existing lots and import new ones\n` +
-            `[2] Merge - Keep existing lots and add new ones\n` +
-            `[0] Cancel - Abort import operation`,
-            '2'  // Default to merge
-        );
-        
-        if (choice === null) {
-            // User clicked Cancel/Close on prompt
-            this.closeImportDialog();
-            return;
-        }
-        
-        const trimmedChoice = choice.trim().toLowerCase();
-        
-        if (trimmedChoice === '1' || trimmedChoice === 'replace') {
-            this.importStrategy = 'replace';
-            this.executeImport(parsedLots);
-        } else if (trimmedChoice === '2' || trimmedChoice === 'merge') {
-            this.importStrategy = 'merge';
-            this.executeImport(parsedLots);
-        } else {
-            // Invalid choice - treat as cancel
-            alert('Invalid selection. Import cancelled.');
-            this.closeImportDialog();
-        }
+        importDialog.open();
     }
 
-    /**
-     * Executes the actual import based on selected strategy.
-     */
-    private executeImport(parsedLots: ParsedLot[]): void {
-        if (this.importStrategy === 'replace') {
+    /** Handles conflict resolution when importing lots */
+    private handleImportConflict(parsedLots: ParsedLot[]): void {
+        const existingCount = this.lotManager.getTotalCount();
+        
+        // If no existing lots, proceed directly with merge strategy
+        if (existingCount === 0) {
+            this.executeImport(parsedLots, 'merge');
+            return;
+        }
+        
+        // Show conflict resolution dialog
+        const conflictDialog = new ImportConflictDialog(existingCount, (strategy: ImportStrategy) => {
+            if (strategy === 'cancel') {
+                return; // Do nothing on cancel
+            }
+            this.executeImport(parsedLots, strategy);
+        });
+        
+        conflictDialog.open();
+    }
+
+    /** Executes the actual import based on selected strategy */
+    private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
+        if (strategy === 'replace') {
             // Clear all existing lots first
             this.lotManager.clearAll();
-        } else if (this.importStrategy === 'merge') {
+        } else if (strategy === 'merge') {
             // For merge strategy, check for name conflicts and update or add accordingly
             for (const parsedLot of parsedLots) {
                 const matchingLot = this.lotManager.getAllLots().find(
@@ -712,33 +659,6 @@ export class App {
         this.updateUI();
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
-        
-        // Close import dialog
-        this.closeImportDialog();
-    }
-
-    /**
-     * Closes the import dialog and resets state.
-     */
-    private closeImportDialog(): void {
-        if (this.importDialog) {
-            this.importDialog.classList.add('hidden');
-        }
-        
-        // Reset parsed result and strategy
-        this.parsedResult = null;
-        this.importStrategy = null;
-        
-        // Clear textarea and preview
-        if (this.importTextarea) {
-            this.importTextarea.value = '';
-        }
-        if (this.previewContainer) {
-            this.previewContainer.classList.add('hidden');
-        }
-        if (this.importStatus) {
-            this.importStatus.classList.add('hidden');
-        }
     }
 }
 

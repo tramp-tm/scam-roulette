@@ -160,3 +160,16 @@ export interface LotsListRenderOptions {
     editableAmount?: boolean;  // Whether amount input is editable
     onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
 }
+
+// ========================================
+// MODAL DIALOG TYPES
+// ========================================
+
+/** Callback type for ImportDialog import action */
+export type ImportCallback = (parsedLots: ParsedLot[]) => void;
+
+/** Strategy for handling import conflicts */
+export type ImportStrategy = 'replace' | 'merge' | 'cancel';
+
+/** Callback type for conflict resolution */
+export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;

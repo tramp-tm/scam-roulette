@@ -59,6 +59,8 @@
             </div>
         </div>
 
+        <!-- Import dialog will be created dynamically by ImportDialog component -->
+
         <!-- Right Panel: Settings -->
         <div class="sidebar">
             <!-- Settings Panel -->
@@ -88,61 +90,6 @@
                         <span id="duration-value" class="slider-value">3.0s</span>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Import Dialog Modal -->
-    <div id="import-dialog" class="modal-overlay hidden">
-        <div class="modal-content">
-            <button class="modal-close">&times;</button>
-            
-            <h2>Import Lots</h2>
-            
-            <!-- Tab Navigation -->
-            <div class="tab-navigation">
-                <button class="tab-button active" data-tab="csv">CSV Import</button>
-                <button class="tab-button" data-tab="link">Link Import</button>
-            </div>
-            
-            <!-- CSV Tab Content -->
-            <div id="tab-csv" class="tab-content active">
-                <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
-                
-                <textarea 
-                    id="import-textarea" 
-                    placeholder="Alice, 100&#10;Bob, 250&#10;Charlie, 75"
-                    rows="6"></textarea>
-                
-                <div class="settings-group">
-                    <label for="separator-select">Separator:</label>
-                    <select id="separator-select">
-                        <option value="comma" selected>Comma (,)</option>
-                        <option value="tab">Tab (&#9;)</option>
-                    </select>
-                </div>
-                
-                <div class="import-actions">
-                    <button id="preview-btn" class="btn-secondary">👁️ Preview</button>
-                    <button id="import-btn" class="btn-primary">📥 Import</button>
-                </div>
-                
-                <!-- Status Line -->
-                <div id="import-status" class="import-status hidden">
-                    <span id="valid-count"></span> valid lots, 
-                    <span id="error-count"></span> errors
-                </div>
-                
-                <!-- Preview Container -->
-                <div id="preview-container" class="preview-container hidden">
-                    <h4>Preview:</h4>
-                    <ul id="preview-lots-list"></ul>
-                </div>
-            </div>
-            
-            <!-- Link Tab Content (Placeholder) -->
-            <div id="tab-link" class="tab-content">
-                <p class="placeholder-text">Link import coming soon...</p>
             </div>
         </div>
     </div>
