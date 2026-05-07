@@ -46,6 +46,9 @@ export class ImportDialog extends ModalDialog {
             if (this.importBtn) {
                 this.importBtn.disabled = false;
             }
+            
+            // Destroy the dialog to clean up DOM nodes and event listeners
+            this.destroy();
         };
         
         // Build the dialog UI
