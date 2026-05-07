@@ -54,4 +54,19 @@ export class ModalManager {
     public hasOpenModals(): boolean {
         return this.openModals.length > 0;
     }
+
+    /**
+     * Gets the topmost (last opened) modal element.
+     */
+    public getTopmostModal(): HTMLElement | undefined {
+        return this.openModals[this.openModals.length - 1];
+    }
+
+    /**
+     * Checks if a given modal is currently the topmost one.
+     */
+    public isTopmost(modalElement: HTMLElement): boolean {
+        const topmost = this.getTopmostModal();
+        return topmost === modalElement;
+    }
 }
