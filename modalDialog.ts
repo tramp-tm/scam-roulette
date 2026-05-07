@@ -43,14 +43,14 @@ export abstract class ModalDialog {
 
         // Setup close on overlay click (outside content) - only for topmost modal
         this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay && manager.isTopmost(this.overlay)) {
+            if (this.overlay && e.target === this.overlay && manager.isTopmost(this.overlay)) {
                 this.close();
             }
         });
 
         // Setup close on Escape key - only for topmost modal
         const escapeHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !this.isHidden() && manager.isTopmost(this.overlay)) {
+            if (this.overlay && e.key === 'Escape' && !this.isHidden() && manager.isTopmost(this.overlay)) {
                 this.close();
             }
         };
