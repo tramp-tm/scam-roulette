@@ -1,3 +1,5 @@
+import { ModalManager } from './modalManager.js';
+
 /**
  * Base class for modal dialogs.
  * Provides common functionality: opening, closing, rendering structure.
@@ -17,9 +19,12 @@ export abstract class ModalDialog {
 
     /** Creates the modal DOM structure in document body */
     private createStructure(): void {
-        // Create overlay
+        const manager = ModalManager.getInstance();
+        
+        // Create overlay with dynamic z-index for stacking
         this.overlay = document.createElement('div');
         this.overlay.className = 'modal-overlay hidden';
+        this.overlay.style.zIndex = String(manager.getNextZIndex());
         
         // Create content container
         this.content = document.createElement('div');
@@ -36,17 +41,23 @@ export abstract class ModalDialog {
         this.overlay.appendChild(this.content);
         document.body.appendChild(this.overlay);
 
-        // Setup close on overlay click (outside content)
+        // Setup close on overlay click (outside content) - only for topmost modal
         this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
+            if (e.target === this.overlay && manager.getOpenModalCount() > 0) {
+                const topmost = manager.openModals[manager.openModals.length - 1];
+                if (topmost === this.overlay) {
+                    this.close();
+                }
             }
         });
 
-        // Setup close on Escape key
+        // Setup close on Escape key - only for topmost modal
         const escapeHandler = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && !this.isHidden()) {
-                this.close();
+                const topmost = manager.openModals[manager.openModals.length - 1];
+                if (topmost === this.overlay) {
+                    this.close();
+                }
             }
         };
         document.addEventListener('keydown', escapeHandler);
@@ -55,18 +66,24 @@ export abstract class ModalDialog {
         (this as any)._escapeHandler = escapeHandler;
     }
 
-    /** Opens the dialog */
+    /** Opens the dialog and registers with manager */
     public open(): void {
+        const manager = ModalManager.getInstance();
+        
         if (this.overlay) {
             this.overlay.classList.remove('hidden');
+            manager.registerModal(this.overlay);
         }
         this.onOpen?.();
     }
 
-    /** Closes the dialog and optionally passes data to onClose callback */
+    /** Closes the dialog, unregisters from manager, and optionally passes data to onClose callback */
     public close(data?: unknown): void {
+        const manager = ModalManager.getInstance();
+        
         if (this.overlay) {
             this.overlay.classList.add('hidden');
+            manager.unregisterModal(this.overlay);
         }
         this.onClose?.(data);
     }

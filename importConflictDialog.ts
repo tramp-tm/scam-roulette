@@ -7,53 +7,88 @@ export type ImportStrategy = 'replace' | 'merge' | 'cancel';
 export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;
 
 /**
- * Simple dialog for resolving import conflicts.
- * Shows replace/merge/cancel options using browser prompt.
+ * Visual modal dialog for resolving import conflicts.
+ * Shows replace/merge/cancel buttons that stack above the ImportDialog.
  */
 export class ImportConflictDialog extends ModalDialog {
     private existingCount: number;
     private resolutionCallback: ConflictResolutionCallback;
+    private resolveBtns: HTMLButtonElement[] = [];
 
     constructor(existingCount: number, resolutionCallback: ConflictResolutionCallback) {
         super();
         this.existingCount = existingCount;
         this.resolutionCallback = resolutionCallback;
         
-        // This dialog uses browser prompt for simplicity
-        // The base ModalDialog structure is created but we use prompt instead
+        // Build the dialog UI
+        this.renderHeader('⚠️ Import Conflict');
+        this.renderConflictContent();
     }
 
-    /** Shows the conflict resolution prompt */
-    public show(): void {
-        const choice = prompt(
-            `⚠️ CONFLICT DETECTED\n\nYou have ${this.existingCount} existing lot(s).\nHow would you like to proceed?\n\n` +
-            `[1] Replace - Remove all existing lots and import new ones\n` +
-            `[2] Merge - Keep existing lots and add new ones\n` +
-            `[0] Cancel - Abort import operation`,
-            '2'  // Default to merge
-        );
-        
-        if (choice === null) {
-            // User clicked Cancel/Close on prompt
-            this.resolutionCallback('cancel');
-            return;
-        }
-        
-        const trimmedChoice = choice.trim().toLowerCase();
-        
-        if (trimmedChoice === '1' || trimmedChoice === 'replace') {
-            this.resolutionCallback('replace');
-        } else if (trimmedChoice === '2' || trimmedChoice === 'merge') {
-            this.resolutionCallback('merge');
-        } else {
-            // Invalid choice - treat as cancel
-            alert('Invalid selection. Import cancelled.');
-            this.resolutionCallback('cancel');
+    private renderConflictContent(): void {
+        const html = `
+            <div class="conflict-message">
+                <p>You have <strong>${this.existingCount}</strong> existing lot(s).</p>
+                <p>How would you like to proceed?</p>
+            </div>
+            
+            <div class="strategy-buttons">
+                <button id="btn-replace" class="strategy-btn replace">
+                    🔄 Replace
+                    <span class="strategy-desc">Remove all existing lots and import new ones</span>
+                </button>
+                
+                <button id="btn-merge" class="strategy-btn merge">
+                    🔗 Merge
+                    <span class="strategy-desc">Keep existing lots and add new ones</span>
+                </button>
+                
+                <button id="btn-cancel" class="strategy-btn cancel">
+                    ❌ Cancel
+                    <span class="strategy-desc">Abort import operation</span>
+                </button>
+            </div>
+        `;
+
+        if (this.content) {
+            const container = document.createElement('div');
+            container.className = 'modal-body';
+            container.innerHTML = html;
+            
+            // Insert after header
+            const header = this.content.querySelector('h2');
+            if (header && header.nextSibling) {
+                this.content.insertBefore(container, header.nextSibling);
+            } else {
+                this.content.appendChild(container);
+            }
+
+            // Cache button references and setup event listeners
+            const replaceBtn = container.querySelector('#btn-replace') as HTMLButtonElement;
+            const mergeBtn = container.querySelector('#btn-merge') as HTMLButtonElement;
+            const cancelBtn = container.querySelector('#btn-cancel') as HTMLButtonElement;
+            
+            this.resolveBtns = [replaceBtn, mergeBtn, cancelBtn];
+            
+            replaceBtn.addEventListener('click', () => {
+                this.resolutionCallback('replace');
+                this.close();
+            });
+            
+            mergeBtn.addEventListener('click', () => {
+                this.resolutionCallback('merge');
+                this.close();
+            });
+            
+            cancelBtn.addEventListener('click', () => {
+                this.resolutionCallback('cancel');
+                this.close();
+            });
         }
     }
 
-    /** Override open to show prompt instead */
+    /** Override open to show visual modal instead of prompt */
     public override open(): void {
-        this.show();
+        super.open();
     }
 }

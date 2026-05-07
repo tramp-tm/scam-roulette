@@ -617,3 +617,72 @@ input[type="number"] {
     padding: 30px;
     font-style: italic;
 }
+
+/* ========================================
+   CONFLICT RESOLUTION DIALOG STYLES
+   ======================================== */
+
+.conflict-message {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.conflict-message p {
+    font-size: 1em;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+.strategy-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.strategy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.strategy-btn .strategy-desc {
+    font-size: 0.85em;
+    opacity: 0.7;
+    margin-left: 10px;
+}
+
+.strategy-btn.replace {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.strategy-btn.replace:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+}
+
+.strategy-btn.merge {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.strategy-btn.merge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+}
+
+.strategy-btn.cancel {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.strategy-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

@@ -28,6 +28,8 @@ export class ImportDialog extends ModalDialog {
         super();
         this.importCallback = importCallback;
         
+import { ModalManager } from './modalManager.js';
+
         // Set up onClose callback for cleanup when dialog closes
         this.onClose = (data?: unknown) => {
             // Reset parsed result
@@ -48,7 +50,11 @@ export class ImportDialog extends ModalDialog {
             }
             
             // Destroy the dialog to clean up DOM nodes and event listeners
-            this.destroy();
+            // Only destroy if no other modals are open (we're the last one)
+            const manager = ModalManager.getInstance();
+            if (!manager.hasOpenModals()) {
+                this.destroy();
+            }
         };
         
         // Build the dialog UI
