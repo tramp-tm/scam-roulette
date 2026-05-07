@@ -28,6 +28,7 @@ export class App {
     private highlightedLotId: string | null = null;
     private isSettingsLocked: boolean = false;
     private endRotation: number = 0;
+    private importStrategy: ImportStrategy | null = null;
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -600,14 +601,104 @@ export class App {
 
     /**
      * Handles conflict resolution when importing lots.
-     * This is a placeholder - actual implementation in Step 10.
+     * Prompts user to choose strategy if existing lots are present.
      */
     private handleConflictResolution(parsedLots: ParsedLot[], count: number): void {
-        // Placeholder for conflict resolution dialog (Step 10)
-        console.log(`Import ready: ${count} valid lots pending import.`);
+        const existingCount = this.lotManager.getTotalCount();
         
-        // TODO: Show conflict resolution dialog with replace/merge/cancel options
-        // This will be implemented in Step 10
+        // If no existing lots, proceed directly with import (merge behavior)
+        if (existingCount === 0) {
+            this.importStrategy = 'merge';
+            this.executeImport(parsedLots);
+            return;
+        }
+        
+        // Show conflict resolution prompt using browser confirm dialogs
+        const choice = prompt(
+            `⚠️ CONFLICT DETECTED\n\nYou have ${existingCount} existing lot(s).\nHow would you like to proceed?\n\n` +
+            `[1] Replace - Remove all existing lots and import new ones\n` +
+            `[2] Merge - Keep existing lots and add new ones\n` +
+            `[0] Cancel - Abort import operation`,
+            '2'  // Default to merge
+        );
+        
+        if (choice === null) {
+            // User clicked Cancel/Close on prompt
+            this.closeImportDialog();
+            return;
+        }
+        
+        const trimmedChoice = choice.trim().toLowerCase();
+        
+        if (trimmedChoice === '1' || trimmedChoice === 'replace') {
+            this.importStrategy = 'replace';
+            this.executeImport(parsedLots);
+        } else if (trimmedChoice === '2' || trimmedChoice === 'merge') {
+            this.importStrategy = 'merge';
+            this.executeImport(parsedLots);
+        } else {
+            // Invalid choice - treat as cancel
+            alert('Invalid selection. Import cancelled.');
+            this.closeImportDialog();
+        }
+    }
+
+    /**
+     * Executes the actual import based on selected strategy.
+     */
+    private executeImport(parsedLots: ParsedLot[]): void {
+        if (this.importStrategy === 'replace') {
+            // Clear all existing lots first
+            this.lotManager.clearAll();
+        } else if (this.importStrategy === 'merge') {
+            // For merge strategy, check for name conflicts and update or add accordingly
+            for (const parsedLot of parsedLots) {
+                const matchingLot = this.lotManager.getAllLots().find(
+                    l => l.name.toLowerCase() === parsedLot.name.toLowerCase()
+                );
+                
+                if (matchingLot) {
+                    // Update existing lot with new amount
+                    this.lotManager.updateLot(matchingLot.id, { amount: parsedLot.amount });
+                } else {
+                    // Add new lot with random color
+                    const color = generateRandomReadableColor();
+                    this.lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+                }
+            }
+        }
+
+        // Update UI and renderer
+        this.updateUI();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.render();
+        
+        // Close import dialog
+        this.closeImportDialog();
+    }
+
+    /**
+     * Closes the import dialog and resets state.
+     */
+    private closeImportDialog(): void {
+        if (this.importDialog) {
+            this.importDialog.classList.add('hidden');
+        }
+        
+        // Reset parsed result and strategy
+        this.parsedResult = null;
+        this.importStrategy = null;
+        
+        // Clear textarea and preview
+        if (this.importTextarea) {
+            this.importTextarea.value = '';
+        }
+        if (this.previewContainer) {
+            this.previewContainer.classList.add('hidden');
+        }
+        if (this.importStatus) {
+            this.importStatus.classList.add('hidden');
+        }
     }
 }
 
