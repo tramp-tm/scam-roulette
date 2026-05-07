@@ -37,6 +37,7 @@ export class App {
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
+    private importBtn: HTMLButtonElement | null = null;
     
     // Import dialog elements
     private importDialog: HTMLElement | null = null;
@@ -87,6 +88,7 @@ export class App {
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
+        this.importBtn = document.getElementById('import-btn') as HTMLButtonElement;
         
         // Import dialog elements
         this.importDialog = document.getElementById('import-dialog');
@@ -232,6 +234,26 @@ export class App {
                     this.previewContainer.classList.add('hidden');
                 }
             }
+        });
+        
+        // Import button - validates size limit and proceeds to conflict resolution
+        this.importBtn?.addEventListener('click', () => {
+            // Check if preview has been run with valid lots
+            if (!this.parsedResult || this.parsedResult.validLots.length === 0) {
+                alert('Please click "Preview" first to parse the CSV data.');
+                return;
+            }
+
+            const validLotCount = this.parsedResult.validLots.length;
+
+            // Check size limit (1000 lots maximum)
+            if (validLotCount > 1000) {
+                alert(`Import blocked: ${validLotCount} lots exceeds the maximum limit of 1000.\n\nPlease reduce the number of lots and try again.`);
+                return;
+            }
+
+            // Size check passed - proceed to conflict resolution (Step 10)
+            this.handleConflictResolution(this.parsedResult.validLots, validLotCount);
         });
         
         // Settings changes
@@ -573,6 +595,18 @@ export class App {
 
     private render(): void {
         this.renderer.render();
+    }
+
+    /**
+     * Handles conflict resolution when importing lots.
+     * This is a placeholder - actual implementation in Step 10.
+     */
+    private handleConflictResolution(parsedLots: ParsedLot[], count: number): void {
+        // Placeholder for conflict resolution dialog (Step 10)
+        console.log(`Import ready: ${count} valid lots pending import.`);
+        
+        // TODO: Show conflict resolution dialog with replace/merge/cancel options
+        // This will be implemented in Step 10
     }
 }
 
