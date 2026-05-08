@@ -302,12 +302,13 @@ export class ImportDialog extends ModalDialog {
 
     private handleImport(): void {
         // Check if preview has been run with valid lots
-        if (!this.parsedResult || this.parsedResult.validLots.length === 0) {
+        const parsedResult = this.parsedResult;
+        if (!parsedResult || parsedResult.validLots.length === 0) {
             alert('Please click "Preview" first to parse the CSV data.');
             return;
         }
 
-        const validLotCount = this.parsedResult.validLots.length;
+        const validLotCount = parsedResult.validLots.length;
 
         // Check for zero valid lots (edge case: empty input with no errors)
         if (validLotCount === 0) {
