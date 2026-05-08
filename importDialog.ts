@@ -246,7 +246,8 @@ export class ImportDialog extends ModalDialog {
         if (!this.textarea || !this.previewContainer || !this.previewList) return;
         
         // If preview is hidden and we have valid lots, show it and fill it
-        if (this.previewContainer.classList.contains('hidden') && this.parsedResult?.validLots.length > 0) {
+        const validLotCount = this.parsedResult?.validLots.length ?? 0;
+        if (this.previewContainer.classList.contains('hidden') && validLotCount > 0) {
             // Generate random colors for preview lots
             const previewLots = this.parsedResult.validLots.map(lot => ({
                 ...lot,
@@ -258,7 +259,7 @@ export class ImportDialog extends ModalDialog {
             
             // Show preview container
             this.previewContainer.classList.remove('hidden');
-        } else if (!this.parsedResult?.validLots.length) {
+        } else if (validLotCount === 0) {
             // Hide preview if no valid lots
             this.previewContainer.classList.add('hidden');
         }
@@ -303,18 +304,16 @@ export class ImportDialog extends ModalDialog {
     private handleImport(): void {
         // Check if preview has been run with valid lots
         const parsedResult = this.parsedResult;
-        if (!parsedResult || parsedResult.validLots.length === 0) {
+        if (!parsedResult) {
             alert('Please click "Preview" first to parse the CSV data.');
+            return;
+        }
+        if (parsedResult.validLots.length === 0) {
+            alert('No valid lots to import.');
             return;
         }
 
         const validLotCount = parsedResult.validLots.length;
-
-        // Check for zero valid lots (edge case: empty input with no errors)
-        if (validLotCount === 0) {
-            alert('No valid lots to import.');
-            return;
-        }
 
         // Check size limit (1000 lots maximum) - use confirm for Cancel option
         if (validLotCount > 1000) {
