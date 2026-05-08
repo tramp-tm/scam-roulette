@@ -208,24 +208,25 @@ export class ImportDialog extends ModalDialog {
         const csvText = this.textarea.value;
         
         // Parse CSV text with current separator
-        this.parsedResult = parseCSV(csvText, this.currentSeparator);
+        const parsedResult = parseCSV(csvText, this.currentSeparator);
+        this.parsedResult = parsedResult;
         
         // Update status line (always visible now)
         if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
-            this.validCountSpan.textContent = `${this.parsedResult.validLots.length}`;
-            this.errorCountSpan.textContent = `${this.parsedResult.errorCount}`;
+            this.validCountSpan.textContent = `${parsedResult.validLots.length}`;
+            this.errorCountSpan.textContent = `${parsedResult.errorCount}`;
         }
         
         // Disable Import button if there are errors (per spec requirement)
         if (this.importBtn) {
-            this.importBtn.disabled = this.parsedResult.errorCount > 0;
+            this.importBtn.disabled = parsedResult.errorCount > 0;
         }
         
         // Update preview container ONLY if it's already visible
         if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
-            if (this.parsedResult.validLots.length > 0) {
+            if (parsedResult.validLots.length > 0) {
                 // Generate random colors for preview lots
-                const previewLots = this.parsedResult.validLots.map(lot => ({
+                const previewLots = parsedResult.validLots.map(lot => ({
                     ...lot,
                     color: generateRandomReadableColor()
                 }));
@@ -245,11 +246,14 @@ export class ImportDialog extends ModalDialog {
     private handlePreview(): void {
         if (!this.textarea || !this.previewContainer || !this.previewList) return;
         
+        // Extract parsed result for type narrowing
+        const parsedResult = this.parsedResult;
+        const validLotCount = parsedResult?.validLots.length ?? 0;
+        
         // If preview is hidden and we have valid lots, show it and fill it
-        const validLotCount = this.parsedResult?.validLots.length ?? 0;
         if (this.previewContainer.classList.contains('hidden') && validLotCount > 0) {
             // Generate random colors for preview lots
-            const previewLots = this.parsedResult.validLots.map(lot => ({
+            const previewLots = parsedResult!.validLots.map(lot => ({
                 ...lot,
                 color: generateRandomReadableColor()
             }));
