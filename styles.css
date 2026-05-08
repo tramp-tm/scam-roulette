@@ -512,14 +512,85 @@ input[type="number"] {
 }
 
 /* ========================================
-   CSV TAB CONTENT
+   TAB HEADER ROW (Instruction + Separator Switch)
    ======================================== */
+
+.tab-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
 
 .tab-instruction {
     font-size: 0.9em;
     opacity: 0.8;
+    margin: 0;
+    flex: 1;
+}
+
+/* ========================================
+   SEPARATOR SWITCH (Comma <-> Tab)
+   ======================================== */
+
+.separator-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sep-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85em;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    transition: all 0.2s ease;
+}
+
+.sep-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.sep-btn.active {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    color: white;
+    font-weight: bold;
+}
+
+.sep-divider {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 1.2em;
+    user-select: none;
+}
+
+/* ========================================
+   IMPORT STATUS LINE (Always Visible)
+   ======================================== */
+
+.import-status {
+    font-size: 0.85em;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
     margin-bottom: 15px;
 }
+
+.import-status #valid-count {
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+.import-status #error-count {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* ========================================
+   CSV TAB CONTENT
+   ======================================== */
 
 #import-textarea {
     width: 100%;
@@ -536,22 +607,6 @@ input[type="number"] {
 #import-textarea:focus {
     outline: none;
     background: rgba(255, 255, 255, 0.15);
-}
-
-#separator-select {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9em;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    margin-bottom: 15px;
-}
-
-#separator-select option {
-    background: #2a2a4e;
-    color: #fff;
 }
 
 .import-actions {

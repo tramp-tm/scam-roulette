@@ -24,6 +24,7 @@ export class ImportDialog extends ModalDialog {
 
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
+    private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
         super();
@@ -72,30 +73,30 @@ export class ImportDialog extends ModalDialog {
             
             <!-- CSV Tab Content -->
             <div id="tab-csv" class="tab-content active">
-                <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
+                <!-- Header row with instruction and separator switch -->
+                <div class="tab-header-row">
+                    <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
+                    <div class="separator-switch">
+                        <button id="sep-comma" class="sep-btn active" data-separator="comma">Comma (,)</button>
+                        <span class="sep-divider">↹</span>
+                        <button id="sep-tab" class="sep-btn" data-separator="tab">Tab</button>
+                    </div>
+                </div>
                 
                 <textarea 
                     id="import-textarea" 
                     placeholder="Alice, 100&#10;Bob, 250&#10;Charlie, 75"
                     rows="6"></textarea>
                 
-                <div class="settings-group">
-                    <label for="separator-select">Separator:</label>
-                    <select id="separator-select">
-                        <option value="comma" selected>Comma (,)</option>
-                        <option value="tab">Tab (&#9;)</option>
-                    </select>
+                <!-- Status Line (always visible) -->
+                <div id="import-status" class="import-status">
+                    <span id="valid-count">0</span> valid lots, 
+                    <span id="error-count">0</span> errors
                 </div>
                 
                 <div class="import-actions">
                     <button id="preview-btn" class="btn-secondary">👁️ Preview</button>
                     <button id="import-btn" class="btn-primary">📥 Import</button>
-                </div>
-                
-                <!-- Status Line -->
-                <div id="import-status" class="import-status hidden">
-                    <span id="valid-count"></span> valid lots, 
-                    <span id="error-count"></span> errors
                 </div>
                 
                 <!-- Preview Container -->
@@ -126,7 +127,6 @@ export class ImportDialog extends ModalDialog {
 
             // Cache element references
             this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
-            this.separatorSelect = container.querySelector('#separator-select') as HTMLSelectElement;
             this.previewBtn = container.querySelector('#preview-btn') as HTMLButtonElement;
             this.importBtn = container.querySelector('#import-btn') as HTMLButtonElement;
             this.statusEl = container.querySelector('#import-status');
@@ -165,27 +165,55 @@ export class ImportDialog extends ModalDialog {
             });
         });
 
-        // Preview button - parses CSV and shows preview
+        // Separator switch buttons
+        const sepCommaBtn = document.getElementById('sep-comma') as HTMLButtonElement;
+        const sepTabBtn = document.getElementById('sep-tab') as HTMLButtonElement;
+        
+        if (sepCommaBtn) {
+            sepCommaBtn.addEventListener('click', () => {
+                this.currentSeparator = 'comma';
+                sepCommaBtn.classList.add('active');
+                sepTabBtn?.classList.remove('active');
+                // Auto-update parsed result when separator changes
+                this.autoUpdateParsedResult();
+            });
+        }
+        
+        if (sepTabBtn) {
+            sepTabBtn.addEventListener('click', () => {
+                this.currentSeparator = 'tab';
+                sepTabBtn.classList.add('active');
+                sepCommaBtn?.classList.remove('active');
+                // Auto-update parsed result when separator changes
+                this.autoUpdateParsedResult();
+            });
+        }
+
+        // Textarea input - auto-update parsed result on fly
+        this.textarea?.addEventListener('input', () => {
+            this.autoUpdateParsedResult();
+        });
+
+        // Preview button - shows/hides preview container, fills if empty
         this.previewBtn?.addEventListener('click', () => this.handlePreview());
 
         // Import button - validates and triggers import callback
         this.importBtn?.addEventListener('click', () => this.handleImport());
     }
 
-    private handlePreview(): void {
-        if (!this.textarea || !this.separatorSelect) return;
+    /** Auto-updates parsed result on textarea input (called from event listener) */
+    private autoUpdateParsedResult(): void {
+        if (!this.textarea) return;
         
         const csvText = this.textarea.value;
-        const separator: SeparatorType = this.separatorSelect.value === 'tab' ? 'tab' : 'comma';
         
-        // Parse CSV text
-        this.parsedResult = parseCSV(csvText, separator);
+        // Parse CSV text with current separator
+        this.parsedResult = parseCSV(csvText, this.currentSeparator);
         
-        // Update status line
+        // Update status line (always visible now)
         if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
             this.validCountSpan.textContent = `${this.parsedResult.validLots.length}`;
             this.errorCountSpan.textContent = `${this.parsedResult.errorCount}`;
-            this.statusEl.classList.remove('hidden');
         }
         
         // Disable Import button if there are errors (per spec requirement)
@@ -193,8 +221,8 @@ export class ImportDialog extends ModalDialog {
             this.importBtn.disabled = this.parsedResult.errorCount > 0;
         }
         
-        // Render preview if there are valid lots
-        if (this.previewContainer && this.previewList) {
+        // Update preview container ONLY if it's already visible
+        if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
             if (this.parsedResult.validLots.length > 0) {
                 // Generate random colors for preview lots
                 const previewLots = this.parsedResult.validLots.map(lot => ({
@@ -204,11 +232,35 @@ export class ImportDialog extends ModalDialog {
                 
                 // Render to preview area
                 this.renderPreviewList(previewLots);
-                
-                this.previewContainer.classList.remove('hidden');
             } else {
-                this.previewContainer.classList.add('hidden');
+                // Clear preview if no valid lots
+                if (this.previewList) {
+                    this.previewList.innerHTML = '';
+                }
             }
+        }
+    }
+
+    /** Preview button handler - shows/hides preview container, fills if empty */
+    private handlePreview(): void {
+        if (!this.textarea || !this.previewContainer || !this.previewList) return;
+        
+        // If preview is hidden and we have valid lots, show it and fill it
+        if (this.previewContainer.classList.contains('hidden') && this.parsedResult?.validLots.length > 0) {
+            // Generate random colors for preview lots
+            const previewLots = this.parsedResult.validLots.map(lot => ({
+                ...lot,
+                color: generateRandomReadableColor()
+            }));
+            
+            // Render to preview area
+            this.renderPreviewList(previewLots);
+            
+            // Show preview container
+            this.previewContainer.classList.remove('hidden');
+        } else if (!this.parsedResult?.validLots.length) {
+            // Hide preview if no valid lots
+            this.previewContainer.classList.add('hidden');
         }
     }
 
