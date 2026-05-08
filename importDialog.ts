@@ -333,7 +333,7 @@ export class ImportDialog extends ModalDialog {
         }
 
         // Size check passed - trigger import callback with parsed lots
-        this.importCallback(this.parsedResult.validLots);
+        this.importCallback(parsedResult.validLots);
     }
 
 }
