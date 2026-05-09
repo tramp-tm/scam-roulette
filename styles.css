@@ -72,10 +72,10 @@ h1 {
     padding: 20px;
 }
 
-/* Lots panel - dynamic height matching content but constrained by left-panel */
+/* Lots panel - dynamic height matching content but constrained by viewport */
 .left-panel .panel {
     flex: 0 0 auto;  /* Don't grow, don't shrink, size to content */
-    max-height: calc(100% - 40px);  /* Leave room for padding in left-panel */
+    max-height: calc(100vh - 80px);  /* Constrain by viewport minus margins/padding */
     overflow-y: auto;  /* Scroll if content exceeds available space */
 }
 
