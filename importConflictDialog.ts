@@ -1,10 +1,5 @@
 import { ModalDialog } from './modalDialog.js';
-
-/** Strategy for handling import conflicts */
-export type ImportStrategy = 'replace' | 'merge' | 'cancel';
-
-/** Callback for when user selects a strategy */
-export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;
+import { ImportStrategy, ImportCallback } from './types.js';
 
 /**
  * Visual modal dialog for resolving import conflicts.
@@ -12,10 +7,10 @@ export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;
  */
 export class ImportConflictDialog extends ModalDialog {
     private existingCount: number;
-    private resolutionCallback: ConflictResolutionCallback;
+    private resolutionCallback: ImportCallback;
     private resolveBtns: HTMLButtonElement[] = [];
 
-    constructor(existingCount: number, resolutionCallback: ConflictResolutionCallback) {
+    constructor(existingCount: number, resolutionCallback: ImportCallback) {
         super();
         this.existingCount = existingCount;
         this.resolutionCallback = resolutionCallback;
@@ -71,17 +66,17 @@ export class ImportConflictDialog extends ModalDialog {
             this.resolveBtns = [replaceBtn, mergeBtn, cancelBtn];
             
             replaceBtn.addEventListener('click', () => {
-                this.resolutionCallback('replace');
+                this.resolutionCallback({ strategy: 'replace' });
                 this.close();
             });
             
             mergeBtn.addEventListener('click', () => {
-                this.resolutionCallback('merge');
+                this.resolutionCallback({ strategy: 'merge' });
                 this.close();
             });
             
             cancelBtn.addEventListener('click', () => {
-                this.resolutionCallback('cancel');
+                this.resolutionCallback({ strategy: 'cancel' });
                 this.close();
             });
         }

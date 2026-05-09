@@ -484,9 +484,11 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
-        const importDialog = new ImportDialog((parsedLots: ParsedLot[]) => {
-            // Handle conflict resolution if needed
-            this.handleImportConflict(parsedLots);
+        const importDialog = new ImportDialog((result) => {
+            // Handle parsed lots from ImportDialog
+            if (result.parsedLots) {
+                this.handleImportConflict(result.parsedLots);
+            }
         });
         
         importDialog.open();
@@ -503,11 +505,10 @@ export class App {
         }
         
         // Show conflict resolution dialog
-        const conflictDialog = new ImportConflictDialog(existingCount, (strategy: ImportStrategy) => {
-            if (strategy === 'cancel') {
-                return; // Do nothing on cancel
+        const conflictDialog = new ImportConflictDialog(existingCount, (result) => {
+            if (result.strategy && result.strategy !== 'cancel') {
+                this.executeImport(parsedLots, result.strategy);
             }
-            this.executeImport(parsedLots, strategy);
         });
         
         conflictDialog.open();

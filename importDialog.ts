@@ -1,11 +1,8 @@
 import { ModalDialog } from './modalDialog.js';
-import { SeparatorType, ParsedLot } from './types.js';
+import { SeparatorType, ParsedLot, ImportResult, ImportCallback } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
 import { ModalManager } from './modalManager.js';
-
-/** Callback for when user clicks Import button */
-export type ImportCallback = (parsedLots: ParsedLot[]) => void;
 
 /**
  * Dialog component for importing lots via CSV.
@@ -332,8 +329,8 @@ export class ImportDialog extends ModalDialog {
             return;
         }
 
-        // Size check passed - trigger import callback with parsed lots
-        this.importCallback(parsedResult.validLots);
+        // Size check passed - trigger import callback with unified ImportResult
+        this.importCallback({ parsedLots: parsedResult.validLots });
     }
 
 }

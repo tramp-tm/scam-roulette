@@ -135,6 +135,15 @@ export interface ParseResult {
  */
 export type ImportStrategy = 'replace' | 'merge' | 'cancel';
 
+/**
+ * Unified result object for import operations.
+ * Contains either parsedLots (from ImportDialog) or strategy (from ImportConflictDialog).
+ */
+export interface ImportResult {
+    parsedLots?: ParsedLot[];
+    strategy?: ImportStrategy;
+}
+
 // ========================================
 // UI RENDERING TYPES
 // ========================================
@@ -165,8 +174,5 @@ export interface LotsListRenderOptions {
 // MODAL DIALOG TYPES
 // ========================================
 
-/** Callback type for ImportDialog import action */
-export type ImportCallback = (parsedLots: ParsedLot[]) => void;
-
-/** Callback type for conflict resolution */
-export type ConflictResolutionCallback = (strategy: ImportStrategy) => void;
+/** Unified callback type for import operations */
+export type ImportCallback = (result: ImportResult) => void;
