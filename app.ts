@@ -312,6 +312,9 @@ export class App {
         
         // Update UI
         this.updateUI();
+        
+        // Redraw the roulette wheel
+        this.render();
     }
 
     private updateUI(): void {
