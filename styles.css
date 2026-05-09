@@ -72,11 +72,34 @@ h1 {
     padding: 20px;
 }
 
-/* Lots panel - dynamic height matching content but constrained by viewport */
+/* Lots panel - flex container to keep add row at bottom */
 .left-panel .panel {
-    flex: 0 0 auto;  /* Don't grow, don't shrink, size to content */
+    display: flex;
+    flex-direction: column;
     max-height: calc(100vh - 80px);  /* Constrain by viewport minus margins/padding */
-    overflow-y: auto;  /* Scroll if content exceeds available space */
+    overflow: hidden;  /* Don't scroll the panel itself */
+}
+
+/* Scrollable wrapper for lots list only */
+#lots-list-wrapper {
+    flex: 1;  /* Grow to fill available space */
+    overflow-y: auto;  /* Only this scrolls */
+    min-height: 0;  /* Required for nested scrolling in flex containers */
+    padding-bottom: 8px;  /* Space between last lot and add row */
+}
+
+#lots-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Add row stays at bottom, always visible */
+.left-panel .panel > .lot-item.add-row {
+    flex-shrink: 0;  /* Don't shrink */
+    margin-top: auto;  /* Push to bottom of flex container */
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px dashed rgba(46, 204, 113, 0.5);
 }
 
 .canvas-container {
@@ -206,12 +229,6 @@ button:disabled {
 /* ========================================
    LOTS LIST
    ======================================== */
-#lots-list {
-    list-style: none;
-    max-height: none;  /* Remove fixed max-height */
-    overflow-y: visible;  /* Let parent handle scrolling */
-}
-
 .lot-item {
     display: flex;
     align-items: center;

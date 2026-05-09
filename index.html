@@ -12,9 +12,13 @@
         <div class="left-panel">
             <div class="panel">
                 <h3>📋 Lots</h3>
-                <ul id="lots-list"></ul>
-                
-                <!-- Add New Lot Row (inline at bottom of table) -->
+            
+                <!-- Scrollable lots list wrapper -->
+                <div id="lots-list-wrapper">
+                    <ul id="lots-list"></ul>
+                </div>
+            
+                <!-- Add New Lot Row (outside scrollable area, always visible) -->
                 <li class="lot-item add-row">
                     <div id="new-lot-color-indicator" class="lot-color-indicator"></div>
                     <input type="text" id="new-lot-name" placeholder="Lot Name" class="add-lot-input">
