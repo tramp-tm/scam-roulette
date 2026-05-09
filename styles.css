@@ -72,6 +72,13 @@ h1 {
     padding: 20px;
 }
 
+/* Lots panel - dynamic height matching content but constrained by left-panel */
+.left-panel .panel {
+    flex: 0 0 auto;  /* Don't grow, don't shrink, size to content */
+    max-height: calc(100% - 40px);  /* Leave room for padding in left-panel */
+    overflow-y: auto;  /* Scroll if content exceeds available space */
+}
+
 .canvas-container {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 15px;
@@ -201,8 +208,8 @@ button:disabled {
    ======================================== */
 #lots-list {
     list-style: none;
-    max-height: 300px;
-    overflow-y: auto;
+    max-height: none;  /* Remove fixed max-height */
+    overflow-y: visible;  /* Let parent handle scrolling */
 }
 
 .lot-item {

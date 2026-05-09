@@ -412,6 +412,11 @@ export class App {
                 });
             }
 
+            // Append in order: color → name → amount → delete button
+            li.appendChild(colorIndicator);
+            li.appendChild(lotName);
+            li.appendChild(amountInput);
+
             // Actions (delete button only if showActions is true and not highlighted)
             if (showActions && lot.id !== highlightId) {
                 const actionsDiv = document.createElement('div');
@@ -431,11 +436,6 @@ export class App {
                 actionsDiv.appendChild(deleteBtn);
                 li.appendChild(actionsDiv);
             }
-
-            // Append all elements to list item
-            li.appendChild(colorIndicator);
-            li.appendChild(lotName);
-            li.appendChild(amountInput);
 
             container.appendChild(li);
         }
