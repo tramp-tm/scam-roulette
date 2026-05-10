@@ -1,5 +1,5 @@
 import { ModalDialog } from './modalDialog.js';
-import { SeparatorType, ParsedLot, ImportResult, ImportCallback } from './types.js';
+import { SeparatorType, ParsedLot, ImportCallback } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
 import { ModalManager } from './modalManager.js';
