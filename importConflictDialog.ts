@@ -1,5 +1,5 @@
 import { ModalDialog } from './modalDialog.js';
-import { ImportStrategy, ImportCallback } from './types.js';
+import { ImportStrategy, IMPORT_STRATEGIES } from './types.js';
 
 /**
  * Visual modal dialog for resolving import conflicts.
@@ -7,10 +7,9 @@ import { ImportStrategy, ImportCallback } from './types.js';
  */
 export class ImportConflictDialog extends ModalDialog {
     private existingCount: number;
-    private resolutionCallback: ImportCallback;
-    private resolveBtns: HTMLButtonElement[] = [];
+    private resolutionCallback: (strategy: ImportStrategy | null) => void;
 
-    constructor(existingCount: number, resolutionCallback: ImportCallback) {
+    constructor(existingCount: number, resolutionCallback: (strategy: ImportStrategy | null) => void) {
         console.log('⚠️ [ImportConflictDialog] Constructor called');
         console.log(`   └─ Existing lots: ${existingCount}`);
         super();
@@ -23,6 +22,13 @@ export class ImportConflictDialog extends ModalDialog {
     }
 
     private renderConflictContent(): void {
+        const strategyButtonsHtml = IMPORT_STRATEGIES.map(strategy => `
+            <button id="btn-${strategy.id}" class="strategy-btn ${strategy.id}">
+                ${strategy.label}
+                <span class="strategy-desc">${strategy.description}</span>
+            </button>
+        `).join('');
+
         const html = `
             <div class="conflict-message">
                 <p>You have <strong>${this.existingCount}</strong> existing lot(s).</p>
@@ -30,15 +36,7 @@ export class ImportConflictDialog extends ModalDialog {
             </div>
             
             <div class="strategy-buttons">
-                <button id="btn-replace" class="strategy-btn replace">
-                    🔄 Replace
-                    <span class="strategy-desc">Remove all existing lots and import new ones</span>
-                </button>
-                
-                <button id="btn-merge" class="strategy-btn merge">
-                    🔗 Merge
-                    <span class="strategy-desc">Keep existing lots and add new ones</span>
-                </button>
+                ${strategyButtonsHtml}
                 
                 <button id="btn-cancel" class="strategy-btn cancel">
                     ❌ Cancel
@@ -60,30 +58,27 @@ export class ImportConflictDialog extends ModalDialog {
                 this.content.appendChild(container);
             }
 
-            // Cache button references and setup event listeners
-            const replaceBtn = container.querySelector('#btn-replace') as HTMLButtonElement;
-            const mergeBtn = container.querySelector('#btn-merge') as HTMLButtonElement;
+            // Setup event listeners for each strategy button
+            IMPORT_STRATEGIES.forEach(strategy => {
+                const btn = container.querySelector(`#btn-${strategy.id}`) as HTMLButtonElement;
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        console.log(`⚠️ [ImportConflictDialog] ${strategy.label} clicked`);
+                        this.resolutionCallback(strategy);
+                        this.close();
+                    });
+                }
+            });
+            
+            // Cancel button - passes null (no strategy = no execution)
             const cancelBtn = container.querySelector('#btn-cancel') as HTMLButtonElement;
-            
-            this.resolveBtns = [replaceBtn, mergeBtn, cancelBtn];
-            
-            replaceBtn.addEventListener('click', () => {
-                console.log('⚠️ [ImportConflictDialog] REPLACE button clicked');
-                this.resolutionCallback({ strategy: 'replace' });
-                this.close();
-            });
-            
-            mergeBtn.addEventListener('click', () => {
-                console.log('⚠️ [ImportConflictDialog] MERGE button clicked');
-                this.resolutionCallback({ strategy: 'merge' });
-                this.close();
-            });
-            
-            cancelBtn.addEventListener('click', () => {
-                console.log('⚠️ [ImportConflictDialog] CANCEL button clicked');
-                this.resolutionCallback({ strategy: 'cancel' });
-                this.close();
-            });
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    console.log('⚠️ [ImportConflictDialog] CANCEL clicked');
+                    this.resolutionCallback(null);
+                    this.close();
+                });
+            }
         }
     }
 

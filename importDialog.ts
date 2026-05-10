@@ -343,9 +343,9 @@ export class ImportDialog extends ModalDialog {
             return;
         }
 
-        // Size check passed - trigger import callback with unified ImportResult
+        // Size check passed - trigger import callback directly with ParsedLot[]
         console.log(`✅ [ImportDialog] Triggering callback with ${validLotCount} lots`);
-        this.importCallback({ parsedLots: parsedResult.validLots });
+        this.importCallback(parsedResult.validLots);
     }
 
 }
