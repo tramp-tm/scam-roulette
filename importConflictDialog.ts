@@ -11,6 +11,8 @@ export class ImportConflictDialog extends ModalDialog {
     private resolveBtns: HTMLButtonElement[] = [];
 
     constructor(existingCount: number, resolutionCallback: ImportCallback) {
+        console.log('⚠️ [ImportConflictDialog] Constructor called');
+        console.log(`   └─ Existing lots: ${existingCount}`);
         super();
         this.existingCount = existingCount;
         this.resolutionCallback = resolutionCallback;
@@ -66,16 +68,19 @@ export class ImportConflictDialog extends ModalDialog {
             this.resolveBtns = [replaceBtn, mergeBtn, cancelBtn];
             
             replaceBtn.addEventListener('click', () => {
+                console.log('⚠️ [ImportConflictDialog] REPLACE button clicked');
                 this.resolutionCallback({ strategy: 'replace' });
                 this.close();
             });
             
             mergeBtn.addEventListener('click', () => {
+                console.log('⚠️ [ImportConflictDialog] MERGE button clicked');
                 this.resolutionCallback({ strategy: 'merge' });
                 this.close();
             });
             
             cancelBtn.addEventListener('click', () => {
+                console.log('⚠️ [ImportConflictDialog] CANCEL button clicked');
                 this.resolutionCallback({ strategy: 'cancel' });
                 this.close();
             });

@@ -485,22 +485,38 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
+        console.log('📥 [APP] Import button pressed');
+        console.log(`   ├─ Existing lots: ${this.lotManager.getTotalCount()}`);
+        console.log(`   ├─ Active lots: ${this.lotManager.getActiveCount()}`);
+        console.log(`   └─ Modals open: ${ModalManager.getInstance().getOpenModalCount()}`);
+        
         this.importDialog = new ImportDialog((result) => {
             // Handle parsed lots from ImportDialog
             if (result.parsedLots) {
+                console.log('📥 [APP] ImportDialog callback received');
+                console.log(`   ├─ Parsed lots count: ${result.parsedLots.length}`);
+                console.log(`   └─ First lot: ${result.parsedLots[0]?.name} ($${result.parsedLots[0]?.amount})`);
                 this.handleImportConflict(result.parsedLots);
             }
         });
         
         this.importDialog.open();
+        console.log('📥 [APP] ImportDialog opened');
+        console.log(`   └─ Total modals now open: ${ModalManager.getInstance().getOpenModalCount()}`);
     }
 
     /** Handles conflict resolution when importing lots */
     private handleImportConflict(parsedLots: ParsedLot[]): void {
         const existingCount = this.lotManager.getTotalCount();
         
+        console.log('⚠️ [APP] Handling import conflict');
+        console.log(`   ├─ Existing lots: ${existingCount}`);
+        console.log(`   ├─ New lots to import: ${parsedLots.length}`);
+        console.log(`   └─ Modals open before: ${ModalManager.getInstance().getOpenModalCount()}`);
+        
         // If no existing lots, proceed directly with merge strategy
         if (existingCount === 0) {
+            console.log('✅ [APP] No conflict - proceeding with MERGE');
             this.executeImport(parsedLots, 'merge');
             return;
         }
@@ -508,20 +524,39 @@ export class App {
         // Show conflict resolution dialog
         const conflictDialog = new ImportConflictDialog(existingCount, (result) => {
             if (result.strategy && result.strategy !== 'cancel') {
+                console.log('⚠️ [APP] ConflictDialog callback received');
+                console.log(`   ├─ Strategy: ${result.strategy}`);
+                console.log(`   └─ Modals open before executeImport: ${ModalManager.getInstance().getOpenModalCount()}`);
                 this.executeImport(parsedLots, result.strategy);
+            } else {
+                console.log('❌ [APP] Import cancelled by user');
             }
         });
         
         conflictDialog.open();
+        console.log('⚠️ [APP] ConflictDialog opened');
+        console.log(`   └─ Total modals now open: ${ModalManager.getInstance().getOpenModalCount()}`);
     }
 
     /** Executes the actual import based on selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
+        console.log('🔄 [APP] Executing import');
+        console.log(`   ├─ Strategy: ${strategy.toUpperCase()}`);
+        console.log(`   ├─ Lots to import: ${parsedLots.length}`);
+        console.log(`   ├─ Existing lots before: ${this.lotManager.getTotalCount()}`);
+        console.log(`   └─ Modals open: ${ModalManager.getInstance().getOpenModalCount()}`);
+        
         if (strategy === 'replace') {
+            console.log('🔄 [APP] REPLACE strategy - clearing all existing lots');
             // Clear all existing lots first
             this.lotManager.clearAll();
+            console.log(`   └─ Lots after clear: ${this.lotManager.getTotalCount()}`);
         } else if (strategy === 'merge') {
+            console.log('🔗 [APP] MERGE strategy - merging with existing lots');
             // For merge strategy, check for name conflicts and update or add accordingly
+            let added = 0;
+            let updated = 0;
+            
             for (const parsedLot of parsedLots) {
                 const matchingLot = this.lotManager.getAllLots().find(
                     l => l.name.toLowerCase() === parsedLot.name.toLowerCase()
@@ -529,13 +564,19 @@ export class App {
                 
                 if (matchingLot) {
                     // Update existing lot with new amount
+                    console.log(`   └─ Updating: ${parsedLot.name} ($${matchingLot.amount} → $${parsedLot.amount})`);
                     this.lotManager.updateLot(matchingLot.id, { amount: parsedLot.amount });
+                    updated++;
                 } else {
                     // Add new lot with random color
                     const color = generateRandomReadableColor();
+                    console.log(`   └─ Adding: ${parsedLot.name} ($${parsedLot.amount})`);
                     this.lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+                    added++;
                 }
             }
+            
+            console.log(`   ├─ Added: ${added}, Updated: ${updated}`);
         }
 
         // Update UI and renderer
@@ -543,10 +584,16 @@ export class App {
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
         
+        console.log('✅ [APP] Import completed');
+        console.log(`   ├─ Total lots after import: ${this.lotManager.getTotalCount()}`);
+        console.log(`   └─ Active lots: ${this.lotManager.getActiveCount()}`);
+        
         // Close the import dialog after successful import
         if (this.importDialog) {
+            console.log('📥 [APP] Closing ImportDialog');
             this.importDialog.close();
             this.importDialog = null;
+            console.log(`   └─ Modals open after close: ${ModalManager.getInstance().getOpenModalCount()}`);
         }
     }
 }
