@@ -31,6 +31,7 @@ export class App {
     private isSettingsLocked: boolean = false;
     private endRotation: number = 0;
     private importStrategy: ImportStrategy | null = null;
+    private importDialog: ImportDialog | null = null;
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -484,14 +485,14 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
-        const importDialog = new ImportDialog((result) => {
+        this.importDialog = new ImportDialog((result) => {
             // Handle parsed lots from ImportDialog
             if (result.parsedLots) {
                 this.handleImportConflict(result.parsedLots);
             }
         });
         
-        importDialog.open();
+        this.importDialog.open();
     }
 
     /** Handles conflict resolution when importing lots */
@@ -541,6 +542,12 @@ export class App {
         this.updateUI();
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
+        
+        // Close the import dialog after successful import
+        if (this.importDialog) {
+            this.importDialog.close();
+            this.importDialog = null;
+        }
     }
 }
 
