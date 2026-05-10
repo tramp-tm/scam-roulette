@@ -7,6 +7,7 @@ import { generateRandomReadableColor } from './utils.js';
 import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
+import { ModalManager } from './modalManager.js';
 
 /**
  * Main application controller for the roulette game.
