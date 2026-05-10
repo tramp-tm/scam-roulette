@@ -552,6 +552,17 @@ export class App {
             // Clear all existing lots first
             this.lotManager.clearAll();
             console.log(`   └─ Lots after clear: ${this.lotManager.getTotalCount()}`);
+            
+            // Now add all imported lots (similar to merge's "add" logic)
+            let added = 0;
+            for (const parsedLot of parsedLots) {
+                const color = generateRandomReadableColor();
+                console.log(`   └─ Adding: ${parsedLot.name} ($${parsedLot.amount})`);
+                this.lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+                added++;
+            }
+            console.log(`   ├─ Added: ${added}`);
+            
         } else if (strategy === 'merge') {
             console.log('🔗 [APP] MERGE strategy - merging with existing lots');
             // For merge strategy, check for name conflicts and update or add accordingly
