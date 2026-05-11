@@ -227,6 +227,36 @@ button:disabled {
 }
 
 /* ========================================
+   SORT CONTROLS
+   ======================================== */
+.sort-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.sort-btn {
+    padding: 6px 12px;
+    font-size: 0.85em;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sort-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.sort-btn.active {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    color: white;
+    font-weight: bold;
+}
+
+/* ========================================
    LOTS LIST
    ======================================== */
 .lot-item {

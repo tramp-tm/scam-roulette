@@ -105,6 +105,22 @@ export interface Segment {
 export type EasingFunction = (t: number) => number;
 
 // ========================================
+// SORTING TYPES
+// ========================================
+
+/** Sort field options for lots list */
+export type SortField = 'name' | 'amount';
+
+/** Sort direction */
+export type SortDirection = 'asc' | 'desc';
+
+/** Current sort state */
+export interface SortState {
+    field: SortField;
+    direction: SortDirection;
+}
+
+// ========================================
 // IMPORT FEATURE TYPES
 // ========================================
 

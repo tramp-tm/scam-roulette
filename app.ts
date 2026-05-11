@@ -2,7 +2,7 @@ import { LotManager } from './lotManager.js';
 import { Renderer } from './renderer.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy } from './types.js';
+import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
 import { generateRandomReadableColor } from './utils.js';
 import { parseCSV } from './csvParser.js';
@@ -34,6 +34,10 @@ export class App {
     private endRotation: number = 0;
     private importStrategy: ImportStrategy | null = null;
     private importDialog: ImportDialog | null = null;
+    
+    // Sort state
+    private sortField: SortField = 'name';
+    private sortDirection: SortDirection = 'asc';
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -60,6 +64,10 @@ export class App {
     private durationValue: HTMLElement | null = null;
     private spinsSlider: HTMLInputElement | null = null;
     private spinsValue: HTMLElement | null = null;
+    
+    // Sort control elements
+    private sortByNameBtn: HTMLButtonElement | null = null;
+    private sortByAmountBtn: HTMLButtonElement | null = null;
 
     constructor() {
         this.lotManager = new LotManager([]);
@@ -92,6 +100,10 @@ export class App {
         this.durationValue = document.getElementById('duration-value');
         this.spinsSlider = document.getElementById('spins-slider') as HTMLInputElement;
         this.spinsValue = document.getElementById('spins-value');
+        
+        // Sort control elements
+        this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
+        this.sortByAmountBtn = document.getElementById('sort-by-amount') as HTMLButtonElement;
 
         // Initialize UI
         this.updateUI();
@@ -171,6 +183,55 @@ export class App {
         this.spinsSlider?.addEventListener('input', () => {
             if (this.spinsValue) this.spinsValue.textContent = this.spinsSlider ? this.spinsSlider.value : '';
         });
+        
+        // Sort by name button
+        this.sortByNameBtn?.addEventListener('click', () => {
+            this.setSortField('name');
+        });
+        
+        // Sort by amount button
+        this.sortByAmountBtn?.addEventListener('click', () => {
+            this.setSortField('amount');
+        });
+    }
+
+    /** Sets the sort field and toggles direction if same field */
+    private setSortField(field: SortField): void {
+        // If clicking same field, toggle direction; otherwise default to ascending
+        if (this.sortField === field) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortField = field;
+            this.sortDirection = 'asc';
+        }
+        
+        // Update button visual states
+        this.updateSortButtons();
+        
+        // Re-render lots list with new sort order
+        this.renderLotsList();
+    }
+    
+    /** Updates visual state of sort buttons */
+    private updateSortButtons(): void {
+        if (!this.sortByNameBtn || !this.sortByAmountBtn) return;
+        
+        // Reset both buttons to inactive state
+        this.sortByNameBtn.classList.remove('active');
+        this.sortByAmountBtn.classList.remove('active');
+        this.sortByNameBtn.textContent = '🅰️ Name';
+        this.sortByAmountBtn.textContent = '💵 Amount';
+        
+        // Set active button with direction indicator
+        if (this.sortField === 'name') {
+            this.sortByNameBtn.classList.add('active');
+            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
+            this.sortByNameBtn.textContent = `🅰️ Name ${arrow}`;
+        } else {
+            this.sortByAmountBtn.classList.add('active');
+            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
+            this.sortByAmountBtn.textContent = `💵 Amount ${arrow}`;
+        }
     }
 
     private addLot(): void {
@@ -448,7 +509,20 @@ export class App {
     }
 
     private renderLotsList(): void {
-        const lots = this.lotManager.getAllLots();
+        let lots = this.lotManager.getAllLots();
+        
+        // Apply sorting based on current sort state
+        lots = [...lots].sort((a, b) => {
+            if (this.sortField === 'name') {
+                return this.sortDirection === 'asc' 
+                    ? a.name.localeCompare(b.name)
+                    : b.name.localeCompare(a.name);
+            } else { // amount
+                return this.sortDirection === 'asc'
+                    ? a.amount - b.amount
+                    : b.amount - a.amount;
+            }
+        });
         
         // Use the reusable rendering method with default options for main lots list
         this.renderLotsListToContainer(this.lotsList, lots, {
