@@ -50,16 +50,12 @@ export class ImportDialog extends ModalDialog {
                 this.importBtn.disabled = false;
             }
             
-            // Destroy the dialog to clean up DOM nodes and event listeners
-            // Only destroy if no other modals are open (we're the last one)
+            // Always destroy the dialog to clean up DOM nodes and event listeners
+            // This prevents stale state issues when reopening the import dialog
             const manager = ModalManager.getInstance();
             console.log(`   ├─ Modals still open: ${manager.getOpenModalCount()}`);
-            if (!manager.hasOpenModals()) {
-                console.log('   └─ Destroying ImportDialog');
-                this.destroy();
-            } else {
-                console.log('   └─ Keeping ImportDialog (other modals open)');
-            }
+            console.log('   └─ Destroying ImportDialog');
+            this.destroy();
         };
         
         // Build the dialog UI

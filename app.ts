@@ -492,6 +492,13 @@ export class App {
         console.log(`   ├─ Active lots: ${this.lotManager.getActiveCount()}`);
         console.log(`   └─ Modals open: ${ModalManager.getInstance().getOpenModalCount()}`);
         
+        // Ensure any existing ImportDialog is destroyed before creating a new one
+        if (this.importDialog) {
+            console.log('📥 [APP] Destroying existing ImportDialog before creating new one');
+            this.importDialog.destroy();
+            this.importDialog = null;
+        }
+        
         this.importDialog = new ImportDialog((parsedLots) => {
             console.log('📥 [APP] ImportDialog callback received');
             console.log(`   ├─ Parsed lots count: ${parsedLots.length}`);
