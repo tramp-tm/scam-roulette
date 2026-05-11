@@ -552,6 +552,14 @@ export class App {
         console.log('✅ [APP] Import completed');
         console.log(`   ├─ Total lots after import: ${this.lotManager.getTotalCount()}`);
         console.log(`   └─ Active lots: ${this.lotManager.getActiveCount()}`);
+        
+        // Close the import dialog after successful import (handles both conflict and no-conflict cases)
+        if (this.importDialog) {
+            console.log('📥 [APP] Closing ImportDialog');
+            this.importDialog.close();
+            this.importDialog = null;
+            console.log(`   └─ Modals open after close: ${ModalManager.getInstance().getOpenModalCount()}`);
+        }
     }
 }
 
