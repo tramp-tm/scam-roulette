@@ -1,5 +1,6 @@
 import { ModalDialog } from './modalDialog.js';
-import { ImportStrategy, IMPORT_STRATEGIES } from './strategies.js';
+import { ImportStrategy } from './types.js';
+import { IMPORT_STRATEGIES } from './strategies.js';
 
 /**
  * Visual modal dialog for resolving import conflicts.

@@ -1,5 +1,5 @@
+import { Lot, ImportStrategy } from './types.js';
 import { LotManager } from './lotManager.js';
-import { ImportStrategy } from './types.js';
 import { generateRandomReadableColor } from './utils.js';
 
 /** Replace strategy - clears existing lots and imports new ones */
@@ -35,7 +35,7 @@ export const MERGE_STRATEGY: ImportStrategy = {
         
         for (const parsedLot of parsedLots) {
             const matchingLot = lotManager.getAllLots().find(
-                l => l.name.toLowerCase() === parsedLot.name.toLowerCase()
+                (l: Lot) => l.name.toLowerCase() === parsedLot.name.toLowerCase()
             );
             
             if (matchingLot) {

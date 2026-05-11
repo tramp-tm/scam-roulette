@@ -138,7 +138,8 @@ export interface ImportStrategy {
     id: 'replace' | 'merge';
     label: string;
     description: string;
-    execute: (parsedLots: ParsedLot[], lotManager: LotManager) => void;
+    /** Execute function - LotManager type is referenced but not imported to avoid circular dependency */
+    execute: (parsedLots: ParsedLot[], lotManager: any) => void;
 }
 
 /** Strategies are defined in strategies.ts to avoid circular dependencies */
