@@ -584,10 +584,10 @@ input[type="number"] {
 }
 
 /* ========================================
-   SEPARATOR SWITCH (Comma <-> Tab)
+   GENERIC SWITCH COMPONENT (Reusable Toggle/Switch UI)
    ======================================== */
 
-.separator-switch {
+.switch {
     display: inline-flex;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -595,7 +595,7 @@ input[type="number"] {
     gap: 2px;
 }
 
-.sep-btn {
+.switch-btn {
     padding: 6px 14px;
     border: none;
     border-radius: 6px;
@@ -606,23 +606,23 @@ input[type="number"] {
     transition: all 0.2s ease;
 }
 
-.sep-btn:hover {
+.switch-btn:hover {
     color: #fff;
 }
 
-.sep-btn.active {
+.switch-btn.active {
     background: linear-gradient(90deg, #f39c12, #e67e22);
     color: white;
     font-weight: bold;
     box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
 }
 
-.sep-btn:first-child {
+.switch-btn:first-child {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
 }
 
-.sep-btn:last-child {
+.switch-btn:last-child {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
 }
