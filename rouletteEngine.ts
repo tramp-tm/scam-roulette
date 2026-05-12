@@ -131,25 +131,6 @@ export class RouletteEngine {
         const segment = segments.find(s => s.lot.id === targetLotId);
         if (!segment) return currentRotation;
 
-        // DEBUG: Log wheel state before spin
-        console.group('🎡 Wheel State Before Spin');
-        console.log(`Current rotation: ${currentRotation.toFixed(6)} rad (${(currentRotation * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Target lot: "${segment.lot.name}" (amount: $${segment.lot.amount})`);
-        console.log(`Segment angles: start=${segment.startAngle.toFixed(4)} rad, end=${segment.endAngle.toFixed(4)} rad`);
-        console.log(`Segment span: ${(segment.endAngle - segment.startAngle).toFixed(4)} rad (${((segment.endAngle - segment.startAngle) * 180 / Math.PI).toFixed(2)}°)`);
-        
-        // Log all segments for debugging
-        console.table(segments.map((s, i) => ({
-            index: i,
-            name: s.lot.name,
-            amount: s.lot.amount,
-            startAngle: s.startAngle.toFixed(4),
-            endAngle: s.endAngle.toFixed(4),
-            spanDeg: ((s.endAngle - s.startAngle) * 180 / Math.PI).toFixed(2),
-            isTarget: s.lot.id === targetLotId ? '✓' : ''
-        })));
-        console.groupEnd();
-
         // POINTER POSITION: Fixed at TOP of wheel = angle -π/2 (or equivalently 3π/2)
         const pointerAngle = -Math.PI / 2;
         
@@ -184,24 +165,6 @@ export class RouletteEngine {
         const extraRotations = 
             Math.floor(Math.random() * (maxFullRotations - minFullRotations + 1)) + minFullRotations;
         totalRotation += extraRotations * Math.PI * 2;
-
-        // DEBUG: Log computed rotation details
-        console.group('🔄 Rotation Calculation');
-        console.log(`Pointer angle (top): ${pointerAngle.toFixed(4)} rad (${(pointerAngle * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Target segment angle: ${targetSegmentAngle.toFixed(6)} rad (${(targetSegmentAngle * 180 / Math.PI).toFixed(2)}°)`);
-        console.log(`Base rotation (pointer - target): ${baseRotation.toFixed(6)} rad`);
-        console.log(`Extra rotations added: ${extraRotations}`);
-        console.log(`Total final rotation: ${totalRotation.toFixed(6)} rad (${(totalRotation * 180 / Math.PI).toFixed(2)}°)`);
-        
-        // Verify alignment
-        const normalizedFinal = totalRotation % (Math.PI * 2);
-        const angleUnderPointer = (targetSegmentAngle + totalRotation) % (Math.PI * 2);
-        console.log(`\n📐 VERIFICATION:`);
-        console.log(`  targetSegmentAngle + finalRotation = ${(angleUnderPointer).toFixed(6)} rad`);
-        console.log(`  Expected (pointer at top): ${pointerAngle.toFixed(6)} rad or ${(pointerAngle + Math.PI * 2).toFixed(6)} rad`);
-        const diff = Math.abs(((angleUnderPointer - pointerAngle + Math.PI) % (Math.PI * 2)) - Math.PI);
-        console.log(`  Difference from pointer: ${diff.toFixed(6)} rad (${(diff * 180 / Math.PI).toFixed(4)}°)`);
-        console.groupEnd();
 
         return totalRotation;
     }

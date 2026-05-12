@@ -11,8 +11,6 @@ export class ImportConflictDialog extends ModalDialog {
     private resolutionCallback: (strategy: ImportStrategy | null) => void;
 
     constructor(existingCount: number, resolutionCallback: (strategy: ImportStrategy | null) => void) {
-        console.log('⚠️ [ImportConflictDialog] Constructor called');
-        console.log(`   └─ Existing lots: ${existingCount}`);
         super();
         this.existingCount = existingCount;
         this.resolutionCallback = resolutionCallback;
@@ -64,7 +62,6 @@ export class ImportConflictDialog extends ModalDialog {
                 const btn = container.querySelector(`#btn-${strategy.id}`) as HTMLButtonElement;
                 if (btn) {
                     btn.addEventListener('click', () => {
-                        console.log(`⚠️ [ImportConflictDialog] ${strategy.label} clicked`);
                         this.resolutionCallback(strategy);
                         this.close();
                     });
@@ -75,7 +72,6 @@ export class ImportConflictDialog extends ModalDialog {
             const cancelBtn = container.querySelector('#btn-cancel') as HTMLButtonElement;
             if (cancelBtn) {
                 cancelBtn.addEventListener('click', () => {
-                    console.log('⚠️ [ImportConflictDialog] CANCEL clicked');
                     this.resolutionCallback(null);
                     this.close();
                 });

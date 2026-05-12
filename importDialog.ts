@@ -24,15 +24,11 @@ export class ImportDialog extends ModalDialog {
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
-        console.log('📥 [ImportDialog] Constructor called');
         super();
         this.importCallback = importCallback;
         
         // Set up onClose callback for cleanup when dialog closes
         this.onClose = (data?: unknown) => {
-            console.log('📥 [ImportDialog] onClose called');
-            console.log(`   ├─ Parsed result: ${this.parsedResult ? `${this.parsedResult.validLots.length} valid, ${this.parsedResult.errorCount} errors` : 'null'}`);
-            
             // Reset parsed result
             this.parsedResult = null;
             
@@ -52,9 +48,6 @@ export class ImportDialog extends ModalDialog {
             
             // Always destroy the dialog to clean up DOM nodes and event listeners
             // This prevents stale state issues when reopening the import dialog
-            const manager = ModalManager.getInstance();
-            console.log(`   ├─ Modals still open: ${manager.getOpenModalCount()}`);
-            console.log('   └─ Destroying ImportDialog');
             this.destroy();
         };
         
@@ -306,17 +299,13 @@ export class ImportDialog extends ModalDialog {
     }
 
     private handleImport(): void {
-        console.log('📥 [ImportDialog] Import button clicked');
-        
         // Check if preview has been run with valid lots
         const parsedResult = this.parsedResult;
         if (!parsedResult) {
-            console.log('   └─ No parsed result available');
             alert('Please click "Preview" first to parse the CSV data.');
             return;
         }
         if (parsedResult.validLots.length === 0) {
-            console.log('   └─ No valid lots in parsed result');
             alert('No valid lots to import.');
             return;
         }
@@ -325,21 +314,18 @@ export class ImportDialog extends ModalDialog {
 
         // Check size limit (1000 lots maximum) - use confirm for Cancel option
         if (validLotCount > 1000) {
-            console.log(`   └─ Size limit exceeded: ${validLotCount} > 1000`);
             const confirmed = confirm(
                 `⚠️ SIZE LIMIT EXCEEDED\n\n` +
                 `${validLotCount} lots exceeds the maximum limit of 1000.\n\n` +
                 `Click OK to reduce and retry, or Cancel to abort.`
             );
             if (!confirmed) {
-                console.log('   └─ User cancelled size limit warning');
                 return;
             }
             return;
         }
 
         // Size check passed - trigger import callback directly with ParsedLot[]
-        console.log(`✅ [ImportDialog] Triggering callback with ${validLotCount} lots`);
         this.importCallback(parsedResult.validLots);
     }
 

@@ -28,7 +28,6 @@ export class ModalManager {
      * Registers an open modal in the stack.
      */
     public registerModal(modalElement: HTMLElement): void {
-        console.log(`📋 [ModalManager] Registering modal #${this.openModals.length + 1}`);
         this.openModals.push(modalElement);
     }
 
@@ -36,7 +35,6 @@ export class ModalManager {
      * Unregisters a closed modal from the stack.
      */
     public unregisterModal(modalElement: HTMLElement): void {
-        console.log(`📋 [ModalManager] Unregistering modal`);
         const index = this.openModals.indexOf(modalElement);
         if (index !== -1) {
             this.openModals.splice(index, 1);

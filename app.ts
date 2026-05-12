@@ -567,42 +567,25 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
-        console.log('📥 [APP] Import button pressed');
-        console.log(`   ├─ Existing lots: ${this.lotManager.getTotalCount()}`);
-        console.log(`   ├─ Active lots: ${this.lotManager.getActiveCount()}`);
-        console.log(`   └─ Modals open: ${ModalManager.getInstance().getOpenModalCount()}`);
-        
         // Ensure any existing ImportDialog is destroyed before creating a new one
         if (this.importDialog) {
-            console.log('📥 [APP] Destroying existing ImportDialog before creating new one');
             this.importDialog.destroy();
             this.importDialog = null;
         }
         
         this.importDialog = new ImportDialog((parsedLots) => {
-            console.log('📥 [APP] ImportDialog callback received');
-            console.log(`   ├─ Parsed lots count: ${parsedLots.length}`);
-            console.log(`   └─ First lot: ${parsedLots[0]?.name} ($${parsedLots[0]?.amount})`);
             this.handleImportConflict(parsedLots);
         });
         
         this.importDialog.open();
-        console.log('📥 [APP] ImportDialog opened');
-        console.log(`   └─ Total modals now open: ${ModalManager.getInstance().getOpenModalCount()}`);
     }
 
     /** Handles conflict resolution when importing lots */
     private handleImportConflict(parsedLots: ParsedLot[]): void {
         const existingCount = this.lotManager.getTotalCount();
         
-        console.log('⚠️ [APP] Handling import conflict');
-        console.log(`   ├─ Existing lots: ${existingCount}`);
-        console.log(`   ├─ New lots to import: ${parsedLots.length}`);
-        console.log(`   └─ Modals open before: ${ModalManager.getInstance().getOpenModalCount()}`);
-        
         // If no existing lots, proceed directly with merge strategy (no conflict)
         if (existingCount === 0) {
-            console.log('✅ [APP] No conflict - proceeding with MERGE');
             this.executeImport(parsedLots, MERGE_STRATEGY);
             return;
         }
@@ -610,24 +593,15 @@ export class App {
         // Show conflict resolution dialog - callback receives ImportStrategy | null
         const conflictDialog = new ImportConflictDialog(existingCount, (strategy) => {
             if (strategy) {  // If strategy is not null (user didn't cancel)
-                console.log('⚠️ [APP] ConflictDialog callback received:', strategy.label);
                 this.executeImport(parsedLots, strategy);
-            } else {
-                console.log('❌ [APP] Import cancelled by user');
             }
         });
         
         conflictDialog.open();
-        console.log('⚠️ [APP] ConflictDialog opened');
-        console.log(`   └─ Total modals now open: ${ModalManager.getInstance().getOpenModalCount()}`);
     }
 
     /** Executes the import using the selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
-        console.log('🔄 [APP] Executing import with strategy:', strategy.label);
-        console.log(`   ├─ Lots to import: ${parsedLots.length}`);
-        console.log(`   └─ Existing lots before: ${this.lotManager.getTotalCount()}`);
-        
         // Delegate execution to the strategy object - no branching needed!
         strategy.execute(parsedLots, this.lotManager);
         
@@ -636,16 +610,10 @@ export class App {
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
         
-        console.log('✅ [APP] Import completed');
-        console.log(`   ├─ Total lots after import: ${this.lotManager.getTotalCount()}`);
-        console.log(`   └─ Active lots: ${this.lotManager.getActiveCount()}`);
-        
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {
-            console.log('📥 [APP] Closing ImportDialog');
             this.importDialog.close();
             this.importDialog = null;
-            console.log(`   └─ Modals open after close: ${ModalManager.getInstance().getOpenModalCount()}`);
         }
     }
 }
