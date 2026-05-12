@@ -184,14 +184,20 @@ export class App {
             if (this.spinsValue) this.spinsValue.textContent = this.spinsSlider ? this.spinsSlider.value : '';
         });
         
-        // Sort by name button
-        this.sortByNameBtn?.addEventListener('click', () => {
-            this.setSortField('name');
-        });
-        
-        // Sort by amount button
-        this.sortByAmountBtn?.addEventListener('click', () => {
-            this.setSortField('amount');
+        // Sort switch buttons - unified handler for both buttons
+        const sortButtons = document.querySelectorAll('#sort-controls .switch-btn');
+        sortButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetField = (button as HTMLElement).dataset.sortField;
+                if (!targetField) return;
+                
+                // Update active state visually
+                sortButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Set sort field and toggle direction if same field
+                this.setSortField(targetField as SortField);
+            });
         });
     }
 

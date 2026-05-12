@@ -11,16 +11,17 @@
         <!-- Left Panel: Lots List -->
         <div class="left-panel">
             <div class="panel">
-                <h3>📋 Lots</h3>
-                
-                <!-- Sort Controls -->
-                <div id="sort-controls" class="sort-controls">
-                    <button id="sort-by-name" class="sort-btn" title="Sort by name (A-Z)">
-                        🅰️ Name
-                    </button>
-                    <button id="sort-by-amount" class="sort-btn" title="Sort by amount ($ low-high)">
-                        💵 Amount
-                    </button>
+                <!-- Header row with title and sort switch -->
+                <div class="lots-header-row">
+                    <h3>📋 Lots</h3>
+                    <div id="sort-controls" class="switch">
+                        <button id="sort-by-name" class="switch-btn active" data-sort-field="name" title="Sort by name (A-Z)">
+                            🅰️ Name
+                        </button>
+                        <button id="sort-by-amount" class="switch-btn" data-sort-field="amount" title="Sort by amount ($ low-high)">
+                            💵 Amount
+                        </button>
+                    </div>
                 </div>
             
                 <!-- Scrollable lots list wrapper -->
