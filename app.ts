@@ -1,5 +1,6 @@
 import { LotManager } from './lotManager.js';
-import { Renderer } from './renderer.js';
+import { IRenderer, VisualizationType } from './types.js';
+import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
 import { Settings, Mode, VisualizationType, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
@@ -15,7 +16,7 @@ import { ModalManager } from './modalManager.js';
  */
 export class App {
     private lotManager: LotManager;
-    private renderer: Renderer;
+    private renderer: IRenderer;
     private animationController: AnimationController;
     
     private settings: Settings = {
@@ -71,7 +72,8 @@ export class App {
 
     constructor() {
         this.lotManager = new LotManager([]);
-        this.renderer = new Renderer(document.getElementById('roulette-canvas') as HTMLCanvasElement);
+        const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
+        this.renderer = createRenderer(this.settings.visualization, canvas);
         this.animationController = new AnimationController();
         
         // Initialize DOM elements
@@ -166,7 +168,13 @@ export class App {
         this.visualizationSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
             this.settings.visualization = target.value as VisualizationType;
-            this.renderer.setVisualizationType(this.settings.visualization);
+            
+            // Recreate renderer with new visualization type
+            const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
+            this.renderer = createRenderer(this.settings.visualization, canvas);
+            
+            // Re-initialize segments and render
+            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
             this.render();
         });
         
@@ -562,7 +570,8 @@ export class App {
     }
 
     private render(): void {
-        this.renderer.render();
+        const rect = this.canvas.getBoundingClientRect();
+        this.renderer.render(rect.width, rect.height);
     }
 
     /** Opens the import dialog */

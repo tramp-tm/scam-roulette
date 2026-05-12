@@ -192,3 +192,35 @@ export interface LotsListRenderOptions {
 
 /** Callback type for receiving parsed lots from ImportDialog */
 export type ImportCallback = (parsedLots: ParsedLot[]) => void;
+
+// ========================================
+// RENDERER INTERFACE
+// ========================================
+
+/**
+ * Abstract renderer interface for visualization strategies.
+ */
+export interface IRenderer {
+    /** Update segments based on lots and mode configuration */
+    updateSegments(lots: Lot[], modeConfig: ModeConfig): void;
+    
+    /** Set current rotation value (for animation) */
+    setRotation(value: number): void;
+    
+    /** Get current rotation value */
+    getCurrentRotation(): number;
+    
+    /** Set highlighted lot ID */
+    setHighlightedLot(id: string | null): void;
+    
+    /** Render the visualization to canvas */
+    render(canvasWidth: number, canvasHeight: number): void;
+    
+    /** Reset renderer state */
+    reset(): void;
+}
+
+/**
+ * Factory function type for creating renderers.
+ */
+export type RendererFactory = (canvas: HTMLCanvasElement) => IRenderer;
