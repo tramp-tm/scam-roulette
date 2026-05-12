@@ -79,7 +79,6 @@ export class ImportDialog extends ModalDialog {
                     <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
                     <div class="separator-switch">
                         <button id="sep-comma" class="sep-btn active" data-separator="comma">Comma (,)</button>
-                        <span class="sep-divider">↹</span>
                         <button id="sep-tab" class="sep-btn" data-separator="tab">Tab</button>
                     </div>
                 </div>
