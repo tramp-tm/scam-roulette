@@ -192,7 +192,7 @@ export class StripRenderer implements IRenderer {
             
             this.ctx.save(); // Save context before rotation
             this.ctx.translate(textX, textY);
-            this.ctx.rotate(Math.PI / 2); // Rotate 90° counterclockwise
+            this.ctx.rotate(-Math.PI / 2); // Rotate 90° counterclockwise
             
             this.ctx.fillStyle = '#fff';
             this.ctx.font = 'bold 14px Arial';
