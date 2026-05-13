@@ -102,8 +102,8 @@ export class StripRenderer implements IRenderer {
 
         this.ctx.save();
 
-        // Apply horizontal scroll (rotation converted to x offset)
-        const scrollOffset = this.currentRotation * 5;
+        // Apply horizontal scroll (currentRotation is already in pixels for strip mode)
+        const scrollOffset = this.currentRotation;
         
         // DEBUG LOG: Render frame info for strip mode
         debugLog('STRIP.render', `Render frame - Scroll offset: ${scrollOffset.toFixed(2)}px, Num cycles rendered: ${numCycles}`);

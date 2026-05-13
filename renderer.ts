@@ -246,8 +246,8 @@ export class Renderer {
         
         this.ctx.save();
 
-        // Apply horizontal scroll (rotation converted to x offset)
-        const scrollOffset = this.currentRotation * 5;
+        // Apply horizontal scroll (currentRotation is already in pixels for strip mode)
+        const scrollOffset = this.currentRotation;
         
         // Create clipping region for the strip view
         this.ctx.beginPath();
