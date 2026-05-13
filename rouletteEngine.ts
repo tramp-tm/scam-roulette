@@ -1,4 +1,5 @@
 import { Lot, ModeConfig, getModeConfig } from './types';
+import { debugLog } from './utils.js';
 
 /**
  * Core roulette engine that handles weighted random selection.
@@ -192,11 +193,19 @@ export class RouletteEngine {
     ): number {
         const segments = this.calculateSegments(lots, modeConfig);
         
+        // DEBUG LOG: Entry into computeFinalScrollOffset
+        debugLog('ENGINE.computeFinalScrollOffset', `Computing scroll offset for target lot id="${targetLotId}"`);
         // Calculate total width of one complete cycle
         let totalCycleWidth = 0;
         for (const segment of segments) {
-            totalCycleWidth += Math.max(60, segment.weight * 400);
+            const segWidth = Math.max(60, segment.weight * 400);
+            totalCycleWidth += segWidth;
+            
+            // DEBUG LOG: Segment widths
+            debugLog('ENGINE.computeFinalScrollOffset', `  Segment "${segment.lot.name}": weight=${segment.weight.toFixed(3)}, width=${segWidth.toFixed(1)}px`);
         }
+
+        debugLog('ENGINE.computeFinalScrollOffset', `Total cycle width: ${totalCycleWidth.toFixed(2)}px`);
 
         if (totalCycleWidth === 0) return currentOffset;
 
@@ -216,15 +225,19 @@ export class RouletteEngine {
                 // Target position within the cycle where this lot should land under center pointer
                 const targetPositionInCycle = cumulativeWidth + randomOffset;
                 
+                debugLog('ENGINE.computeFinalScrollOffset', `Target lot found: "${segment.lot.name}"`);
+                debugLog('ENGINE.computeFinalScrollOffset', `  Position in cycle: ${targetPositionInCycle.toFixed(2)}px (cumulative=${cumulativeWidth.toFixed(2)}, random offset=${randomOffset.toFixed(2)})`);
                 // Calculate base scroll offset to bring target under center pointer
                 const centerX = canvasWidth / 2;
                 let baseOffset = centerX - targetPositionInCycle;
                 
+                debugLog('ENGINE.computeFinalScrollOffset', `Center X: ${centerX}px, Base offset before cycles: ${baseOffset.toFixed(2)}px`);
                 // Add full cycles to ensure smooth forward scroll from current position
                 while (baseOffset <= currentOffset) {
                     baseOffset += totalCycleWidth;
                 }
                 
+                debugLog('ENGINE.computeFinalScrollOffset', `Base offset after cycle adjustment: ${baseOffset.toFixed(2)}px`);
                 // Add extra cycles based on duration for visual effect
                 const minCyclesPerSecond = 2;
                 const maxCyclesPerSecond = 5;
@@ -237,12 +250,17 @@ export class RouletteEngine {
                     Math.floor(Math.random() * (maxFullCycles - minFullCycles + 1)) + minFullCycles;
                 baseOffset += extraCycles * totalCycleWidth;
 
+                debugLog('ENGINE.computeFinalScrollOffset', `Extra cycles added: ${extraCycles}`);
+                debugLog('ENGINE.computeFinalScrollOffset', `FINAL SCROLL OFFSET: ${baseOffset.toFixed(2)}px`);
+
                 return baseOffset;
             }
             
             cumulativeWidth += segmentWidth;
         }
 
+        debugLog('ENGINE.computeFinalScrollOffset', `WARNING: Target lot "${targetLotId}" not found in segments!`);
+        
         // Fallback if target not found
         return currentOffset;
     }
