@@ -12,6 +12,32 @@ export type EasingFunction = (t: number) => number;
  */
 export const EasingFunctions = {
     /**
+     * Linear easing - constant speed throughout animation
+     */
+    linear: (t: number): number => t,
+    
+    /**
+     * Cubic ease out - decelerates with cubic curve
+     */
+    easeOutCubic: (t: number): number => 1 - Math.pow(1 - t, 3),
+    
+    /**
+     * Quartic ease out - stronger deceleration than cubic
+     */
+    easeOutQuart: (t: number): number => 1 - Math.pow(1 - t, 4),
+    
+    /**
+     * Quintic ease out - very strong deceleration
+     */
+    easeOutQuint: (t: number): number => 1 - Math.pow(1 - t, 5),
+    
+    /**
+     * Exponential ease out - extremely smooth deceleration
+     */
+    easeOutExpo: (t: number): number => 
+        t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+    
+    /**
      * Custom roulette easing - smooth deceleration starting from halfway through
      * Provides a natural wheel slowdown effect with extended tail
      */
