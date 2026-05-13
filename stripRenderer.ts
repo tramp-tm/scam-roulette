@@ -1,6 +1,7 @@
 import { Lot, Segment, ModeConfig } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { IRenderer } from './types.js';
+import { debugLog } from './utils.js';
 
 /**
  * Strip (ribbon) visualization renderer.
@@ -104,6 +105,9 @@ export class StripRenderer implements IRenderer {
         // Apply horizontal scroll (rotation converted to x offset)
         const scrollOffset = this.currentRotation * 5;
         
+        // DEBUG LOG: Render frame info for strip mode
+        debugLog('STRIP.render', `Render frame - Scroll offset: ${scrollOffset.toFixed(2)}px, Num cycles rendered: ${numCycles}`);
+        
         // Create clipping region for the strip view
         this.ctx.beginPath();
         this.ctx.rect(0, centerY - 75, canvasWidth, 150);
@@ -121,6 +125,12 @@ export class StripRenderer implements IRenderer {
                 
                 // Absolute x position for this segment in this cycle
                 const absoluteX = scrollOffset + (cycle * totalCycleWidth) + currentXInCycle;
+                
+                // DEBUG LOG: Check if highlighted lot is near center pointer
+                if (isHighlighted && Math.abs(absoluteX - canvasWidth / 2) < 50) {
+                    debugLog('STRIP.render', `✓ HIGHLIGHTED LOT "${segment.lot.name}" IS NEAR CENTER POINTER!`);
+                    debugLog('STRIP.render', `  Lot center X: ${absoluteX + segmentWidthPx/2}px, Canvas center: ${canvasWidth/2}px, Offset: ${(absoluteX + segmentWidthPx/2 - canvasWidth/2).toFixed(1)}px`);
+                }
                 
                 // Draw segment background
                 this.ctx.fillStyle = isHighlighted ? this.brightenColor(segment.lot.color, 30) : segment.lot.color;
