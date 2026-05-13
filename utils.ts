@@ -8,3 +8,11 @@ export function generateRandomReadableColor(): string {
     const lightness = Math.floor(Math.random() * 25) + 20; // 20-45%
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
+
+/**
+ * Debug logging helper for strip mode verification.
+ */
+export function debugLog(tag: string, message: string, data?: any): void {
+    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+    console.log(`[${timestamp}] [${tag}] ${message}`, data || '');
+}
