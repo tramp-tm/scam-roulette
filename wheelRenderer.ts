@@ -164,11 +164,11 @@ export class WheelRenderer implements IRenderer {
         
         this.ctx.save();
         
-        // Draw pointer triangle
+        // Draw pointer triangle (flipped to point DOWN toward wheel)
         this.ctx.beginPath();
         this.ctx.moveTo(centerX - 15, centerY - radius - 20);
         this.ctx.lineTo(centerX + 15, centerY - radius - 20);
-        this.ctx.lineTo(centerX, centerY - radius - 40);
+        this.ctx.lineTo(centerX, centerY - radius);
         this.ctx.closePath();
         
         this.ctx.fillStyle = '#fff';
