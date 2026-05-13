@@ -77,13 +77,27 @@ export class StripRenderer implements IRenderer {
     }
 
     /**
-     * Main render method - renders strip visualization.
+     * Main render method - renders infinite strip visualization.
      */
     render(canvasWidth: number, canvasHeight: number): void {
         const centerY = canvasHeight / 2;
         
         // Clear canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        // Calculate total width of one complete cycle
+        let totalCycleWidth = 0;
+        for (const segment of this.segments) {
+            totalCycleWidth += Math.max(60, segment.weight * 400);
+        }
+
+        if (totalCycleWidth === 0) return;
+
+        // Calculate how many cycles we need to fill screen + buffer on both sides
+        const visibleWidth = canvasWidth;
+        const bufferSize = totalCycleWidth; // Extra buffer for smooth scrolling
+        const requiredWidth = visibleWidth + bufferSize * 2;
+        const numCycles = Math.ceil(requiredWidth / totalCycleWidth) + 1;
 
         this.ctx.save();
 
@@ -95,44 +109,49 @@ export class StripRenderer implements IRenderer {
         this.ctx.rect(0, centerY - 75, canvasWidth, 150);
         this.ctx.clip();
 
-        // Draw all segments in a horizontal line
-        let currentX = scrollOffset;
-        
-        for (const segment of this.segments) {
-            const isHighlighted = segment.lot.id === this.highlightedLotId;
+        // Render multiple cycles (infinite loop effect)
+        for (let cycle = 0; cycle < numCycles; cycle++) {
+            let currentXInCycle = 0;
             
-            // Calculate segment width based on weight (with minimum)
-            const segmentWidthPx = Math.max(60, segment.weight * 400);
-            
-            // Draw segment background
-            this.ctx.fillStyle = isHighlighted ? this.brightenColor(segment.lot.color, 30) : segment.lot.color;
-            this.ctx.fillRect(currentX, centerY - 75, segmentWidthPx + 2, 150);
+            for (const segment of this.segments) {
+                const isHighlighted = segment.lot.id === this.highlightedLotId;
+                
+                // Calculate segment width based on weight (with minimum)
+                const segmentWidthPx = Math.max(60, segment.weight * 400);
+                
+                // Absolute x position for this segment in this cycle
+                const absoluteX = scrollOffset + (cycle * totalCycleWidth) + currentXInCycle;
+                
+                // Draw segment background
+                this.ctx.fillStyle = isHighlighted ? this.brightenColor(segment.lot.color, 30) : segment.lot.color;
+                this.ctx.fillRect(absoluteX, centerY - 75, segmentWidthPx + 2, 150);
 
-            // Draw border
-            this.ctx.strokeStyle = '#fff';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(currentX, centerY - 75, segmentWidthPx + 2, 150);
+                // Draw border
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(absoluteX, centerY - 75, segmentWidthPx + 2, 150);
 
-            // Draw label
-            const centerX = currentX + segmentWidthPx / 2;
-            
-            this.ctx.fillStyle = '#fff';
-            this.ctx.font = 'bold 14px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            
-            // Name
-            const displayName = segment.lot.name.length > 15 
-                ? segment.lot.name.substring(0, 13) + '..' 
-                : segment.lot.name;
-            this.ctx.fillText(displayName, centerX, centerY - 20);
-            
-            // Amount
-            this.ctx.font = '12px Arial';
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, centerX, centerY + 20);
+                // Draw label
+                const centerX = absoluteX + segmentWidthPx / 2;
+                
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                
+                // Name
+                const displayName = segment.lot.name.length > 15 
+                    ? segment.lot.name.substring(0, 13) + '..' 
+                    : segment.lot.name;
+                this.ctx.fillText(displayName, centerX, centerY - 20);
+                
+                // Amount
+                this.ctx.font = '12px Arial';
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, centerX, centerY + 20);
 
-            currentX += segmentWidthPx;
+                currentXInCycle += segmentWidthPx;
+            }
         }
 
         // Draw center pointer line

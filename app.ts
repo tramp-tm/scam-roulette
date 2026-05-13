@@ -282,22 +282,38 @@ export class App {
         this.isSettingsLocked = true;
         this.updateControlsState();
         
-        // Select winner using mode's weight calculation
+        // Select winner using mode's weight calculation (BEFORE animation)
         const winner = RouletteEngine.selectWeighted(activeLots, this.modeConfig);
         if (!winner) return;
 
-        // Calculate final rotation
+        // Calculate final rotation based on visualization type
         const currentRotation = this.renderer.getCurrentRotation();
         const targetLotId = winner.id;
         const animationDuration = this.settings.animationDuration;
         
-        this.endRotation = RouletteEngine.computeFinalRotation(
-            activeLots,
-            this.modeConfig,
-            targetLotId,
-            currentRotation,
-            animationDuration
-        );
+        // Get canvas dimensions for strip mode calculation
+        const rect = this.canvas.getBoundingClientRect();
+        
+        if (this.settings.visualization === 'strip') {
+            // Use strip-specific scroll offset calculation
+            this.endRotation = RouletteEngine.computeFinalScrollOffset(
+                activeLots,
+                this.modeConfig,
+                targetLotId,
+                currentRotation,
+                animationDuration,
+                rect.width
+            );
+        } else {
+            // Use wheel rotation calculation (existing logic)
+            this.endRotation = RouletteEngine.computeFinalRotation(
+                activeLots,
+                this.modeConfig,
+                targetLotId,
+                currentRotation,
+                animationDuration
+            );
+        }
 
         // Configure animation
         this.animationController.configure({

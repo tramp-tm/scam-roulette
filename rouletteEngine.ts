@@ -175,4 +175,75 @@ export class RouletteEngine {
     static canSpin(activeLots: Lot[]): boolean {
         return activeLots.length >= 1;
     }
+
+    /**
+     * Computes the final scroll offset for strip visualization.
+     * 
+     * The strip renders lots in an infinite repeating cycle. This method calculates
+     * the horizontal scroll position that brings the winning lot under the center pointer.
+     */
+    static computeFinalScrollOffset(
+        lots: Lot[],
+        modeConfig: ModeConfig,
+        targetLotId: string,
+        currentOffset: number,
+        animationDurationMs: number,
+        canvasWidth: number
+    ): number {
+        const segments = this.calculateSegments(lots, modeConfig);
+        
+        // Calculate total width of one complete cycle
+        let totalCycleWidth = 0;
+        for (const segment of segments) {
+            totalCycleWidth += Math.max(60, segment.weight * 400);
+        }
+
+        if (totalCycleWidth === 0) return currentOffset;
+
+        // Find target lot's position within one cycle
+        let cumulativeWidth = 0;
+        
+        for (const segment of segments) {
+            const segmentWidth = Math.max(60, segment.weight * 400);
+            
+            if (segment.lot.id === targetLotId) {
+                // Pick random point within this lot's width (with margin from edges)
+                const margin = Math.min(segmentWidth * 0.15, 20);
+                const minOffset = margin;
+                const maxOffset = segmentWidth - margin;
+                const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
+                
+                // Target position within the cycle where this lot should land under center pointer
+                const targetPositionInCycle = cumulativeWidth + randomOffset;
+                
+                // Calculate base scroll offset to bring target under center pointer
+                const centerX = canvasWidth / 2;
+                let baseOffset = centerX - targetPositionInCycle;
+                
+                // Add full cycles to ensure smooth forward scroll from current position
+                while (baseOffset <= currentOffset) {
+                    baseOffset += totalCycleWidth;
+                }
+                
+                // Add extra cycles based on duration for visual effect
+                const minCyclesPerSecond = 2;
+                const maxCyclesPerSecond = 5;
+                const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
+                const minFullCycles = Math.floor(minCyclesPerSecond * durationSeconds);
+                const maxFullCycles = Math.ceil(maxCyclesPerSecond * durationSeconds);
+                
+                // Add random extra cycles for visual variety
+                const extraCycles = 
+                    Math.floor(Math.random() * (maxFullCycles - minFullCycles + 1)) + minFullCycles;
+                baseOffset += extraCycles * totalCycleWidth;
+
+                return baseOffset;
+            }
+            
+            cumulativeWidth += segmentWidth;
+        }
+
+        // Fallback if target not found
+        return currentOffset;
+    }
 }
