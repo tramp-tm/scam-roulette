@@ -1,7 +1,6 @@
 import { Lot, Segment, ModeConfig } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { IRenderer } from './types.js';
-import { debugLog } from './utils.js';
 
 /**
  * Strip (ribbon) visualization renderer.
@@ -115,11 +114,6 @@ export class StripRenderer implements IRenderer {
             visualScrollOffset += totalCycleWidth;
         }
 
-        // DEBUG LOG: Infinite scrolling calculation
-        debugLog('STRIP.render', `Mathematical offset: ${mathematicalScrollOffset.toFixed(2)}px`);
-        debugLog('STRIP.render', `Visual offset (modulo): ${visualScrollOffset.toFixed(2)}px`);
-        debugLog('STRIP.render', `Total cycle width: ${totalCycleWidth.toFixed(2)}px`);
-
         // ========================================
         // RENDER WITH BUFFER COPIES
         // ========================================
@@ -136,8 +130,6 @@ export class StripRenderer implements IRenderer {
         const totalRenderWidth = canvasWidth + 2 * bufferMargin;
         const cyclesNeeded = Math.ceil(totalRenderWidth / totalCycleWidth) + 1;
 
-        debugLog('STRIP.render', `Rendering ${cyclesNeeded} buffer copies`);
-
         // Render multiple copies of the strip for infinite illusion
         for (let cycle = -1; cycle <= cyclesNeeded; cycle++) {
             this.renderOneCycle(cycle * totalCycleWidth, centerY);
@@ -151,9 +143,6 @@ export class StripRenderer implements IRenderer {
         
         // Draw center marker at viewport center (independent of scroll)
         this.drawCenterMarker(canvasWidth / 2, centerY, canvasHeight);
-
-        // DEBUG LOG: Final render state
-        debugLog('STRIP.render', `Render complete - Visual offset applied: ${visualScrollOffset.toFixed(2)}px`);
     }
 
     /**
