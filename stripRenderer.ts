@@ -200,11 +200,6 @@ export class StripRenderer implements IRenderer {
                 ? segment.lot.name.substring(0, 13) + '..' 
                 : segment.lot.name;
             this.ctx.fillText(displayName, textX, textY - 12);
-            
-            // Amount
-            this.ctx.font = '12px Arial';
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, textX, textY + 12);
 
             currentX += segmentWidth;
         }

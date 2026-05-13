@@ -285,11 +285,6 @@ export class Renderer {
                 ? segment.lot.name.substring(0, 13) + '..' 
                 : segment.lot.name;
             this.ctx.fillText(displayName, centerX, centerY - 20);
-            
-            // Amount
-            this.ctx.font = '12px Arial';
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, centerX, centerY + 20);
 
             currentX += segmentWidthPx;
         }
