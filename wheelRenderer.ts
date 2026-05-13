@@ -1,6 +1,7 @@
 import { Lot, Segment, ModeConfig } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { IRenderer } from './types.js';
+import { brightenColor } from './utils.js';
 
 /**
  * Wheel visualization renderer.
@@ -200,31 +201,6 @@ export class WheelRenderer implements IRenderer {
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         this.ctx.lineWidth = 2;
         this.ctx.stroke();
-    }
-
-    /**
-     * Brightens a color by the specified percentage.
-     */
-    private brightenColor(color: string, percent: number): string {
-        // Convert hex to RGB
-        let r = 0, g = 0, b = 0;
-        
-        if (color.length === 4) {
-            r = parseInt('0x' + color[1] + color[1]);
-            g = parseInt('0x' + color[2] + color[2]);
-            b = parseInt('0x' + color[3] + color[3]);
-        } else if (color.length === 7) {
-            r = parseInt('0x' + color[1] + color[2]);
-            g = parseInt('0x' + color[3] + color[4]);
-            b = parseInt('0x' + color[5] + color[6]);
-        }
-
-        // Brighten
-        r = Math.min(255, r + percent);
-        g = Math.min(255, g + percent);
-        b = Math.min(255, b + percent);
-
-        return `rgb(${r}, ${g}, ${b})`;
     }
 
     /**

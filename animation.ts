@@ -157,9 +157,3 @@ export class AnimationController {
     }
 }
 
-/**
- * Creates a simple animation controller with default settings.
- */
-export function createAnimationController(): AnimationController {
-    return new AnimationController();
-}
