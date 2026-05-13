@@ -178,17 +178,21 @@ export class StripRenderer implements IRenderer {
                 this.ctx.shadowBlur = 15;
             }
             
-            // Draw segment rectangle
+            // Draw segment rectangle (doubled height: 80 → 160)
             this.ctx.fillStyle = fillColor;
-            this.ctx.fillRect(currentX, centerY - 40, segmentWidth, 80);
+            this.ctx.fillRect(currentX, centerY - 80, segmentWidth, 160);
             
             if (segment.lot.id === this.highlightedLotId) {
                 this.ctx.restore();
             }
 
-            // Draw text label centered in segment
+            // Draw text label centered in segment (rotated 90° counterclockwise)
             const textX = currentX + segmentWidth / 2;
             const textY = centerY;
+            
+            this.ctx.save(); // Save context before rotation
+            this.ctx.translate(textX, textY);
+            this.ctx.rotate(Math.PI / 2); // Rotate 90° counterclockwise
             
             this.ctx.fillStyle = '#fff';
             this.ctx.font = 'bold 14px Arial';
@@ -199,7 +203,9 @@ export class StripRenderer implements IRenderer {
             const displayName = segment.lot.name.length > 15 
                 ? segment.lot.name.substring(0, 13) + '..' 
                 : segment.lot.name;
-            this.ctx.fillText(displayName, textX, textY - 12);
+            this.ctx.fillText(displayName, 0, -12); // Offset from rotated origin
+            
+            this.ctx.restore(); // Restore context after rotation
 
             currentX += segmentWidth;
         }

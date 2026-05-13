@@ -140,7 +140,7 @@ export class WheelRenderer implements IRenderer {
             Math.cos(midAngle) * textRadius,
             Math.sin(midAngle) * textRadius
         );
-        this.ctx.rotate(midAngle + Math.PI / 2);
+        this.ctx.rotate(midAngle + Math.PI / 2 + Math.PI / 2); // Add 90° counterclockwise rotation
         
         this.ctx.fillStyle = '#fff';
         this.ctx.font = 'bold 14px Arial';
