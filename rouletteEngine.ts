@@ -137,7 +137,7 @@ export class RouletteEngine {
         
         // 1. Pick random point inside the segment for landing position
         const segmentSpan = segment.endAngle - segment.startAngle;
-        const margin = Math.min(segmentSpan * 0.15, 0.3); // ±15% margin or max ~17° from edges
+        const margin = Math.min(segmentSpan * 0.02, 0.04); // ±2% margin for dramatic stop near edges
         const minOffset = margin;
         const maxOffset = segmentSpan - margin;
         const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
@@ -217,7 +217,7 @@ export class RouletteEngine {
             
             if (segment.lot.id === targetLotId) {
                 // Pick random point within this lot's width (with margin from edges)
-                const margin = Math.min(segmentWidth * 0.15, 20);
+                const margin = Math.min(segmentWidth * 0.02, 3); // ±2% margin for dramatic stop near edges
                 const minOffset = margin;
                 const maxOffset = segmentWidth - margin;
                 const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
