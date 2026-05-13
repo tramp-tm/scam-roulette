@@ -4,7 +4,7 @@ import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
 import { IRenderer, VisualizationType, Settings, Mode, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
-import { generateRandomReadableColor } from './utils.js';
+import { generateRandomReadableColor, debugLog } from './utils.js';
 import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
@@ -286,6 +286,9 @@ export class App {
         const winner = RouletteEngine.selectWeighted(activeLots, this.modeConfig);
         if (!winner) return;
 
+        // DEBUG LOG: Winner selected before animation
+        debugLog('APP.spin', `Winner determined BEFORE animation: "${winner.name}" (id=${winner.id}, amount=$${winner.amount})`);
+
         // Calculate final rotation based on visualization type
         const currentRotation = this.renderer.getCurrentRotation();
         const targetLotId = winner.id;
@@ -295,6 +298,11 @@ export class App {
         const rect = this.canvas.getBoundingClientRect();
         
         if (this.settings.visualization === 'strip') {
+            // DEBUG LOG: Strip mode selected
+            debugLog('APP.spin', `STRIP MODE ACTIVE - Computing scroll offset`);
+            debugLog('APP.spin', `  Canvas width: ${rect.width}px, Center X: ${rect.width / 2}px`);
+            debugLog('APP.spin', `  Current rotation: ${currentRotation.toFixed(4)}`);
+            
             // Use strip-specific scroll offset calculation
             this.endRotation = RouletteEngine.computeFinalScrollOffset(
                 activeLots,
@@ -304,6 +312,9 @@ export class App {
                 animationDuration,
                 rect.width
             );
+            
+            // DEBUG LOG: Result of computation
+            debugLog('APP.spin', `  Computed end rotation (scroll offset): ${this.endRotation.toFixed(4)}`);
         } else {
             // Use wheel rotation calculation (existing logic)
             this.endRotation = RouletteEngine.computeFinalRotation(
@@ -313,6 +324,8 @@ export class App {
                 currentRotation,
                 animationDuration
             );
+            
+            debugLog('APP.spin', `WHEEL MODE - Computed end rotation: ${this.endRotation.toFixed(4)}`);
         }
 
         // Configure animation
@@ -324,9 +337,20 @@ export class App {
             onUpdate: (value) => {
                 this.renderer.setRotation(value);
                 this.render();
+                
+                // DEBUG LOG: Animation progress for strip mode only
+                if (this.settings.visualization === 'strip') {
+                    const scrollOffset = value * 5;
+                    debugLog('APP.animate', `Animation frame - Rotation: ${value.toFixed(2)}, Scroll offset: ${scrollOffset.toFixed(2)}px`);
+                }
             },
             onComplete: () => {
                 this.finishSpin(winner, this.endRotation);
+                
+                // DEBUG LOG: Animation complete for strip mode
+                if (this.settings.visualization === 'strip') {
+                    debugLog('APP.spin', `ANIMATION COMPLETE - Final scroll offset: ${(this.endRotation * 5).toFixed(2)}px`);
+                }
             }
         });
 
@@ -342,6 +366,13 @@ export class App {
             // Highlight the result
             this.highlightedLotId = winner.id;
             
+            // DEBUG LOG: Finish spin for strip mode
+            if (this.settings.visualization === 'strip') {
+                debugLog('APP.finishSpin', `Highlighting winning lot: "${winner.name}" (id=${winner.id})`);
+                debugLog('APP.finishSpin', `Final rotation value: ${finalRotation?.toFixed(4)}`);
+                debugLog('APP.finishSpin', `Scroll offset at end: ${(finalRotation || 0) * 5}px`);
+            }
+
             // Show result display using mode's getResultText function
             if (this.resultText) {
                 this.resultText.textContent = this.modeConfig.getResultText(winner);
