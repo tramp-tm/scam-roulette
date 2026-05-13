@@ -77,21 +77,6 @@ export interface Settings {
     animationDuration: number; // in milliseconds
 }
 
-// Animation state interface
-export interface AnimationState {
-    isPlaying: boolean;
-    progress: number;
-    currentValue: number;
-}
-
-// Application state
-export interface AppState {
-    lots: Lot[];
-    settings: Settings;
-    animation: AnimationState;
-    highlightedLotId: string | null; // Currently highlighted lot (winner/eliminated)
-    isSettingsLocked: boolean;
-}
 
 // Segment data for rendering
 export interface Segment {
@@ -113,12 +98,6 @@ export type SortField = 'name' | 'amount';
 
 /** Sort direction */
 export type SortDirection = 'asc' | 'desc';
-
-/** Current sort state */
-export interface SortState {
-    field: SortField;
-    direction: SortDirection;
-}
 
 // ========================================
 // IMPORT FEATURE TYPES
@@ -219,8 +198,3 @@ export interface IRenderer {
     /** Reset renderer state */
     reset(): void;
 }
-
-/**
- * Factory function type for creating renderers.
- */
-export type RendererFactory = (canvas: HTMLCanvasElement) => IRenderer;

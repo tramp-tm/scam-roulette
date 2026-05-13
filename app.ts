@@ -32,8 +32,6 @@ export class App {
     
     private highlightedLotId: string | null = null;
     private isSettingsLocked: boolean = false;
-    private endRotation: number = 0;
-    private importStrategy: ImportStrategy | null = null;
     private importDialog: ImportDialog | null = null;
     
     // Sort state
@@ -297,7 +295,7 @@ export class App {
         
         // Use strategy pattern to compute final position based on visualization type
         const strategy: IVisualizationStrategy = getVisualizationStrategy(this.settings.visualization);
-        this.endRotation = strategy.computeFinalPosition(
+        const endRotation = strategy.computeFinalPosition(
             activeLots,
             this.modeConfig,
             targetLotId,
@@ -309,7 +307,7 @@ export class App {
         // Configure animation
         this.animationController.configure({
             startValue: currentRotation,
-            endValue: this.endRotation,
+            endValue: endRotation,
             duration: animationDuration,
             easing: EasingFunctions.rouletteEaseOut,
             onUpdate: (value) => {
@@ -317,7 +315,7 @@ export class App {
                 this.render();
             },
             onComplete: () => {
-                this.finishSpin(winner, this.endRotation);
+                this.finishSpin(winner, endRotation);
             }
         });
 
@@ -328,7 +326,7 @@ export class App {
     /**
      * Finishes the spin and applies results.
      */
-    private finishSpin(winner: Lot | null, finalRotation?: number): void {
+    private finishSpin(winner: Lot | null): void {
         if (winner) {
             // Highlight the result
             this.highlightedLotId = winner.id;
@@ -384,7 +382,6 @@ export class App {
         // Reset state
         this.highlightedLotId = null;
         this.isSettingsLocked = false;
-        this.endRotation = 0;
         this.lotManager.resetAll();
         
         // Reset renderer

@@ -12,33 +12,6 @@ export type EasingFunction = (t: number) => number;
  */
 export const EasingFunctions = {
     /**
-     * Linear - constant speed
-     */
-    linear: (t: number): number => t,
-
-    /**
-     * Ease Out Cubic - starts fast, slows down at end
-     * Perfect for roulette deceleration effect
-     */
-    easeOutCubic: (t: number): number => 1 - Math.pow(1 - t, 3),
-
-    /**
-     * Ease Out Quart - more pronounced slowdown
-     */
-    easeOutQuart: (t: number): number => 1 - Math.pow(1 - t, 4),
-
-    /**
-     * Ease Out Quint - even more dramatic slowdown
-     */
-    easeOutQuint: (t: number): number => 1 - Math.pow(1 - t, 5),
-
-    /**
-     * Ease Out Expo - exponential deceleration
-     */
-    easeOutExpo: (t: number): number => 
-        t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
-
-    /**
      * Custom roulette easing - smooth deceleration starting from halfway through
      * Provides a natural wheel slowdown effect with extended tail
      */
@@ -52,7 +25,7 @@ export const EasingFunctions = {
 /**
  * Default easing function for roulette animation
  */
-export const DEFAULT_EASING: EasingFunction = EasingFunctions.easeOutCubic;
+export const DEFAULT_EASING: EasingFunction = EasingFunctions.rouletteEaseOut;
 
 /**
  * Animation controller class that manages time-based animations.
@@ -155,27 +128,6 @@ export class AnimationController {
      */
     isAnimating(): boolean {
         return this.startTime !== null && this.animationFrameId !== null;
-    }
-
-    /**
-     * Gets the current progress (0-1).
-     */
-    getProgress(): number {
-        if (this.startTime === null) return 0;
-        
-        const elapsed = performance.now() - this.startTime;
-        return Math.min(elapsed / this.duration, 1);
-    }
-
-    /**
-     * Gets the current animated value.
-     */
-    getCurrentValue(): number {
-        if (this.startTime === null) return this.startValue;
-        
-        const progress = this.getProgress();
-        const easedProgress = this.easing(progress);
-        return this.startValue + (this.endValue - this.startValue) * easedProgress;
     }
 }
 

@@ -42,20 +42,6 @@ export class ModalManager {
     }
 
     /**
-     * Gets the count of currently open modals.
-     */
-    public getOpenModalCount(): number {
-        return this.openModals.length;
-    }
-
-    /**
-     * Checks if any modal is currently open.
-     */
-    public hasOpenModals(): boolean {
-        return this.openModals.length > 0;
-    }
-
-    /**
      * Gets the topmost (last opened) modal element.
      */
     public getTopmostModal(): HTMLElement | undefined {

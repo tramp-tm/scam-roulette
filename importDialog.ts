@@ -10,7 +10,6 @@ import { ModalManager } from './modalManager.js';
  */
 export class ImportDialog extends ModalDialog {
     private textarea: HTMLTextAreaElement | null = null;
-    private separatorSelect: HTMLSelectElement | null = null;
     private previewBtn: HTMLButtonElement | null = null;
     private importBtn: HTMLButtonElement | null = null;
     private statusEl: HTMLElement | null = null;
