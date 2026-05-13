@@ -78,115 +78,154 @@ export class StripRenderer implements IRenderer {
     }
 
     /**
-     * Main render method - renders infinite strip visualization.
+     * Renders the strip visualization with infinite scrolling effect.
+     * 
+     * Uses modulo arithmetic to map large mathematical offsets to visual offsets,
+     * then renders multiple buffer copies for seamless infinite illusion.
      */
-    render(canvasWidth: number, canvasHeight: number): void {
+    public render(canvasWidth: number, canvasHeight: number): void {
         const centerY = canvasHeight / 2;
         
         // Clear canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        
+        if (this.segments.length === 0) return;
 
         // Calculate total width of one complete cycle
         let totalCycleWidth = 0;
         for (const segment of this.segments) {
-            totalCycleWidth += Math.max(60, segment.weight * 400);
+            const segWidth = Math.max(60, segment.weight * 400);
+            totalCycleWidth += segWidth;
         }
 
         if (totalCycleWidth === 0) return;
 
-        // Calculate how many cycles we need to fill screen + buffer on both sides
-        const visibleWidth = canvasWidth;
-        const bufferSize = totalCycleWidth; // Extra buffer for smooth scrolling
-        const requiredWidth = visibleWidth + bufferSize * 2;
-        const numCycles = Math.ceil(requiredWidth / totalCycleWidth) + 1;
-
-        this.ctx.save();
-
-        // Apply horizontal scroll (currentRotation is already in pixels for strip mode)
-        const scrollOffset = this.currentRotation;
+        // ========================================
+        // INFINITE SCROLLING LOGIC
+        // ========================================
         
-        // DEBUG LOG: Render frame info for strip mode
-        debugLog('STRIP.render', `Render frame - Scroll offset: ${scrollOffset.toFixed(2)}px, Num cycles rendered: ${numCycles}`);
+        // Mathematical offset: The true cumulative scroll position from animation
+        // This can be any large number (e.g., 5182.55px after multiple cycles)
+        const mathematicalScrollOffset = this.currentRotation;
         
-        // Create clipping region for the strip view
-        this.ctx.beginPath();
-        this.ctx.rect(0, centerY - 75, canvasWidth, 150);
-        this.ctx.clip();
-
-        // Render multiple cycles (infinite loop effect)
-        for (let cycle = 0; cycle < numCycles; cycle++) {
-            let currentXInCycle = 0;
-            
-            for (const segment of this.segments) {
-                const isHighlighted = segment.lot.id === this.highlightedLotId;
-                
-                // Calculate segment width based on weight (with minimum)
-                const segmentWidthPx = Math.max(60, segment.weight * 400);
-                
-                // Absolute x position for this segment in this cycle
-                const absoluteX = scrollOffset + (cycle * totalCycleWidth) + currentXInCycle;
-                
-                // DEBUG LOG: Check if highlighted lot is near center pointer
-                if (isHighlighted && Math.abs(absoluteX - canvasWidth / 2) < 50) {
-                    debugLog('STRIP.render', `✓ HIGHLIGHTED LOT "${segment.lot.name}" IS NEAR CENTER POINTER!`);
-                    debugLog('STRIP.render', `  Lot center X: ${absoluteX + segmentWidthPx/2}px, Canvas center: ${canvasWidth/2}px, Offset: ${(absoluteX + segmentWidthPx/2 - canvasWidth/2).toFixed(1)}px`);
-                }
-                
-                // Draw segment background
-                this.ctx.fillStyle = isHighlighted ? this.brightenColor(segment.lot.color, 30) : segment.lot.color;
-                this.ctx.fillRect(absoluteX, centerY - 75, segmentWidthPx + 2, 150);
-
-                // Draw border
-                this.ctx.strokeStyle = '#fff';
-                this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(absoluteX, centerY - 75, segmentWidthPx + 2, 150);
-
-                // Draw label
-                const centerX = absoluteX + segmentWidthPx / 2;
-                
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = 'bold 14px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                
-                // Name
-                const displayName = segment.lot.name.length > 15 
-                    ? segment.lot.name.substring(0, 13) + '..' 
-                    : segment.lot.name;
-                this.ctx.fillText(displayName, centerX, centerY - 20);
-                
-                // Amount
-                this.ctx.font = '12px Arial';
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, centerX, centerY + 20);
-
-                currentXInCycle += segmentWidthPx;
-            }
+        // Visual offset: Map to [0, totalCycleWidth) using modulo for rendering
+        // This keeps the actual translation within one cycle's bounds
+        let visualScrollOffset = mathematicalScrollOffset % totalCycleWidth;
+        if (visualScrollOffset < 0) {
+            visualScrollOffset += totalCycleWidth;
         }
 
-        // Draw center pointer line
+        // DEBUG LOG: Infinite scrolling calculation
+        debugLog('STRIP.render', `Mathematical offset: ${mathematicalScrollOffset.toFixed(2)}px`);
+        debugLog('STRIP.render', `Visual offset (modulo): ${visualScrollOffset.toFixed(2)}px`);
+        debugLog('STRIP.render', `Total cycle width: ${totalCycleWidth.toFixed(2)}px`);
+
+        // ========================================
+        // RENDER WITH BUFFER COPIES
+        // ========================================
+        
+        this.ctx.save();
+        
+        // Translate by visual offset only (not mathematical)
+        // Negative because we want left-to-right scrolling effect
+        this.ctx.translate(-visualScrollOffset, 0);
+
+        // Calculate how many buffer copies to render for seamless infinite effect
+        // We need enough copies to cover viewport + margins on both sides
+        const bufferMargin = canvasWidth; // Extra margin for smooth transitions
+        const totalRenderWidth = canvasWidth + 2 * bufferMargin;
+        const cyclesNeeded = Math.ceil(totalRenderWidth / totalCycleWidth) + 1;
+
+        debugLog('STRIP.render', `Rendering ${cyclesNeeded} buffer copies`);
+
+        // Render multiple copies of the strip for infinite illusion
+        for (let cycle = -1; cycle <= cyclesNeeded; cycle++) {
+            this.renderOneCycle(cycle * totalCycleWidth, centerY);
+        }
+
+        // ========================================
+        // DRAW CENTER POINTER LINE
+        // ========================================
+        
         this.ctx.restore();
         
-        // Center marker (pointer position)
-        this.drawCenterMarker(canvasWidth / 2, centerY);
+        // Draw center marker at viewport center (independent of scroll)
+        this.drawCenterMarker(canvasWidth / 2, centerY, canvasHeight);
+
+        // DEBUG LOG: Final render state
+        debugLog('STRIP.render', `Render complete - Visual offset applied: ${visualScrollOffset.toFixed(2)}px`);
     }
 
     /**
-     * Draws the center marker for strip view.
+     * Renders one complete cycle of the strip at a given horizontal position.
      */
-    private drawCenterMarker(x: number, y: number): void {
+    private renderOneCycle(xOffset: number, centerY: number): void {
+        let currentX = xOffset;
+        
+        for (const segment of this.segments) {
+            const segmentWidth = Math.max(60, segment.weight * 400);
+            
+            // Determine fill color
+            let fillColor = segment.lot.color || '#888';
+            
+            // Highlight the winning lot if it's this one
+            if (segment.lot.id === this.highlightedLotId) {
+                fillColor = this.brightenColor(fillColor, 40);
+                
+                // Draw highlight glow effect
+                this.ctx.save();
+                this.ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+                this.ctx.shadowBlur = 15;
+            }
+            
+            // Draw segment rectangle
+            this.ctx.fillStyle = fillColor;
+            this.ctx.fillRect(currentX, centerY - 40, segmentWidth, 80);
+            
+            if (segment.lot.id === this.highlightedLotId) {
+                this.ctx.restore();
+            }
+
+            // Draw text label centered in segment
+            const textX = currentX + segmentWidth / 2;
+            const textY = centerY;
+            
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = 'bold 14px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            
+            // Name (truncated if needed)
+            const displayName = segment.lot.name.length > 15 
+                ? segment.lot.name.substring(0, 13) + '..' 
+                : segment.lot.name;
+            this.ctx.fillText(displayName, textX, textY - 12);
+            
+            // Amount
+            this.ctx.font = '12px Arial';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.fillText(`$${segment.lot.amount.toFixed(2)}`, textX, textY + 12);
+
+            currentX += segmentWidth;
+        }
+    }
+
+    /**
+     * Draws the center marker for strip view (pointer position).
+     */
+    private drawCenterMarker(x: number, y: number, canvasHeight: number): void {
         this.ctx.save();
         
-        // Vertical line
+        // Vertical dashed line through viewport
         this.ctx.beginPath();
         this.ctx.moveTo(x, 0);
-        this.ctx.lineTo(x, window.innerHeight);
+        this.ctx.lineTo(x, canvasHeight);
         this.ctx.strokeStyle = 'gold';
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([10, 5]);
         this.ctx.stroke();
 
-        // Arrow at top
+        // Arrow at top pointing down
         this.ctx.beginPath();
         this.ctx.moveTo(x - 15, 20);
         this.ctx.lineTo(x + 15, 20);
@@ -195,11 +234,11 @@ export class StripRenderer implements IRenderer {
         this.ctx.fillStyle = 'gold';
         this.ctx.fill();
 
-        // Arrow at bottom
+        // Arrow at bottom pointing up
         this.ctx.beginPath();
-        this.ctx.moveTo(x - 15, window.innerHeight - 40);
-        this.ctx.lineTo(x + 15, window.innerHeight - 40);
-        this.ctx.lineTo(x, window.innerHeight - 20);
+        this.ctx.moveTo(x - 15, canvasHeight - 40);
+        this.ctx.lineTo(x + 15, canvasHeight - 40);
+        this.ctx.lineTo(x, canvasHeight - 20);
         this.ctx.closePath();
         this.ctx.fillStyle = 'gold';
         this.ctx.fill();
