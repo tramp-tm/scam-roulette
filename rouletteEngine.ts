@@ -229,7 +229,7 @@ export class RouletteEngine {
                 debugLog('ENGINE.computeFinalScrollOffset', `  Position in cycle: ${targetPositionInCycle.toFixed(2)}px (cumulative=${cumulativeWidth.toFixed(2)}, random offset=${randomOffset.toFixed(2)})`);
                 // Calculate base scroll offset to bring target under center pointer
                 const centerX = canvasWidth / 2;
-                let baseOffset = centerX - targetPositionInCycle;
+                let baseOffset = targetPositionInCycle - centerX;
                 
                 debugLog('ENGINE.computeFinalScrollOffset', `Center X: ${centerX}px, Base offset before cycles: ${baseOffset.toFixed(2)}px`);
                 // Add full cycles to ensure smooth forward scroll from current position
