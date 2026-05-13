@@ -340,8 +340,7 @@ export class App {
                 
                 // DEBUG LOG: Animation progress for strip mode only
                 if (this.settings.visualization === 'strip') {
-                    const scrollOffset = value * 5;
-                    debugLog('APP.animate', `Animation frame - Rotation: ${value.toFixed(2)}, Scroll offset: ${scrollOffset.toFixed(2)}px`);
+                    debugLog('APP.animate', `Animation frame - Rotation: ${value.toFixed(2)}, Scroll offset: ${value.toFixed(2)}px`);
                 }
             },
             onComplete: () => {
@@ -349,7 +348,7 @@ export class App {
                 
                 // DEBUG LOG: Animation complete for strip mode
                 if (this.settings.visualization === 'strip') {
-                    debugLog('APP.spin', `ANIMATION COMPLETE - Final scroll offset: ${(this.endRotation * 5).toFixed(2)}px`);
+                    debugLog('APP.spin', `ANIMATION COMPLETE - Final scroll offset: ${this.endRotation.toFixed(2)}px`);
                 }
             }
         });
@@ -370,7 +369,7 @@ export class App {
             if (this.settings.visualization === 'strip') {
                 debugLog('APP.finishSpin', `Highlighting winning lot: "${winner.name}" (id=${winner.id})`);
                 debugLog('APP.finishSpin', `Final rotation value: ${finalRotation?.toFixed(4)}`);
-                debugLog('APP.finishSpin', `Scroll offset at end: ${(finalRotation || 0) * 5}px`);
+                debugLog('APP.finishSpin', `Scroll offset at end: ${(finalRotation || 0).toFixed(2)}px`);
             }
 
             // Show result display using mode's getResultText function
