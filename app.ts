@@ -2,6 +2,7 @@ import { LotManager } from './lotManager.js';
 import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
+import { getVisualizationStrategy, IVisualizationStrategy } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
 import { generateRandomReadableColor } from './utils.js';
@@ -286,34 +287,24 @@ export class App {
         const winner = RouletteEngine.selectWeighted(activeLots, this.modeConfig);
         if (!winner) return;
 
-        // Calculate final rotation based on visualization type
+        // Calculate final position using visualization strategy pattern
         const currentRotation = this.renderer.getCurrentRotation();
         const targetLotId = winner.id;
         const animationDuration = this.settings.animationDuration;
         
-        // Get canvas dimensions for strip mode calculation
+        // Get canvas dimensions (needed for strip visualization)
         const rect = this.canvas.getBoundingClientRect();
         
-        if (this.settings.visualization === 'strip') {
-            // Use strip-specific scroll offset calculation
-            this.endRotation = RouletteEngine.computeFinalScrollOffset(
-                activeLots,
-                this.modeConfig,
-                targetLotId,
-                currentRotation,
-                animationDuration,
-                rect.width
-            );
-        } else {
-            // Use wheel rotation calculation (existing logic)
-            this.endRotation = RouletteEngine.computeFinalRotation(
-                activeLots,
-                this.modeConfig,
-                targetLotId,
-                currentRotation,
-                animationDuration
-            );
-        }
+        // Use strategy pattern to compute final position based on visualization type
+        const strategy: IVisualizationStrategy = getVisualizationStrategy(this.settings.visualization);
+        this.endRotation = strategy.computeFinalPosition(
+            activeLots,
+            this.modeConfig,
+            targetLotId,
+            currentRotation,
+            animationDuration,
+            rect.width  // Pass canvas width (required for strip, ignored by wheel)
+        );
 
         // Configure animation
         this.animationController.configure({
