@@ -11,7 +11,7 @@ export class LotManager {
     /**
      * Generates a unique ID for new lots.
      */
-    private generateId(): string {
+    private static generateId(): string {
         return `lot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
@@ -25,7 +25,7 @@ export class LotManager {
         }
 
         const lot: Lot = {
-            id: this.generateId(),
+            id: LotManager.generateId(),
             name: name.trim(),
             amount: Math.max(0.01, parseFloat(amount.toString())),
             color,

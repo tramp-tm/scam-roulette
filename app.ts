@@ -42,7 +42,6 @@ export class App {
     private canvas: HTMLCanvasElement;
     private resultDisplay: HTMLElement | null = null;
     private resultText: HTMLElement | null = null;
-    private infoContainer: HTMLElement | null = null;
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
@@ -61,8 +60,6 @@ export class App {
     private visualizationSelect: HTMLSelectElement | null = null;
     private durationSlider: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
-    private spinsSlider: HTMLInputElement | null = null;
-    private spinsValue: HTMLElement | null = null;
     
     // Sort control elements
     private sortByNameBtn: HTMLButtonElement | null = null;
@@ -78,7 +75,6 @@ export class App {
         this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
         this.resultDisplay = document.getElementById('result-display');
         this.resultText = document.getElementById('result-text');
-        this.infoContainer = document.getElementById('info-container') as HTMLElement;
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
@@ -87,7 +83,6 @@ export class App {
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
         
         // Add row elements (inline at bottom of lots table)
-        const addLotRow = document.getElementById('add-lot-row') as HTMLElement;
         this.lotNameInput = document.getElementById('new-lot-name') as HTMLInputElement;
         this.lotAmountInput = document.getElementById('new-lot-amount') as HTMLInputElement;
         this.addBtn = document.getElementById('add-lot-btn') as HTMLButtonElement;
@@ -98,8 +93,6 @@ export class App {
         this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value');
-        this.spinsSlider = document.getElementById('spins-slider') as HTMLInputElement;
-        this.spinsValue = document.getElementById('spins-value');
         
         // Sort control elements
         this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
@@ -183,11 +176,6 @@ export class App {
                 this.settings.animationDuration = duration;
                 if (this.durationValue) this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
             }
-        });
-        
-        // Spins slider
-        this.spinsSlider?.addEventListener('input', () => {
-            if (this.spinsValue) this.spinsValue.textContent = this.spinsSlider ? this.spinsSlider.value : '';
         });
         
         // Sort switch buttons - unified handler for both buttons

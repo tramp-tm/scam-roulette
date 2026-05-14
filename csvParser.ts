@@ -23,8 +23,6 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
     // Determine the separator character
     const sepChar = separator === 'comma' ? ',' : '\t';
 
-    let headerDetected = false;
-
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         const row = rows[rowIndex];
         
@@ -58,9 +56,8 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         // Validate: valid numeric amount required (must be positive)
         if (isNaN(amount) || amount <= 0) {
             // Check for header row auto-detection on first data row only
-            if (!headerDetected && rowIndex === 0) {
+            if (rowIndex === 0) {
                 // If second column is not a valid number, treat as header and skip this row
-                headerDetected = true;
                 continue;
             }
             
