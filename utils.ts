@@ -75,6 +75,7 @@ export function sliderToDuration(sliderValue: number): number {
 
 /**
  * Converts a duration in SECONDS to slider position value.
+ * Finds nearest allowed position when exact match not found.
  */
 export function durationToSlider(durationSeconds: number): number {
     const clamped = Math.max(1, Math.min(MAX_DURATION_SEC, durationSeconds));
@@ -84,14 +85,29 @@ export function durationToSlider(durationSeconds: number): number {
     } else {
         // Find the slider position that maps to this duration using a simple loop
         const keys = Object.keys(DURATION_MAP);
+        
+        // First try exact match
         for (let i = 0; i < keys.length; i++) {
             const pos = parseInt(keys[i]);
             if (DURATION_MAP[pos] === clamped) {
                 return pos;
             }
         }
-        // Default to max position if not found in map
-        return MAX_DURATION_SLIDER_VALUE;
+        
+        // No exact match - find nearest allowed duration value
+        let nearestPos = MAX_DURATION_SLIDER_VALUE;
+        let minDiff = Infinity;
+        
+        for (let i = 0; i < keys.length; i++) {
+            const pos = parseInt(keys[i]);
+            const diff = Math.abs(DURATION_MAP[pos] - clamped);
+            if (diff < minDiff) {
+                minDiff = diff;
+                nearestPos = pos;
+            }
+        }
+        
+        return nearestPos;
     }
 }
 
