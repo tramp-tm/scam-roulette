@@ -56,7 +56,9 @@ export const MAX_DURATION_SLIDER_VALUE = Object.keys(DURATION_MAP).reduce((max, 
     Math.max(max, parseInt(key)), 0);
 
 /** Maximum duration in seconds - derived from DURATION_MAP's max value */
-export const MAX_DURATION_SEC = Object.values(DURATION_MAP).reduce(Math.max, 60);
+export const MAX_DURATION_SEC = Object.keys(DURATION_MAP)
+    .map(key => DURATION_MAP[parseInt(key)])
+    .reduce((max, val) => Math.max(max, val), 60);
 
 /**
  * Converts a slider position to duration in seconds.
