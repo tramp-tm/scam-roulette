@@ -33,3 +33,39 @@ export function brightenColor(color: string, percent: number): string {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
+// ========================================
+// DURATION SLIDER MAPPING
+// ========================================
+
+/**
+ * Map for slider positions > 60 to predefined duration values in seconds.
+ */
+const DURATION_MAP: Record<number, number> = {
+    61: 70,
+    62: 80,
+    63: 90,
+    64: 120,
+    65: 150,
+    66: 180,
+    67: 240,
+    68: 300,
+};
+
+/** Maximum slider position value */
+export const MAX_DURATION_SLIDER_VALUE = 68;
+
+/**
+ * Converts a slider position to duration in seconds.
+ * Positions 1-60 map directly to seconds (1s-60s).
+ * Positions 61+ use predefined values from DURATION_MAP.
+ */
+export function sliderToDuration(sliderValue: number): number {
+    const clampedPos = Math.max(1, Math.min(MAX_DURATION_SLIDER_VALUE, sliderValue));
+    
+    if (clampedPos <= 60) {
+        return clampedPos; // Direct mapping for positions 1-60
+    } else {
+        return DURATION_MAP[clampedPos] ?? 300; // Lookup or default to 300s
+    }
+}
+

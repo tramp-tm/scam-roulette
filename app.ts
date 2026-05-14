@@ -5,7 +5,7 @@ import { AnimationController, EasingFunctions } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
-import { generateRandomReadableColor } from './utils.js';
+import { generateRandomReadableColor, sliderToDuration, MAX_DURATION_SLIDER_VALUE } from './utils.js';
 import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
@@ -196,6 +196,7 @@ export class App {
         });
 
         // Duration number input - direct value entry
+        
         this.durationInput?.addEventListener('input', () => {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
@@ -256,50 +257,6 @@ export class App {
         });
     }
 
-    /**
-     * Converts slider position (0-100) to duration in milliseconds using non-linear mapping.
-     * Provides finer control at lower durations and coarser steps at higher durations.
-     * 
-     * Mapping: 0→1s, ~33→10s, ~67→100s, 100→300s (logarithmic-like distribution)
-     */
-    private sliderToDuration(sliderValue: number): number {
-        // Clamp slider value to [0, 100]
-        const clamped = Math.max(0, Math.min(100, sliderValue));
-        
-        // Use a piecewise function for non-linear mapping:
-        // Range 0-50: 1s to 60s (more granular)
-        // Range 50-100: 60s to 300s (coarser steps)
-        
-        if (clamped <= 50) {
-            // Lower range: 1s to 60s over slider positions 0-50
-            // Uses exponential curve for finer control at low end
-            const t = clamped / 50; // Normalize to [0, 1]
-            return Math.round(1000 + (59000) * Math.pow(t, 2));
-        } else {
-            // Upper range: 60s to 300s over slider positions 50-100
-            const t = (clamped - 50) / 50; // Normalize to [0, 1]
-            return Math.round(60000 + (240000) * t);
-        }
-    }
-
-    /**
-     * Converts duration in milliseconds to slider position (0-100).
-     * Inverse of sliderToDuration().
-     */
-    private durationToSlider(duration: number): number {
-        // Clamp duration to [1000, 300000]
-        const clamped = Math.max(1000, Math.min(300000, duration));
-        
-        if (clamped <= 60000) {
-            // Lower range: inverse of exponential curve
-            const t = Math.sqrt((clamped - 1000) / 59000);
-            return Math.round(t * 50);
-        } else {
-            // Upper range: linear interpolation
-            const t = (clamped - 60000) / 240000;
-            return Math.round(50 + t * 50);
-        }
-    }
 
     /** Sets the sort field and toggles direction if same field */
     private setSortField(field: SortField): void {
