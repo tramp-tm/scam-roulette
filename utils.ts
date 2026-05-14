@@ -69,3 +69,24 @@ export function sliderToDuration(sliderValue: number): number {
     }
 }
 
+/**
+ * Converts a duration in seconds to slider position value.
+ * Inverse of sliderToDuration().
+ */
+export function durationToSlider(durationSeconds: number): number {
+    const clamped = Math.max(1, Math.min(300, durationSeconds));
+    
+    if (clamped <= 60) {
+        return clamped; // Direct mapping for durations 1-60 seconds
+    } else {
+        // Find the slider position that maps to this duration
+        for (const [pos, dur] of Object.entries(DURATION_MAP)) {
+            if (dur === clamped) {
+                return parseInt(pos);
+            }
+        }
+        // Default to max position (300s) if not found in map
+        return MAX_DURATION_SLIDER_VALUE;
+    }
+}
+

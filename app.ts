@@ -5,7 +5,7 @@ import { AnimationController, EasingFunctions } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
-import { generateRandomReadableColor, sliderToDuration, MAX_DURATION_SLIDER_VALUE } from './utils.js';
+import { generateRandomReadableColor, sliderToDuration, durationToSlider, MAX_DURATION_SLIDER_VALUE } from './utils.js';
 import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
@@ -106,7 +106,7 @@ export class App {
         // Set initial slider and number input positions based on default duration (3000ms = 3s)
         if (this.durationSlider && this.durationInput) {
             const initialDuration = 3000; // Default 3 seconds
-            this.durationSlider.value = String(this.durationToSlider(initialDuration));
+            this.durationSlider.value = String(durationToSlider(initialDuration / 1000));
             this.durationInput.value = '3';
         }
         
@@ -210,7 +210,7 @@ export class App {
                 
                 // Update slider position and display value
                 if (this.durationSlider) {
-                    this.durationSlider.value = String(this.durationToSlider(duration));
+                    this.durationSlider.value = String(durationToSlider(duration / 1000));
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = `${seconds.toFixed(1)}s`;
@@ -232,7 +232,7 @@ export class App {
                 
                 // Update slider position and display value
                 if (this.durationSlider) {
-                    this.durationSlider.value = String(this.durationToSlider(duration));
+                    this.durationSlider.value = String(durationToSlider(duration / 1000));
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = `${seconds.toFixed(1)}s`;
