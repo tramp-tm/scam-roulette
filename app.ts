@@ -105,9 +105,9 @@ export class App {
         
         // Set initial slider and number input positions based on default duration (3s)
         if (this.durationSlider && this.durationInput) {
-            const initialDurationSeconds = 3; // Default 3 seconds
-            this.durationSlider.value = String(durationToSlider(initialDurationSeconds * 1000));
-            this.durationInput.value = String(initialDurationSeconds);
+            const initialSeconds = 3; // Default 3 SECONDS
+            this.durationSlider.value = String(durationToSlider(initialSeconds));
+            this.durationInput.value = String(initialSeconds);
         }
         
         // Set initial random color for new lot indicator
@@ -181,16 +181,15 @@ export class App {
         // Duration slider - uses non-linear mapping for better control at lower values
         this.durationSlider?.addEventListener('input', () => {
             if (this.durationSlider) {
-                const sliderValue = parseInt(this.durationSlider.value);
-                const duration = sliderToDuration(sliderValue);
-                this.settings.animationDuration = duration;
+                const seconds = sliderToDuration(parseInt(this.durationSlider.value)); // Returns SECONDS
+                this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
-                // Update number input and display value
+                // Update number input and display value in SECONDS
                 if (this.durationInput) {
-                    this.durationInput.value = String(Math.round(duration / 1000));
+                    this.durationInput.value = String(Math.round(seconds));
                 }
                 if (this.durationValue) {
-                    this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
                 }
             }
         });
@@ -201,16 +200,15 @@ export class App {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
                 
-                // Validate and clamp to range [1, 300]
+                // Validate and clamp to range [1, 300] SECONDS
                 if (isNaN(seconds)) seconds = 1;
                 seconds = Math.max(1, Math.min(300, seconds));
                 
-                const duration = Math.round(seconds * 1000);
-                this.settings.animationDuration = duration;
+                this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
-                // Update slider position and display value
+                // Update slider position using durationToSlider with SECONDS
                 if (this.durationSlider) {
-                    this.durationSlider.value = String(durationToSlider(duration / 1000));
+                    this.durationSlider.value = String(durationToSlider(seconds));
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = `${seconds.toFixed(1)}s`;
@@ -223,16 +221,15 @@ export class App {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
                 
-                // Validate and clamp to range [1, 300]
+                // Validate and clamp to range [1, 300] SECONDS
                 if (isNaN(seconds)) seconds = 1;
                 seconds = Math.max(1, Math.min(300, seconds));
                 
-                const duration = Math.round(seconds * 1000);
-                this.settings.animationDuration = duration;
+                this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
-                // Update slider position and display value
+                // Update slider position using durationToSlider with SECONDS
                 if (this.durationSlider) {
-                    this.durationSlider.value = String(durationToSlider(duration / 1000));
+                    this.durationSlider.value = String(durationToSlider(seconds));
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = `${seconds.toFixed(1)}s`;

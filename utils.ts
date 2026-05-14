@@ -61,23 +61,20 @@ export const MAX_DURATION_SEC = Object.keys(DURATION_MAP)
     .reduce((max, val) => Math.max(max, val), 60);
 
 /**
- * Converts a slider position to duration in seconds.
- * Positions 1-60 map directly to seconds (1s-60s).
- * Positions 61+ use predefined values from DURATION_MAP.
+ * Converts a slider position to duration in SECONDS.
  */
 export function sliderToDuration(sliderValue: number): number {
     const clampedPos = Math.max(1, Math.min(MAX_DURATION_SLIDER_VALUE, sliderValue));
     
     if (clampedPos <= 60) {
-        return clampedPos; // Direct mapping for positions 1-60
+        return clampedPos; // Direct mapping for positions 1-60 → returns SECONDS
     } else {
-        return DURATION_MAP[clampedPos] ?? MAX_DURATION_SEC; // Lookup or default to max
+        return DURATION_MAP[clampedPos] ?? MAX_DURATION_SEC; // Returns SECONDS
     }
 }
 
 /**
- * Converts a duration in seconds to slider position value.
- * Inverse of sliderToDuration().
+ * Converts a duration in SECONDS to slider position value.
  */
 export function durationToSlider(durationSeconds: number): number {
     const clamped = Math.max(1, Math.min(MAX_DURATION_SEC, durationSeconds));
