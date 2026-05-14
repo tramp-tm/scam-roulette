@@ -194,46 +194,30 @@ export class App {
             }
         });
 
-        // Duration number input - direct value entry
-        
-        this.durationInput?.addEventListener('input', () => {
-            if (this.durationInput) {
-                let seconds = parseFloat(this.durationInput.value);
-                
-                // Validate and clamp to range [1, 300] SECONDS
-                if (isNaN(seconds)) seconds = 1;
-                seconds = Math.max(1, Math.min(300, seconds));
-                
-                this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
-                
-                // Update slider position using durationToSlider with SECONDS
-                if (this.durationSlider) {
-                    this.durationSlider.value = String(durationToSlider(seconds));
-                }
-                if (this.durationValue) {
-                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
-                }
-            }
-        });
-
-        // Duration number input - sync on blur/enter
+        // Duration number input - validate and correct on blur/enter only
         this.durationInput?.addEventListener('change', () => {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
                 
-                // Validate and clamp to range [1, 300] SECONDS
-                if (isNaN(seconds)) seconds = 1;
-                seconds = Math.max(1, Math.min(300, seconds));
+                // Correct invalid value to closest valid [1, 300] SECONDS
+                if (isNaN(seconds)) {
+                    seconds = 1; // Default to minimum if not a number
+                } else {
+                    seconds = Math.max(1, Math.min(300, seconds)); // Clamp to range
+                }
                 
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
-                // Update slider position using durationToSlider with SECONDS
+                // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = `${seconds.toFixed(1)}s`;
                 }
+                
+                // Update the input field to show corrected value
+                this.durationInput.value = String(Math.round(seconds));
             }
         });
         
