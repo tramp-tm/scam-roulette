@@ -198,3 +198,24 @@ export interface IRenderer {
     /** Reset renderer state */
     reset(): void;
 }
+
+// ========================================
+// VISUALIZATION PACKAGE TYPES
+// ========================================
+
+/**
+ * Bundled package containing everything needed for a visualization type.
+ * Eliminates string-based branching by providing renderer factory and strategy together.
+ */
+export interface VisualizationPackage {
+    id: VisualizationType;
+    createRenderer: (canvas: HTMLCanvasElement) => IRenderer;
+    computeFinalPosition: (
+        lots: Lot[],
+        modeConfig: ModeConfig,
+        targetLotId: string,
+        currentPosition: number,
+        animationDurationMs: number,
+        canvasWidth?: number
+    ) => number;
+}

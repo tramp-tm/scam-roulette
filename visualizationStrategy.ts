@@ -1,89 +1,40 @@
-import { Lot, ModeConfig, VisualizationType } from './types.js';
+import { Lot, ModeConfig, VisualizationType, VisualizationPackage } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
+import { WheelRenderer } from './wheelRenderer.js';
+import { StripRenderer } from './stripRenderer.js';
 
 /**
- * Interface for visualization-specific position computation strategies.
+ * Bundled visualization package for wheel type.
  */
-export interface IVisualizationStrategy {
-    /**
-     * Computes the final position (rotation angle or scroll offset) for animation.
-     * 
-     * @param lots - Active lots in the roulette
-     * @param modeConfig - Current game mode configuration
-     * @param targetLotId - ID of the winning lot to animate toward
-     * @param currentPosition - Current rotation/scroll position
-     * @param animationDurationMs - Duration of animation in milliseconds
-     * @param canvasWidth - Canvas width (required for strip visualization)
-     * @returns Final position value for animation end point
-     */
-    computeFinalPosition(
-        lots: Lot[],
-        modeConfig: ModeConfig,
-        targetLotId: string,
-        currentPosition: number,
-        animationDurationMs: number,
-        canvasWidth?: number
-    ): number;
-}
-
-/**
- * Strategy for wheel visualization - computes rotation angle.
- */
-export const WheelVisualizationStrategy: IVisualizationStrategy = {
-    computeFinalPosition(
-        lots: Lot[],
-        modeConfig: ModeConfig,
-        targetLotId: string,
-        currentPosition: number,
-        animationDurationMs: number
-    ): number {
-        return RouletteEngine.computeFinalRotation(
-            lots,
-            modeConfig,
-            targetLotId,
-            currentPosition,
-            animationDurationMs
-        );
-    }
+const WHEEL_PACKAGE: VisualizationPackage = {
+    id: 'wheel',
+    createRenderer: (canvas) => new WheelRenderer(canvas),
+    computeFinalPosition: (lots, modeConfig, targetLotId, currentPosition, duration) => 
+        RouletteEngine.computeFinalRotation(lots, modeConfig, targetLotId, currentPosition, duration)
 };
 
 /**
- * Strategy for strip visualization - computes scroll offset.
+ * Bundled visualization package for strip type.
  */
-export const StripVisualizationStrategy: IVisualizationStrategy = {
-    computeFinalPosition(
-        lots: Lot[],
-        modeConfig: ModeConfig,
-        targetLotId: string,
-        currentPosition: number,
-        animationDurationMs: number,
-        canvasWidth: number
-    ): number {
-        if (canvasWidth === undefined) {
-            throw new Error('Canvas width is required for strip visualization');
-        }
-        
-        return RouletteEngine.computeFinalScrollOffset(
-            lots,
-            modeConfig,
-            targetLotId,
-            currentPosition,
-            animationDurationMs,
-            canvasWidth
-        );
-    }
+const STRIP_PACKAGE: VisualizationPackage = {
+    id: 'strip',
+    createRenderer: (canvas) => new StripRenderer(canvas),
+    computeFinalPosition: (lots, modeConfig, targetLotId, currentPosition, duration, canvasWidth) => 
+        RouletteEngine.computeFinalScrollOffset(lots, modeConfig, targetLotId, currentPosition, duration, canvasWidth!)
 };
 
 /**
- * Factory function to get the appropriate strategy for a visualization type.
+ * Registry of all visualization packages - single source of truth.
  */
-export function getVisualizationStrategy(type: VisualizationType): IVisualizationStrategy {
-    switch (type) {
-        case 'wheel':
-            return WheelVisualizationStrategy;
-        case 'strip':
-            return StripVisualizationStrategy;
-        default:
-            throw new Error(`Unknown visualization type: ${type}`);
-    }
+export const VISUALIZATION_PACKAGES = {
+    wheel: WHEEL_PACKAGE,
+    strip: STRIP_PACKAGE
+} as const;
+
+/**
+ * Gets the visualization package for a given type.
+ * Single object property access - no switch statement needed!
+ */
+export function getVisualizationPackage(type: VisualizationType): VisualizationPackage {
+    return VISUALIZATION_PACKAGES[type];
 }

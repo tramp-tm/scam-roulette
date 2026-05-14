@@ -2,7 +2,7 @@ import { LotManager } from './lotManager.js';
 import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
-import { getVisualizationStrategy, IVisualizationStrategy } from './visualizationStrategy.js';
+import { getVisualizationPackage, VisualizationPackage } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
 import { generateRandomReadableColor } from './utils.js';
@@ -278,18 +278,18 @@ export class App {
         const targetLotId = winner.id;
         const animationDuration = this.settings.animationDuration;
         
-        // Get canvas dimensions (needed for strip visualization)
+        // Get canvas dimensions
         const rect = this.canvas.getBoundingClientRect();
         
-        // Use strategy pattern to compute final position based on visualization type
-        const strategy: IVisualizationStrategy = getVisualizationStrategy(this.settings.visualization);
-        const endRotation = strategy.computeFinalPosition(
+        // Use bundled visualization package - single lookup returns everything needed
+        const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
+        const endRotation = vizPackage.computeFinalPosition(
             activeLots,
             this.modeConfig,
             targetLotId,
             currentRotation,
             animationDuration,
-            rect.width  // Pass canvas width (required for strip, ignored by wheel)
+            rect.width  // Always passed - package handles it appropriately
         );
 
         // Configure animation
