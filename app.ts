@@ -3,7 +3,7 @@ import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
 import { getVisualizationStrategy, IVisualizationStrategy } from './visualizationStrategy.js';
-import { IRenderer, VisualizationType, Settings, Mode, AppState, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
+import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
 import { generateRandomReadableColor } from './utils.js';
 import { parseCSV } from './csvParser.js';

@@ -105,7 +105,7 @@ export class WheelRenderer implements IRenderer {
             this.ctx.closePath();
 
             // Fill segment
-            this.ctx.fillStyle = isHighlighted ? this.brightenColor(segment.lot.color, 30) : segment.lot.color;
+            this.ctx.fillStyle = isHighlighted ? brightenColor(segment.lot.color, 30) : segment.lot.color;
             this.ctx.fill();
 
             // Stroke segment

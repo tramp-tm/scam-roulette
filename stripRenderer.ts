@@ -160,7 +160,7 @@ export class StripRenderer implements IRenderer {
             
             // Highlight the winning lot if it's this one
             if (segment.lot.id === this.highlightedLotId) {
-                fillColor = this.brightenColor(fillColor, 40);
+                fillColor = brightenColor(fillColor, 40);
                 
                 // Draw highlight glow effect
                 this.ctx.save();
