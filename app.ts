@@ -195,28 +195,49 @@ export class App {
             }
         });
 
-        // Duration number input - direct value entry with validation and correction
+        // Duration number input - direct value entry
+        
         this.durationInput?.addEventListener('input', () => {
-            if (!this.durationInput || !this.durationSlider || !this.durationValue) return;
-            
-            let seconds = parseFloat(this.durationInput.value);
-            
-            // Validate: if NaN or empty, default to 1 second
-            if (isNaN(seconds) || this.durationInput.value.trim() === '') {
-                seconds = 1;
+            if (this.durationInput) {
+                let seconds = parseFloat(this.durationInput.value);
+                
+                // Validate and clamp to range [1, 300]
+                if (isNaN(seconds)) seconds = 1;
+                seconds = Math.max(1, Math.min(300, seconds));
+                
+                const duration = Math.round(seconds * 1000);
+                this.settings.animationDuration = duration;
+                
+                // Update slider position and display value
+                if (this.durationSlider) {
+                    this.durationSlider.value = String(durationToSlider(duration / 1000));
+                }
+                if (this.durationValue) {
+                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                }
             }
-            
-            // Clamp to valid range [1, 300] - corrects invalid values to nearest valid boundary
-            seconds = Math.max(1, Math.min(300, seconds));
-            
-            const duration = Math.round(seconds * 1000);
-            this.settings.animationDuration = duration;
-            
-            // Update slider position to nearest allowed position for the given duration
-            this.durationSlider.value = String(durationToSlider(duration));
-            
-            // Update display value
-            this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+        });
+
+        // Duration number input - sync on blur/enter
+        this.durationInput?.addEventListener('change', () => {
+            if (this.durationInput) {
+                let seconds = parseFloat(this.durationInput.value);
+                
+                // Validate and clamp to range [1, 300]
+                if (isNaN(seconds)) seconds = 1;
+                seconds = Math.max(1, Math.min(300, seconds));
+                
+                const duration = Math.round(seconds * 1000);
+                this.settings.animationDuration = duration;
+                
+                // Update slider position and display value
+                if (this.durationSlider) {
+                    this.durationSlider.value = String(durationToSlider(duration / 1000));
+                }
+                if (this.durationValue) {
+                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                }
+            }
         });
         
         // Sort switch buttons - unified handler for both buttons
