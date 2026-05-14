@@ -628,28 +628,6 @@ input[type="number"] {
 }
 
 /* ========================================
-   IMPORT STATUS LINE (Always Visible)
-   ======================================== */
-
-.import-status {
-    font-size: 0.85em;
-    padding: 10px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    margin-bottom: 15px;
-}
-
-.import-status #valid-count {
-    color: #2ecc71;
-    font-weight: bold;
-}
-
-.import-status #error-count {
-    color: #e74c3c;
-    font-weight: bold;
-}
-
-/* ========================================
    CSV TAB CONTENT
    ======================================== */
 

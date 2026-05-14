@@ -2,10 +2,7 @@
  * Animation utilities including easing functions.
  */
 
-/**
- * Easing function type
- */
-export type EasingFunction = (t: number) => number;
+import { EasingFunction } from './types.js';
 
 /**
  * Collection of easing functions for smooth animation.

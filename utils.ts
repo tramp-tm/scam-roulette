@@ -60,6 +60,9 @@ export const MAX_DURATION_SEC = Object.keys(DURATION_MAP)
     .map(key => DURATION_MAP[parseInt(key)])
     .reduce((max, val) => Math.max(max, val), 60);
 
+/** Minimum animation duration in seconds */
+export const MIN_DURATION_SEC = 1;
+
 /**
  * Converts a slider position to duration in SECONDS.
  */
@@ -109,5 +112,20 @@ export function durationToSlider(durationSeconds: number): number {
         
         return nearestPos;
     }
+}
+
+/**
+ * Generates a random position within a span with edge margins.
+ * Used for landing positions in wheel/strip animations.
+ */
+export function getRandomPositionInRange(
+    span: number,
+    edgeMarginPercent: number = 0.02,
+    maxEdgeMargin: number = 3
+): number {
+    const margin = Math.min(span * edgeMarginPercent, maxEdgeMargin);
+    const minOffset = margin;
+    const maxOffset = span - margin;
+    return Math.random() * (maxOffset - minOffset) + minOffset;
 }
 

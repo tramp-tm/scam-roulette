@@ -5,7 +5,14 @@ import { AnimationController, EasingFunctions } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
-import { generateRandomReadableColor, sliderToDuration, durationToSlider, MAX_DURATION_SLIDER_VALUE } from './utils.js';
+import { 
+    generateRandomReadableColor, 
+    sliderToDuration, 
+    durationToSlider, 
+    MAX_DURATION_SLIDER_VALUE,
+    MIN_DURATION_SEC,
+    MAX_DURATION_SEC
+} from './utils.js';
 import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
@@ -199,11 +206,11 @@ export class App {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
                 
-                // Correct invalid value to closest valid [1, 300] SECONDS
+                // Correct invalid value to closest valid [MIN_DURATION_SEC, MAX_DURATION_SEC] SECONDS
                 if (isNaN(seconds)) {
-                    seconds = 1; // Default to minimum if not a number
+                    seconds = MIN_DURATION_SEC; // Default to minimum if not a number
                 } else {
-                    seconds = Math.max(1, Math.min(300, seconds)); // Clamp to range
+                    seconds = Math.max(MIN_DURATION_SEC, Math.min(MAX_DURATION_SEC, seconds)); // Clamp to range
                 }
                 
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms

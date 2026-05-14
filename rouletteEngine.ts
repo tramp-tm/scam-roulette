@@ -1,4 +1,5 @@
 import { Lot, ModeConfig, getModeConfig } from './types';
+import { getRandomPositionInRange } from './utils.js';
 
 /**
  * Core roulette engine that handles weighted random selection.
@@ -136,10 +137,7 @@ export class RouletteEngine {
         
         // 1. Pick random point inside the segment for landing position
         const segmentSpan = segment.endAngle - segment.startAngle;
-        const margin = Math.min(segmentSpan * 0.02, 0.04); // ±2% margin for dramatic stop near edges
-        const minOffset = margin;
-        const maxOffset = segmentSpan - margin;
-        const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
+        const randomOffset = getRandomPositionInRange(segmentSpan, 0.02, 0.04);
         
         // Target angle within the winning segment
         const targetSegmentAngle = segment.startAngle + randomOffset;
@@ -209,10 +207,7 @@ export class RouletteEngine {
             
             if (segment.lot.id === targetLotId) {
                 // Pick random point within this lot's width (with margin from edges)
-                const margin = Math.min(segmentWidth * 0.02, 3); // ±2% margin for dramatic stop near edges
-                const minOffset = margin;
-                const maxOffset = segmentWidth - margin;
-                const randomOffset = Math.random() * (maxOffset - minOffset) + minOffset;
+                const randomOffset = getRandomPositionInRange(segmentWidth, 0.02, 3);
                 
                 // Target position within the cycle where this lot should land under center pointer
                 const targetPositionInCycle = cumulativeWidth + randomOffset;
