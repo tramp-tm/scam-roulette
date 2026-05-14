@@ -29,7 +29,7 @@ export interface IVisualizationStrategy {
 /**
  * Strategy for wheel visualization - computes rotation angle.
  */
-export class WheelVisualizationStrategy implements IVisualizationStrategy {
+export const WheelVisualizationStrategy: IVisualizationStrategy = {
     computeFinalPosition(
         lots: Lot[],
         modeConfig: ModeConfig,
@@ -45,12 +45,12 @@ export class WheelVisualizationStrategy implements IVisualizationStrategy {
             animationDurationMs
         );
     }
-}
+};
 
 /**
  * Strategy for strip visualization - computes scroll offset.
  */
-export class StripVisualizationStrategy implements IVisualizationStrategy {
+export const StripVisualizationStrategy: IVisualizationStrategy = {
     computeFinalPosition(
         lots: Lot[],
         modeConfig: ModeConfig,
@@ -72,7 +72,7 @@ export class StripVisualizationStrategy implements IVisualizationStrategy {
             canvasWidth
         );
     }
-}
+};
 
 /**
  * Factory function to get the appropriate strategy for a visualization type.
@@ -80,9 +80,9 @@ export class StripVisualizationStrategy implements IVisualizationStrategy {
 export function getVisualizationStrategy(type: VisualizationType): IVisualizationStrategy {
     switch (type) {
         case 'wheel':
-            return new WheelVisualizationStrategy();
+            return WheelVisualizationStrategy;
         case 'strip':
-            return new StripVisualizationStrategy();
+            return StripVisualizationStrategy;
         default:
             throw new Error(`Unknown visualization type: ${type}`);
     }
