@@ -51,8 +51,12 @@ const DURATION_MAP: Record<number, number> = {
     68: 300,
 };
 
-/** Maximum slider position value */
-export const MAX_DURATION_SLIDER_VALUE = 68;
+/** Maximum slider position value - derived from DURATION_MAP's last key */
+export const MAX_DURATION_SLIDER_VALUE = Object.keys(DURATION_MAP).reduce((max, key) => 
+    Math.max(max, parseInt(key)), 0);
+
+/** Maximum duration in seconds - derived from DURATION_MAP's max value */
+export const MAX_DURATION_SEC = Object.values(DURATION_MAP).reduce(Math.max, 60);
 
 /**
  * Converts a slider position to duration in seconds.
@@ -65,7 +69,7 @@ export function sliderToDuration(sliderValue: number): number {
     if (clampedPos <= 60) {
         return clampedPos; // Direct mapping for positions 1-60
     } else {
-        return DURATION_MAP[clampedPos] ?? 300; // Lookup or default to 300s
+        return DURATION_MAP[clampedPos] ?? MAX_DURATION_SEC; // Lookup or default to max
     }
 }
 
@@ -74,18 +78,20 @@ export function sliderToDuration(sliderValue: number): number {
  * Inverse of sliderToDuration().
  */
 export function durationToSlider(durationSeconds: number): number {
-    const clamped = Math.max(1, Math.min(300, durationSeconds));
+    const clamped = Math.max(1, Math.min(MAX_DURATION_SEC, durationSeconds));
     
     if (clamped <= 60) {
         return clamped; // Direct mapping for durations 1-60 seconds
     } else {
-        // Find the slider position that maps to this duration
-        for (const [pos, dur] of Object.entries(DURATION_MAP)) {
-            if (dur === clamped) {
-                return parseInt(pos);
+        // Find the slider position that maps to this duration using a simple loop
+        const keys = Object.keys(DURATION_MAP);
+        for (let i = 0; i < keys.length; i++) {
+            const pos = parseInt(keys[i]);
+            if (DURATION_MAP[pos] === clamped) {
+                return pos;
             }
         }
-        // Default to max position (300s) if not found in map
+        // Default to max position if not found in map
         return MAX_DURATION_SLIDER_VALUE;
     }
 }

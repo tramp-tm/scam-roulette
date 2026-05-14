@@ -182,7 +182,7 @@ export class App {
         this.durationSlider?.addEventListener('input', () => {
             if (this.durationSlider) {
                 const sliderValue = parseInt(this.durationSlider.value);
-                const duration = this.sliderToDuration(sliderValue);
+                const duration = sliderToDuration(sliderValue);
                 this.settings.animationDuration = duration;
                 
                 // Update number input and display value
