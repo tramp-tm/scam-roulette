@@ -303,7 +303,7 @@ export class App {
                 this.render();
             },
             onComplete: () => {
-                this.finishSpin(winner, endRotation);
+                this.finishSpin(winner);
             }
         });
 
@@ -323,7 +323,6 @@ export class App {
             if (this.resultText) {
                 this.resultText.textContent = this.modeConfig.getResultText(winner);
             }
-            if (this.infoContainer) this.infoContainer.classList.remove('hidden');
 
             // Call mode-specific onRollEnd hook if defined
             const activeLots = this.lotManager.getActiveLots();
