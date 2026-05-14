@@ -103,11 +103,11 @@ export class App {
         // Initialize UI
         this.updateUI();
         
-        // Set initial slider and number input positions based on default duration (3000ms = 3s)
+        // Set initial slider and number input positions based on default duration (3s)
         if (this.durationSlider && this.durationInput) {
-            const initialDuration = 3000; // Default 3 seconds
-            this.durationSlider.value = String(durationToSlider(initialDuration / 1000));
-            this.durationInput.value = '3';
+            const initialDurationSeconds = 3; // Default 3 seconds
+            this.durationSlider.value = String(durationToSlider(initialDurationSeconds * 1000));
+            this.durationInput.value = String(initialDurationSeconds);
         }
         
         // Set initial random color for new lot indicator
