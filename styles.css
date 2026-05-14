@@ -372,6 +372,22 @@ button:disabled {
     padding: 0;
 }
 
+.slider-container input[type="number"].duration-number-input {
+    width: 70px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1a1a2e;
+    font-size: 0.9em;
+    text-align: center;
+}
+
+.slider-container input[type="number"].duration-number-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 1);
+}
+
 .slider-value {
     min-width: 50px;
     text-align: right;

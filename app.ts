@@ -59,6 +59,7 @@ export class App {
     private modeSelect: HTMLSelectElement | null = null;
     private visualizationSelect: HTMLSelectElement | null = null;
     private durationSlider: HTMLInputElement | null = null;
+    private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
     
     // Sort control elements
@@ -92,6 +93,7 @@ export class App {
         this.modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
         this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
+        this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value');
         
         // Sort control elements
@@ -100,6 +102,13 @@ export class App {
 
         // Initialize UI
         this.updateUI();
+        
+        // Set initial slider and number input positions based on default duration (3000ms = 3s)
+        if (this.durationSlider && this.durationInput) {
+            const initialDuration = 3000; // Default 3 seconds
+            this.durationSlider.value = String(this.durationToSlider(initialDuration));
+            this.durationInput.value = '3';
+        }
         
         // Set initial random color for new lot indicator
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
@@ -169,12 +178,64 @@ export class App {
             this.render();
         });
         
-        // Duration slider
+        // Duration slider - uses non-linear mapping for better control at lower values
         this.durationSlider?.addEventListener('input', () => {
             if (this.durationSlider) {
-                const duration = parseInt(this.durationSlider.value);
+                const sliderValue = parseInt(this.durationSlider.value);
+                const duration = this.sliderToDuration(sliderValue);
                 this.settings.animationDuration = duration;
-                if (this.durationValue) this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+                
+                // Update number input and display value
+                if (this.durationInput) {
+                    this.durationInput.value = String(Math.round(duration / 1000));
+                }
+                if (this.durationValue) {
+                    this.durationValue.textContent = `${(duration / 1000).toFixed(1)}s`;
+                }
+            }
+        });
+
+        // Duration number input - direct value entry
+        this.durationInput?.addEventListener('input', () => {
+            if (this.durationInput) {
+                let seconds = parseFloat(this.durationInput.value);
+                
+                // Validate and clamp to range [1, 300]
+                if (isNaN(seconds)) seconds = 1;
+                seconds = Math.max(1, Math.min(300, seconds));
+                
+                const duration = Math.round(seconds * 1000);
+                this.settings.animationDuration = duration;
+                
+                // Update slider position and display value
+                if (this.durationSlider) {
+                    this.durationSlider.value = String(this.durationToSlider(duration));
+                }
+                if (this.durationValue) {
+                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                }
+            }
+        });
+
+        // Duration number input - sync on blur/enter
+        this.durationInput?.addEventListener('change', () => {
+            if (this.durationInput) {
+                let seconds = parseFloat(this.durationInput.value);
+                
+                // Validate and clamp to range [1, 300]
+                if (isNaN(seconds)) seconds = 1;
+                seconds = Math.max(1, Math.min(300, seconds));
+                
+                const duration = Math.round(seconds * 1000);
+                this.settings.animationDuration = duration;
+                
+                // Update slider position and display value
+                if (this.durationSlider) {
+                    this.durationSlider.value = String(this.durationToSlider(duration));
+                }
+                if (this.durationValue) {
+                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                }
             }
         });
         
@@ -193,6 +254,51 @@ export class App {
                 this.setSortField(targetField as SortField);
             });
         });
+    }
+
+    /**
+     * Converts slider position (0-100) to duration in milliseconds using non-linear mapping.
+     * Provides finer control at lower durations and coarser steps at higher durations.
+     * 
+     * Mapping: 0→1s, ~33→10s, ~67→100s, 100→300s (logarithmic-like distribution)
+     */
+    private sliderToDuration(sliderValue: number): number {
+        // Clamp slider value to [0, 100]
+        const clamped = Math.max(0, Math.min(100, sliderValue));
+        
+        // Use a piecewise function for non-linear mapping:
+        // Range 0-50: 1s to 60s (more granular)
+        // Range 50-100: 60s to 300s (coarser steps)
+        
+        if (clamped <= 50) {
+            // Lower range: 1s to 60s over slider positions 0-50
+            // Uses exponential curve for finer control at low end
+            const t = clamped / 50; // Normalize to [0, 1]
+            return Math.round(1000 + (59000) * Math.pow(t, 2));
+        } else {
+            // Upper range: 60s to 300s over slider positions 50-100
+            const t = (clamped - 50) / 50; // Normalize to [0, 1]
+            return Math.round(60000 + (240000) * t);
+        }
+    }
+
+    /**
+     * Converts duration in milliseconds to slider position (0-100).
+     * Inverse of sliderToDuration().
+     */
+    private durationToSlider(duration: number): number {
+        // Clamp duration to [1000, 300000]
+        const clamped = Math.max(1000, Math.min(300000, duration));
+        
+        if (clamped <= 60000) {
+            // Lower range: inverse of exponential curve
+            const t = Math.sqrt((clamped - 1000) / 59000);
+            return Math.round(t * 50);
+        } else {
+            // Upper range: linear interpolation
+            const t = (clamped - 60000) / 240000;
+            return Math.round(50 + t * 50);
+        }
     }
 
     /** Sets the sort field and toggles direction if same field */
