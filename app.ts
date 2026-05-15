@@ -32,6 +32,9 @@ export class App {
         animationDuration: 3000
     };
     
+    // Easing function setting - source of truth for user preference
+    private easingFunction: EasingFunction = DEFAULT_EASING;
+    
     // Get current mode config (cached for performance)
     get modeConfig(): ModeConfig {
         return getModeConfig(this.settings.modeId);
@@ -236,7 +239,7 @@ export class App {
             }
         });
         
-        // Easing function select - updates AnimationController.easing on change
+        // Easing function select - updates App.settings.easingFunction on change
         this.easingSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
             const easingName = target.value;
@@ -244,22 +247,22 @@ export class App {
             // Map selected value to actual easing function from EasingFunctions object
             switch (easingName) {
                 case 'easeOutCubic':
-                    this.animationController.easing = EasingFunctions.easeOutCubic;
+                    this.easingFunction = EasingFunctions.easeOutCubic;
                     break;
                 case 'easeOutQuart':
-                    this.animationController.easing = EasingFunctions.easeOutQuart;
+                    this.easingFunction = EasingFunctions.easeOutQuart;
                     break;
                 case 'easeOutQuint':
-                    this.animationController.easing = EasingFunctions.easeOutQuint;
+                    this.easingFunction = EasingFunctions.easeOutQuint;
                     break;
                 case 'easeOutExpo':
-                    this.animationController.easing = EasingFunctions.easeOutExpo;
+                    this.easingFunction = EasingFunctions.easeOutExpo;
                     break;
                 case 'linear':
-                    this.animationController.easing = EasingFunctions.linear;
+                    this.easingFunction = EasingFunctions.linear;
                     break;
                 default: // rouletteEaseOut is the default
-                    this.animationController.easing = EasingFunctions.rouletteEaseOut;
+                    this.easingFunction = EasingFunctions.rouletteEaseOut;
             }
         });
         
@@ -396,7 +399,7 @@ export class App {
             startValue: currentRotation,
             endValue: endRotation,
             duration: animationDuration,
-            easing: EasingFunctions.rouletteEaseOut,
+            easing: this.easingFunction,
             onUpdate: (value) => {
                 this.renderer.setRotation(value);
                 this.render();

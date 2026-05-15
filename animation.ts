@@ -59,7 +59,7 @@ export class AnimationController {
     private startValue: number = 0;
     private endValue: number = 0;
     private duration: number = 1000;
-    public easing: EasingFunction = DEFAULT_EASING;
+    private easing: EasingFunction = DEFAULT_EASING;
     
     // Fields for tracking speed calculation
     private lastValue: number = 0;
