@@ -117,15 +117,6 @@ export class AnimationController {
         const currentValue = this.startValue + 
             (this.endValue - this.startValue) * easedProgress;
 
-        // Calculate and log instantaneous speed
-        if (this.lastTime !== null && currentTime > this.lastTime) {
-            const deltaTime = (currentTime - this.lastTime) / 1000; // Convert ms to seconds
-            if (deltaTime > 0) {
-                const speed = Math.abs(currentValue - this.lastValue) / deltaTime;
-                console.log(`🎰 Animation Speed: ${currentTime} : ${currentValue} : ${speed.toFixed(2)} units/sec`);
-            }
-        }
-        
         // Update tracking values for next frame
         this.lastValue = currentValue;
         this.lastTime = currentTime;
