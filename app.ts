@@ -68,6 +68,7 @@ export class App {
     private durationSlider: HTMLInputElement | null = null;
     private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
+    private easingSelect: HTMLSelectElement | null = null;
     
     // Sort control elements
     private sortByNameBtn: HTMLButtonElement | null = null;
@@ -105,6 +106,7 @@ export class App {
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
         this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value');
+        this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         
         // Sort control elements
         this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
@@ -234,6 +236,33 @@ export class App {
             }
         });
         
+        // Easing function select - updates AnimationController.easing on change
+        this.easingSelect?.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            const easingName = target.value;
+            
+            // Map selected value to actual easing function from EasingFunctions object
+            switch (easingName) {
+                case 'easeOutCubic':
+                    this.animationController.easing = EasingFunctions.easeOutCubic;
+                    break;
+                case 'easeOutQuart':
+                    this.animationController.easing = EasingFunctions.easeOutQuart;
+                    break;
+                case 'easeOutQuint':
+                    this.animationController.easing = EasingFunctions.easeOutQuint;
+                    break;
+                case 'easeOutExpo':
+                    this.animationController.easing = EasingFunctions.easeOutExpo;
+                    break;
+                case 'linear':
+                    this.animationController.easing = EasingFunctions.linear;
+                    break;
+                default: // rouletteEaseOut is the default
+                    this.animationController.easing = EasingFunctions.rouletteEaseOut;
+            }
+        });
+        
         // Sort switch buttons - unified handler for both buttons
         const sortButtons = document.querySelectorAll('#sort-controls .switch-btn');
         sortButtons.forEach(button => {
@@ -251,15 +280,17 @@ export class App {
         });
         
         // Settings sub-block toggle button
-        this.settingsToggleBtn?.addEventListener('click', () => {
-            const subBlock = document.getElementById('settings-subblock') as HTMLElement;
-            if (subBlock) {
-                subBlock.classList.toggle('hidden');
-                
-                // Update button text to indicate state
-                this.settingsToggleBtn.textContent = subBlock.classList.contains('hidden') ? '⁝' : '✕';
-            }
-        });
+        if (this.settingsToggleBtn) {
+            this.settingsToggleBtn.addEventListener('click', () => {
+                const subBlock = document.getElementById('settings-subblock') as HTMLElement;
+                if (subBlock) {
+                    subBlock.classList.toggle('hidden');
+                    
+                    // Update button text to indicate state
+                    this.settingsToggleBtn!.textContent = subBlock.classList.contains('hidden') ? '⁝' : '✕';
+                }
+            });
+        }
     }
 
 
