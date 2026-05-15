@@ -122,7 +122,7 @@ export class AnimationController {
             const deltaTime = (currentTime - this.lastTime) / 1000; // Convert ms to seconds
             if (deltaTime > 0) {
                 const speed = Math.abs(currentValue - this.lastValue) / deltaTime;
-                console.log(`🎰 Animation Speed: ${speed.toFixed(2)} units/sec`);
+                console.log(`🎰 Animation Speed: ${currentTime} : ${currentValue} : ${speed.toFixed(2)} units/sec`);
             }
         }
         
