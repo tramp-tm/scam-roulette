@@ -72,6 +72,9 @@ export class App {
     // Sort control elements
     private sortByNameBtn: HTMLButtonElement | null = null;
     private sortByAmountBtn: HTMLButtonElement | null = null;
+    
+    // Settings toggle element
+    private settingsToggleBtn: HTMLButtonElement | null = null;
 
     constructor() {
         this.lotManager = new LotManager([]);
@@ -106,6 +109,9 @@ export class App {
         // Sort control elements
         this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
         this.sortByAmountBtn = document.getElementById('sort-by-amount') as HTMLButtonElement;
+        
+        // Settings toggle button
+        this.settingsToggleBtn = document.getElementById('toggle-settings-subblock') as HTMLButtonElement;
 
         // Initialize UI
         this.updateUI();
@@ -242,6 +248,17 @@ export class App {
                 // Set sort field and toggle direction if same field
                 this.setSortField(targetField as SortField);
             });
+        });
+        
+        // Settings sub-block toggle button
+        this.settingsToggleBtn?.addEventListener('click', () => {
+            const subBlock = document.getElementById('settings-subblock') as HTMLElement;
+            if (subBlock) {
+                subBlock.classList.toggle('hidden');
+                
+                // Update button text to indicate state
+                this.settingsToggleBtn.textContent = subBlock.classList.contains('hidden') ? '⁝' : '✕';
+            }
         });
     }
 

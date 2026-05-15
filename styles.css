@@ -64,6 +64,64 @@ h1 {
 }
 
 /* ========================================
+   SETTINGS HEADER ROW WITH TOGGLE BUTTON
+   ======================================== */
+
+.settings-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.settings-header-row h3 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.settings-toggle-btn {
+    background: transparent;
+    border: none;
+    color: #f39c12;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 5px 10px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.settings-toggle-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* ========================================
+   COLLAPSIBLE SUB-BLOCK
+   ======================================== */
+
+.settings-main-block {
+    margin-bottom: 15px;
+}
+
+.settings-sub-block {
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.settings-sub-block.hidden {
+    display: none;
+}
+
+.settings-sub-block h4 {
+    color: #f39c12;
+    font-size: 0.95em;
+    margin-bottom: 12px;
+    opacity: 0.8;
+}
+
+/* ========================================
    PANELS & CONTAINERS
    ======================================== */
 .panel {

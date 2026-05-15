@@ -79,11 +79,16 @@
         <!-- Right Panel: Settings -->
         <div class="sidebar">
             <!-- Settings Panel -->
-            <div class="panel">
-                <h3>⚙️ Settings</h3>
+            <div class="panel settings-panel">
+                <div class="settings-header-row">
+                    <h3>⚙️ Settings</h3>
+                    <button id="toggle-settings-subblock" class="settings-toggle-btn" title="Toggle additional settings">⁝</button>
+                </div>
                 
-                <div class="settings-group">
-                    <label for="mode-select">Game Mode</label>
+                <!-- Main settings (always visible) -->
+                <div class="settings-main-block">
+                    <div class="settings-group">
+                        <label for="mode-select">Game Mode</label>
                     <select id="mode-select">
                         <option value="normal" selected>Normal (Higher amount = Higher chance)</option>
                         <option value="survival">Survival (Lower amount = Eliminated first)</option>
@@ -104,6 +109,27 @@
                         <input type="range" id="duration-slider" min="1" max="68" step="1" value="3">
                         <input type="number" id="duration-input" min="1" max="300" step="1" value="3" class="duration-number-input">
                         <span id="duration-value" class="slider-value">3.0s</span>
+                    </div>
+                </div>
+                
+                <!-- Collapsible sub-block (hidden by default) -->
+                <div id="settings-subblock" class="settings-sub-block hidden">
+                    <h4>Additional Options</h4>
+                    
+                    <div class="settings-group">
+                        <label for="sound-toggle">Sound Effects</label>
+                        <select id="sound-toggle">
+                            <option value="on" selected>On</option>
+                            <option value="off">Off</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label for="theme-select">Theme</label>
+                        <select id="theme-select">
+                            <option value="dark" selected>Dark</option>
+                            <option value="light">Light</option>
+                        </select>
                     </div>
                 </div>
             </div>
