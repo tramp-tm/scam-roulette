@@ -4,7 +4,7 @@ import { Lot } from './types.js';
  * Manages the collection of lots in the roulette application.
  */
 export class LotManager {
-    private static readonly MAX_LOTS = 100;
+    private static readonly MAX_LOTS = 300;
     
     constructor(private lots: Lot[]) {}
 

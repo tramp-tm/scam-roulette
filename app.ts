@@ -4,7 +4,7 @@ import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage } from './types.js';
-import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './strategies.js';
+import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './importStrategies.js';
 import { 
     generateRandomReadableColor, 
     sliderToDuration, 

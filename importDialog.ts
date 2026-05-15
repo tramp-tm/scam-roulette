@@ -311,11 +311,11 @@ export class ImportDialog extends ModalDialog {
 
         const validLotCount = parsedResult.validLots.length;
 
-        // Check size limit (1000 lots maximum) - use confirm for Cancel option
-        if (validLotCount > 1000) {
+        // Check size limit (300 lots maximum) - use confirm for Cancel option
+        if (validLotCount > 300) {
             const confirmed = confirm(
                 `⚠️ SIZE LIMIT EXCEEDED\n\n` +
-                `${validLotCount} lots exceeds the maximum limit of 1000.\n\n` +
+                `${validLotCount} lots exceeds the maximum limit of 300.\n\n` +
                 `Click OK to reduce and retry, or Cancel to abort.`
             );
             if (!confirmed) {
