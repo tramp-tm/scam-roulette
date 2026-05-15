@@ -61,6 +61,10 @@ export class AnimationController {
     private duration: number = 1000;
     private easing: EasingFunction = DEFAULT_EASING;
     
+    // Fields for tracking speed calculation
+    private lastValue: number = 0;
+    private lastTime: number | null = null;
+    
     private onUpdate?: (value: number, progress: number) => void;
     private onComplete?: () => void;
 
@@ -92,6 +96,8 @@ export class AnimationController {
         this.stop(); // Ensure any previous animation is stopped
         
         this.startTime = performance.now();
+        this.lastValue = this.startValue;
+        this.lastTime = this.startTime;
         this.animate(this.startTime);
     }
 
@@ -110,6 +116,19 @@ export class AnimationController {
         // Calculate current value using linear interpolation
         const currentValue = this.startValue + 
             (this.endValue - this.startValue) * easedProgress;
+
+        // Calculate and log instantaneous speed
+        if (this.lastTime !== null && currentTime > this.lastTime) {
+            const deltaTime = (currentTime - this.lastTime) / 1000; // Convert ms to seconds
+            if (deltaTime > 0) {
+                const speed = Math.abs(currentValue - this.lastValue) / deltaTime;
+                console.log(`🎰 Animation Speed: ${speed.toFixed(2)} units/sec`);
+            }
+        }
+        
+        // Update tracking values for next frame
+        this.lastValue = currentValue;
+        this.lastTime = currentTime;
 
         // Call update callback
         if (this.onUpdate) {
@@ -144,6 +163,9 @@ export class AnimationController {
             this.animationFrameId = null;
         }
         this.startTime = null;
+        // Reset speed tracking
+        this.lastValue = 0;
+        this.lastTime = null;
     }
 
     /**
@@ -153,4 +175,3 @@ export class AnimationController {
         return this.startTime !== null && this.animationFrameId !== null;
     }
 }
-
