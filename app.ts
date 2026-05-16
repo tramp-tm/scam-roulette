@@ -17,6 +17,7 @@ import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
 import { ModalManager } from './modalManager.js';
+import { ErrorDialog } from './errorDialog.js';
 
 /**
  * Main application controller for the roulette game.
@@ -341,11 +342,19 @@ export class App {
         const amount = parseFloat(this.lotAmountInput.value);
         const color = this.newLotColorIndicator.style.backgroundColor;
 
-        if (!name || isNaN(amount)) return;
-
-        this.lotManager.addLot(name, amount, color);
+        // Call lotManager.addLot which now returns detailed error info
+        const result = this.lotManager.addLot(name, amount, color);
         
-        // Clear form and generate new random color for next lot
+        if (!result.success) {
+            // Show error dialog with the reason
+            const errorDialog = new ErrorDialog(result.message);
+            errorDialog.open();
+            
+            // Don't clear form on error - let user fix their input
+            return;
+        }
+
+        // Success - proceed as before
         this.lotNameInput.value = '';
         this.lotAmountInput.value = '1';
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();

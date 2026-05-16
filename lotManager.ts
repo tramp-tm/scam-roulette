@@ -1,6 +1,23 @@
 import { Lot } from './types.js';
 
 /**
+ * Error information returned when addLot fails.
+ */
+export interface AddLotError {
+    success: false;
+    reason: 'max_lots_reached' | 'invalid_name' | 'invalid_amount';
+    message: string;
+}
+
+/**
+ * Success result from addLot.
+ */
+export interface AddLotResult {
+    success: true;
+    lot: Lot;
+}
+
+/**
  * Manages the collection of lots in the roulette application.
  */
 export class LotManager {
@@ -17,23 +34,49 @@ export class LotManager {
 
     /**
      * Adds a new lot to the collection.
-     * @returns The added lot or null if max limit reached
+     * @returns The added lot on success, or error information on failure
      */
-    addLot(name: string, amount: number, color: string): Lot | null {
-        if (this.lots.length >= LotManager.MAX_LOTS) {
-            return null;
+    addLot(name: string, amount: number, color: string): AddLotResult | AddLotError {
+        // Validate name - must be non-empty after trimming
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            return {
+                success: false,
+                reason: 'invalid_name',
+                message: 'Please enter a lot name.'
+            };
         }
 
+        // Validate amount - must be positive number
+        if (isNaN(amount) || amount <= 0) {
+            return {
+                success: false,
+                reason: 'invalid_amount',
+                message: 'Please enter a valid amount greater than zero.'
+            };
+        }
+
+        // Check max lots limit
+        if (this.lots.length >= LotManager.MAX_LOTS) {
+            return {
+                success: false,
+                reason: 'max_lots_reached',
+                message: `Maximum lot limit reached (${LotManager.MAX_LOTS} lots). Please delete some existing lots before adding new ones.`
+            };
+        }
+
+        // All validations passed - create the lot
         const lot: Lot = {
             id: LotManager.generateId(),
-            name: name.trim(),
+            name: trimmedName,
             amount: Math.max(0.01, parseFloat(amount.toString())),
             color,
             active: true
         };
 
         this.lots.push(lot);
-        return lot;
+        
+        return { success: true, lot };
     }
 
     /**

@@ -838,3 +838,29 @@ input[type="number"] {
 .strategy-btn.cancel:hover {
     background: rgba(255, 255, 255, 0.3);
 }
+
+/* ========================================
+   ERROR DIALOG STYLES
+   ======================================== */
+
+.error-message {
+    text-align: center;
+    padding: 20px;
+}
+
+.error-message p {
+    font-size: 1em;
+    line-height: 1.6;
+    color: #e74c3c;
+    margin-bottom: 0;
+}
+
+.error-actions {
+    display: flex;
+    justify-content: center;
+    padding-top: 15px;
+}
+
+.error-actions button {
+    min-width: 120px;
+}
