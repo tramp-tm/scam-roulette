@@ -56,6 +56,7 @@ export class App {
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
+    private clearBtnControls: HTMLButtonElement;
     
     // Lots list elements
     private lotsList: HTMLUListElement;
@@ -94,6 +95,7 @@ export class App {
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
+        this.clearBtnControls = document.getElementById('clear-btn-controls') as HTMLButtonElement;
         
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -171,6 +173,11 @@ export class App {
         // Import button - opens import dialog component
         this.importBtnControls.addEventListener('click', () => {
             this.openImportDialog();
+        });
+        
+        // Clear button - clears all lots with confirmation
+        this.clearBtnControls.addEventListener('click', () => {
+            this.handleClearLots();
         });
         
         // Settings changes
@@ -516,6 +523,7 @@ export class App {
         if (this.spinBtn) this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
         if (this.resetBtn) this.resetBtn.disabled = isAnimating;
         if (this.importBtnControls) this.importBtnControls.disabled = isAnimating;
+        if (this.clearBtnControls) this.clearBtnControls.disabled = isAnimating;
         
         // Disable form inputs when locked
         const formInputs = document.querySelectorAll('#lot-form input');
@@ -673,6 +681,34 @@ export class App {
     private render(): void {
         const rect = this.canvas.getBoundingClientRect();
         this.renderer.render(rect.width, rect.height);
+    }
+
+    /** Handles clearing all lots */
+    private handleClearLots(): void {
+        const totalLots = this.lotManager.getTotalCount();
+        
+        if (totalLots === 0) {
+            alert('No lots to clear!');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to clear all ${totalLots} lot(s)?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+        
+        // Clear all lots
+        this.lotManager.clearAll();
+        
+        // Reset highlight and result display
+        this.highlightedLotId = null;
+        if (this.resultText) {
+            this.updateResultTextWithModeName();
+        }
+        
+        // Update UI and renderer
+        this.updateUI();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.render();
     }
 
     /** Opens the import dialog */
