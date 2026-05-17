@@ -125,6 +125,12 @@ export interface ParseResult {
     errorCount: number;
 }
 
+/** Result of import execution - tracks success and truncation */
+export interface ImportResult {
+    lotsAdded: number;
+    lotsTruncated: number;  // How many were skipped due to MAX_LOTS limit
+}
+
 /**
  * Strategy object for handling import operations.
  * Encapsulates the logic for a specific import strategy.
@@ -134,7 +140,7 @@ export interface ImportStrategy {
     label: string;
     description: string;
     /** Execute function - LotManager type is referenced but not imported to avoid circular dependency */
-    execute: (parsedLots: ParsedLot[], lotManager: any) => void;
+    execute: (parsedLots: ParsedLot[], lotManager: any) => ImportResult;
 }
 
 /** Strategies are defined in strategies.ts to avoid circular dependencies */

@@ -1,4 +1,4 @@
-import { Lot, ImportStrategy } from './types.js';
+import { Lot, ImportStrategy, ImportResult } from './types.js';
 import { LotManager } from './lotManager.js';
 import { generateRandomReadableColor } from './utils.js';
 
@@ -7,13 +7,28 @@ export const REPLACE_STRATEGY: ImportStrategy = {
     id: 'replace',
     label: '🔄 Replace',
     description: 'Remove all existing lots and import new ones',
-    execute: (parsedLots, lotManager) => {
+    execute: (parsedLots, lotManager): ImportResult => {
         lotManager.clearAll();
         
+        let lotsAdded = 0;
+        let lotsTruncated = 0;
+        
         for (const parsedLot of parsedLots) {
+            // Check if adding this lot would exceed MAX_LOTS
+            if (lotManager.getTotalCount() >= LotManager.MAX_LOTS) {
+                lotsTruncated++;
+                continue;
+            }
+            
             const color = generateRandomReadableColor();
-            lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+            const result = lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+            
+            if (result.success) {
+                lotsAdded++;
+            }
         }
+        
+        return { lotsAdded, lotsTruncated };
     }
 };
 
@@ -22,19 +37,35 @@ export const MERGE_STRATEGY: ImportStrategy = {
     id: 'merge',
     label: '🔗 Merge',
     description: 'Keep existing lots and add new ones',
-    execute: (parsedLots, lotManager) => {
+    execute: (parsedLots, lotManager): ImportResult => {
+        let lotsAdded = 0;
+        let lotsTruncated = 0;
+        
         for (const parsedLot of parsedLots) {
+            // Check if adding this lot would exceed MAX_LOTS
+            if (lotManager.getTotalCount() >= LotManager.MAX_LOTS) {
+                lotsTruncated++;
+                continue;
+            }
+            
             const matchingLot = lotManager.getAllLots().find(
                 (l: Lot) => l.name.toLowerCase() === parsedLot.name.toLowerCase()
             );
             
             if (matchingLot) {
+                // Update existing lot - doesn't count toward new additions
                 lotManager.updateLot(matchingLot.id, { amount: parsedLot.amount });
             } else {
                 const color = generateRandomReadableColor();
-                lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+                const result = lotManager.addLot(parsedLot.name, parsedLot.amount, color);
+                
+                if (result.success) {
+                    lotsAdded++;
+                }
             }
         }
+        
+        return { lotsAdded, lotsTruncated };
     }
 };
 

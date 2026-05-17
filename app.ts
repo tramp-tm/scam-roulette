@@ -749,7 +749,7 @@ export class App {
     /** Executes the import using the selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
         // Delegate execution to the strategy object - no branching needed!
-        strategy.execute(parsedLots, this.lotManager);
+        const result = strategy.execute(parsedLots, this.lotManager);
         
         // Update UI and renderer after import completes
         this.updateUI();
@@ -760,6 +760,17 @@ export class App {
         if (this.importDialog) {
             this.importDialog.close();
             this.importDialog = null;
+        }
+        
+        // Show info modal if lots were truncated due to MAX_LOTS limit
+        if (result.lotsTruncated > 0) {
+            const message = `📊 Import Complete\n\n` +
+                           `✅ ${result.lotsAdded} lot(s) added\n` +
+                           `⚠️ ${result.lotsTruncated} lot(s) truncated (exceeded MAX_LOTS limit of ${LotManager.MAX_LOTS})\n\n` +
+                           `Total lots in system: ${this.lotManager.getTotalCount()}`;
+            
+            const infoDialog = new ErrorDialog(message, 'ℹ️ Import Summary');
+            infoDialog.open();
         }
     }
 }
