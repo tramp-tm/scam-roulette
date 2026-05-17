@@ -309,21 +309,6 @@ export class ImportDialog extends ModalDialog {
             return;
         }
 
-        const validLotCount = parsedResult.validLots.length;
-
-        // Check size limit (300 lots maximum) - use confirm for Cancel option
-        if (validLotCount > 300) {
-            const confirmed = confirm(
-                `⚠️ SIZE LIMIT EXCEEDED\n\n` +
-                `${validLotCount} lots exceeds the maximum limit of 300.\n\n` +
-                `Click OK to reduce and retry, or Cancel to abort.`
-            );
-            if (!confirmed) {
-                return;
-            }
-            return;
-        }
-
         // Size check passed - trigger import callback directly with ParsedLot[]
         this.importCallback(parsedResult.validLots);
     }
