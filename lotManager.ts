@@ -21,7 +21,7 @@ export interface AddLotResult {
  * Manages the collection of lots in the roulette application.
  */
 export class LotManager {
-    private static readonly MAX_LOTS = 300;
+    public static readonly MAX_LOTS = 300;
     
     constructor(private lots: Lot[]) {}
 
