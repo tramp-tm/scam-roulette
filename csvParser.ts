@@ -50,8 +50,8 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
             continue;
         }
 
-        // Parse amount as number
-        const amount = parseFloat(amountStr);
+        // Parse amount as number (handle European decimal separator)
+        const amount = parseFloat(amountStr.replace(',', '.'));
 
         // Validate: valid numeric amount required (must be positive)
         if (isNaN(amount) || amount <= 0) {
