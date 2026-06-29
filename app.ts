@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { LotManager } from './lotManager.js';
 import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
@@ -326,21 +327,25 @@ export class App {
     private updateSortButtons(): void {
         if (!this.sortByNameBtn || !this.sortByAmountBtn) return;
         
+        // Get translated labels
+        const nameLabel = t('sort.byName');
+        const amountLabel = t('sort.byAmount');
+        
         // Reset both buttons to inactive state
         this.sortByNameBtn.classList.remove('active');
         this.sortByAmountBtn.classList.remove('active');
-        this.sortByNameBtn.textContent = '🅰️ Name';
-        this.sortByAmountBtn.textContent = '💵 Amount';
+        this.sortByNameBtn.textContent = nameLabel;
+        this.sortByAmountBtn.textContent = amountLabel;
         
         // Set active button with direction indicator
         if (this.sortField === 'name') {
             this.sortByNameBtn.classList.add('active');
             const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            this.sortByNameBtn.textContent = `🅰️ Name ${arrow}`;
+            this.sortByNameBtn.textContent = `${nameLabel} ${arrow}`;
         } else {
             this.sortByAmountBtn.classList.add('active');
             const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            this.sortByAmountBtn.textContent = `💵 Amount ${arrow}`;
+            this.sortByAmountBtn.textContent = `${amountLabel} ${arrow}`;
         }
     }
 
@@ -379,7 +384,7 @@ export class App {
         const activeLots = this.lotManager.getActiveLots();
         
         if (!RouletteEngine.canSpin(activeLots)) {
-            alert('Add at least one lot to spin!');
+            alert(t('validation.noLotsToSpin'));
             return;
         }
         
@@ -663,7 +668,7 @@ export class App {
     }
 
     private deleteLot(id: string): void {
-        if (!confirm('Are you sure you want to delete this lot?')) return;
+        if (!confirm(t('confirmation.deleteLot'))) return;
 
         this.lotManager.deleteLot(id);
         
@@ -688,11 +693,12 @@ export class App {
         const totalLots = this.lotManager.getTotalCount();
         
         if (totalLots === 0) {
-            alert('No lots to clear!');
+            alert(t('validation.noLotsToClear'));
             return;
         }
         
-        if (!confirm(`Are you sure you want to clear all ${totalLots} lot(s)?\n\nThis action cannot be undone.`)) {
+        const message = t('confirmation.clearAllLots', { count: totalLots });
+        if (!confirm(message)) {
             return;
         }
         
@@ -764,12 +770,14 @@ export class App {
         
         // Show info modal if lots were truncated due to MAX_LOTS limit
         if (result.lotsTruncated > 0) {
-            const message = `📊 Import Complete\n\n` +
-                           `✅ ${result.lotsAdded} lot(s) added\n` +
-                           `⚠️ ${result.lotsTruncated} lot(s) truncated (exceeded MAX_LOTS limit of ${LotManager.MAX_LOTS})\n\n` +
-                           `Total lots in system: ${this.lotManager.getTotalCount()}`;
+            const message = t('import.summaryWithTruncation', {
+                lotsAdded: result.lotsAdded,
+                lotsTruncated: result.lotsTruncated,
+                maxLots: LotManager.MAX_LOTS,
+                totalLots: this.lotManager.getTotalCount()
+            });
             
-            const infoDialog = new ErrorDialog(message, 'ℹ️ Import Summary');
+            const infoDialog = new ErrorDialog(message, t('import.summaryTitle'));
             infoDialog.open();
         }
     }
