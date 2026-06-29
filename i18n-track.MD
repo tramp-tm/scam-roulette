@@ -1,89 +1,62 @@
-# i18next Translation Keys Tracker
+# i18n Translation Tracking Document
 
-This file tracks all translation keys identified during iterative analysis.
-
----
-
-## Status: IN PROGRESS
-
-Last updated: [DATE]
+This document tracks the iterative analysis of UI strings for multi-language support using i18next.
 
 ---
 
-## Completed Files Analysis
+## Files Status Tracker
 
-| File | Status | Strings Found | Date Analyzed |
-|------|--------|---------------|---------------|
-| `errorDialog.ts` | ✅ Complete | 2 | - |
-| `types.ts` (Mode Config) | ✅ Complete | 4 | - |
-| `app.ts` | ✅ Complete | 15+ | [TODAY] |
-
----
-
-## Pending Files for Analysis
-
-| Priority | File | Notes |
-|----------|------|-------|
-| 1 | `importDialog.ts` | Import dialog strings |
-| 2 | `importConflictDialog.ts` | Conflict resolution strings |
-
----
-
-## Translation Keys Registry
-
-### From errorDialog.ts
-```typescript
-errorDialog.title = "⚠️ Error" → "⚠️ Ошибка"
-errorDialog.okButton = "OK" → "OK"
-```
-
-### From types.ts (Mode Config)
-```typescript
-mode.normal.name = "Normal Mode" → "Обычный режим"
-mode.normal.description = "Standard weighted random selection" → "Стандартный взвешенный случайный выбор"
-mode.survival.name = "Survival Mode" → "Режим выживания"
-mode.survival.description = "Winner is eliminated after each roll until one remains" → "Победитель выбывает после каждого броска, пока не останется один"
-```
-
-### From app.ts
-```typescript
-// Sort buttons
-sort.buttons.name = "🅰️ Name" → "🅰️ Имя"
-sort.buttons.amount = "💵 Amount" → "💵 Сумма"
-
-// Alerts
-ui.alert.noLotsToSpin = "Add at least one lot to spin!" → "Добавьте хотя бы один лот для вращения!"
-ui.alert.noLotsToClear = "No lots to clear!" → "Нет лотов для очистки!"
-
-// Confirmations
-ui.confirm.deleteLot = "Are you sure you want to delete this lot?" → "Вы уверены, что хотите удалить этот лот?"
-ui.confirm.clearAll = "Are you sure you want to clear all {{count}} lot(s)?\n\nThis action cannot be undone." → "Вы уверены, что хотите очистить все {{count}} лот(а/ов)?\n\nЭто действие нельзя отменить."
-
-// Settings toggle (icons - same in both languages)
-settings.toggle.collapsed = "⁝" → "⁝"
-settings.toggle.expanded = "✕" → "✕"
-
-// Delete button character
-ui.deleteButton.char = "×" → "×"
-
-// Import summary messages
-ui.importSummary.title = "ℹ️ Import Summary" → "ℹ️ Итоги импорта"
-ui.importComplete = "📊 Import Complete" → "📊 Импорт завершен"
-ui.lotsAdded = "✅ {{count}} lot(s) added" → "✅ Добавлено {{count}} лот(а/ов)"
-ui.lotsTruncated = "⚠️ {{count}} lot(s) truncated (exceeded MAX_LOTS limit of {{maxLots}})" → "⚠️ {{count}} лот(а/ов) обрезано (превышен лимит MAX_LOTS: {{maxLots}})"
-ui.totalLotsInSystem = "Total lots in system: {{total}}" → "Всего лотов в системе: {{total}}"
-
-// Debug console logs (optional)
-debug.eliminated = "Eliminated" → "Выбывший"
-debug.winning = "Winning" → "Победный"
-```
+| File | Status | Notes |
+|------|--------|-------|
+| `i18n.ts` | analyzed | Core i18n configuration file |
+| `animation.ts` | pending | Animation controller - minimal UI strings expected |
+| `app.ts` | pending | Main application logic |
+| `csvParser.ts` | pending | CSV parsing utilities |
+| `errorDialog.ts` | pending | Error dialog component |
+| `importConflictDialog.ts` | pending | Import conflict resolution dialog |
+| `importDialog.ts` | pending | Import dialog with preview |
+| `importStrategies.ts` | pending | Import strategy definitions |
+| `index.html` | pending | Main HTML template |
+| `lotManager.ts` | pending | Lot management logic |
+| `modalDialog.ts` | pending | Base modal dialog class |
+| `modalManager.ts` | pending | Modal manager singleton |
+| `rendererFactory.ts` | pending | Renderer factory function |
+| `rouletteEngine.ts` | pending | Roulette calculation engine |
+| `stripRenderer.ts` | pending | Strip visualization renderer |
+| `types.ts` | pending | Type definitions and interfaces |
 
 ---
 
-## Next File to Analyze: `importDialog.ts`
+## Strings Inventory
 
-This file contains the import dialog UI with:
-- Dialog title and placeholder text
-- Separator selection labels (Comma/Tab)
-- Button labels (Preview, Import, Cancel)
-- Error messages for invalid format
+### Format:
+- **Key**: i18n key (e.g., `common.ok`, `error.invalidName`)
+- **Source File**: Where the string is defined/used
+- **Context**: Description of usage
+- **Status**: pending / translated / replaced_with_key
+
+| Key | Source File | Context | Status |
+|-----|-------------|---------|--------|
+| *No strings catalogued yet - awaiting file analysis* | | | |
+
+---
+
+## Analysis Notes
+
+### Completed Analyses:
+- None yet
+
+### Pending Files (in order):
+1. `animation.ts`
+2. `app.ts`
+3. ... (remaining files)
+
+---
+
+## Next Steps
+
+Provide the next file for analysis. I will:
+1. Identify all user-facing strings
+2. Suggest i18n keys following naming conventions
+3. Update this tracking document
+4. Provide code modification instructions
