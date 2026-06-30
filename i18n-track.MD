@@ -20,6 +20,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `importStrategies.ts` | translated | Import strategy definitions with labels and descriptions properly translated |
 | `importDialog.ts` | pending | Import dialog with preview |
 | `index.html` | pending | Main HTML template |
+| `utils.ts` | analyzed | No UI strings found - pure utility module containing color generation, duration slider mapping constants/functions, and random position generator. All content is technical (JSDoc comments, numeric constants, computational logic) with no user-facing text |
 | `lotManager.ts` | translated | 3 error messages replaced with i18n keys (error.invalidName, error.invalidAmount, error.maxLotsReached) - all translations verified in both EN/RU |
 | `modalDialog.ts` | analyzed | No UI strings found - base structural class, all content passed as parameters to renderHeader/renderContent/renderFooter methods |
 | `modalManager.ts` | analyzed | No UI strings found - pure utility/singleton class for modal stacking and z-index management, no user-facing text |
