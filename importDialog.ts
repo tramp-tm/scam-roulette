@@ -212,10 +212,10 @@ export class ImportDialog extends ModalDialog {
         const parsedResult = parseCSV(csvText, this.currentSeparator);
         this.parsedResult = parsedResult;
         
-        // Update status line (always visible now)
+        // Update status line (always visible now) - show count + type
         if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
-            this.validCountSpan.textContent = `${parsedResult.validLots.length}`;
-            this.errorCountSpan.textContent = `${parsedResult.errorCount}`;
+            this.validCountSpan.textContent = `${parsedResult.validLots.length} ${t('importDialog.validLots')}`;
+            this.errorCountSpan.textContent = `${parsedResult.errorCount} ${t('importDialog.errors')}`;
         }
         
         // Disable Import button if there are errors (per spec requirement)
