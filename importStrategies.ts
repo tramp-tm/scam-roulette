@@ -3,9 +3,6 @@ import { LotManager } from './lotManager.js';
 import { generateRandomReadableColor } from './utils.js';
 import i18n from './i18n.js';
 
-import i18n from './i18n.js';
-
-
 /** Replace strategy - clears existing lots and imports new ones */
 export const REPLACE_STRATEGY: ImportStrategy = {
     id: 'replace',
