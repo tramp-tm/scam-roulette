@@ -37,7 +37,16 @@ This document tracks the iterative analysis of UI strings for multi-language sup
 
 | Key | Source File | Context | Status |
 |-----|-------------|---------|--------|
-| *No strings catalogued yet - awaiting file analysis* | | | |
+| `validation.noLotsToSpin` | app.ts | Alert when no lots available to spin | translated |
+| `sort.byName` | app.ts | Sort button label for name column | translated |
+| `sort.byAmount` | app.ts | Sort button label for amount column | translated |
+| `confirmation.deleteLot` | app.ts | Confirmation dialog before deleting a lot | translated |
+| `validation.noLotsToClear` | app.ts | Alert when trying to clear empty list | translated |
+| `confirmation.clearAllLots` | app.ts | Confirmation dialog with count placeholder | translated |
+| `import.summaryWithTruncation` | app.ts | Import summary with truncation info | translated |
+| `import.summaryTitle` | app.ts | Title for import summary dialog | translated |
+| `dialog.errorTitle` | app.ts | Default error dialog title (hardcoded: '⚠️ Error') | pending |
+| `button.ok` | app.ts | Close/OK button text (hardcoded: 'OK') | pending |
 
 ---
 
@@ -45,10 +54,13 @@ This document tracks the iterative analysis of UI strings for multi-language sup
 
 ### Completed Analyses:
 - `animation.ts`: No user-facing strings found. Pure animation logic with easing functions and AnimationController class.
+- `app.ts`: Main application controller. Found 8 already-translated strings using t() function, plus 2 hardcoded strings needing translation ('⚠️ Error' and 'OK').
 
 ### Pending Files (in order):
-1. `app.ts`
-3. ... (remaining files)
+1. `errorDialog.ts` - Contains error dialog component with title and button text
+2. `importConflictDialog.ts` - Import conflict resolution dialog
+3. `importDialog.ts` - Import dialog with preview
+4. ... (remaining files)
 
 ---
 
