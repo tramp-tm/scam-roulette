@@ -23,7 +23,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `modalDialog.ts` | analyzed | No UI strings found - base structural class, all content passed as parameters to renderHeader/renderContent/renderFooter methods |
 | `modalManager.ts` | analyzed | No UI strings found - pure utility/singleton class for modal stacking and z-index management, no user-facing text |
 | `rendererFactory.ts` | analyzed | No UI strings found - pure factory/utility function that delegates renderer creation to visualization packages, no user-facing text |
-| `rouletteEngine.ts` | pending | Roulette calculation engine |
+| `rouletteEngine.ts` | analyzed | No UI strings found - pure computational/engine class for weighted selection and angle/position calculations, no user-facing text |
 | `stripRenderer.ts` | pending | Strip visualization renderer |
 | `types.ts` | pending | Type definitions and interfaces |
 
