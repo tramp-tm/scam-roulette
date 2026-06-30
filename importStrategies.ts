@@ -9,8 +9,8 @@ import i18n from './i18n.js';
 /** Replace strategy - clears existing lots and imports new ones */
 export const REPLACE_STRATEGY: ImportStrategy = {
     id: 'replace',
-    label: '🔄 Replace',
-    description: 'Remove all existing lots and import new ones',
+    label: i18n.t('importStrategy.replace.label'),
+    description: i18n.t('importStrategy.replace.description'),
     execute: (parsedLots, lotManager): ImportResult => {
         lotManager.clearAll();
         
