@@ -13,7 +13,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 |------|--------|-------|
 | `animation.ts` | analyzed | No UI strings found - pure logic file |
 | `app.ts` | analyzed | Contains validation messages and sort controls but no direct UI elements displayed by this component |
-| `csvParser.ts` | pending | CSV parsing utilities |
+| `app.ts` | analyzed | Contains validation messages and sort controls but no direct UI elements displayed by this component |
 | `errorDialog.ts` | translated | Uses existing i18n keys (dialog.errorTitle, button.ok) - no new strings found |
 | `importConflictDialog.ts` | translated | Import conflict resolution dialog with translation keys added |
 | `importDialog.ts` | pending | Import dialog with preview |
