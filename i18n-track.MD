@@ -19,7 +19,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `importDialog.ts` | pending | Import dialog with preview |
 | `importStrategies.ts` | translated | Import strategy definitions with labels and descriptions properly translated |
 | `importDialog.ts` | pending | Import dialog with preview |
-| `index.html` | pending | Main HTML template |
+| `index.html` | translated | All UI strings use data-i18n attributes (page.title, lots.*, sort.*, main.title, stats.*, controls.*, settings.*) - all 30+ translation keys verified in both EN/RU sections of i18n.ts. Uses data-i18n-placeholder for inputs and data-i18n-title for tooltips |
 | `utils.ts` | analyzed | No UI strings found - pure utility module containing color generation, duration slider mapping constants/functions, and random position generator. All content is technical (JSDoc comments, numeric constants, computational logic) with no user-facing text |
 | `lotManager.ts` | translated | 3 error messages replaced with i18n keys (error.invalidName, error.invalidAmount, error.maxLotsReached) - all translations verified in both EN/RU |
 | `modalDialog.ts` | analyzed | No UI strings found - base structural class, all content passed as parameters to renderHeader/renderContent/renderFooter methods |
