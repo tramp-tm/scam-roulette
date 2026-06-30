@@ -85,16 +85,18 @@ i18n.init({
 
                 // ── Import dialog ──
                 'importDialog.title': 'Import Lots',
+                // ── Import dialog (additional keys) ──
                 'importDialog.tabCsv': 'CSV Import',
                 'importDialog.tabLink': 'Link Import',
                 'importDialog.instruction': 'Paste your lots below (name, amount per line):',
+                'importDialog.placeholder': 'Paste your lots below (name, amount per line):',
                 'importDialog.separatorComma': 'Comma (,)',
                 'importDialog.separatorTab': 'Tab (↹)',
-                'importDialog.validLots': 'valid lots',
+                'importDialog.validLots': 'valid lots,',
                 'importDialog.errors': 'errors',
                 'importDialog.previewBtn': '👁️ Preview',
                 'importDialog.importBtn': '📥 Import',
-                'importDialog.previewTitle': 'Preview:',
+                'importDialog.previewTitle': 'Preview',
                 'importDialog.linkPlaceholder': 'Link import coming soon...',
                 'importDialog.clickPreviewFirst': 'Please click "Preview" first to parse the CSV data.',
                 'importDialog.noValidLots': 'No valid lots to import.',
@@ -195,16 +197,18 @@ i18n.init({
 
                 // ── Диалог импорта ──
                 'importDialog.title': 'Импорт лотов',
+                // ── Диалог импорта (дополнительные ключи) ──
                 'importDialog.tabCsv': 'Импорт CSV',
                 'importDialog.tabLink': 'Импорт по ссылке',
                 'importDialog.instruction': 'Вставьте лоты ниже (имя, сумма в каждой строке):',
+                'importDialog.placeholder': 'Вставьте лоты ниже (имя, сумма в каждой строке):',
                 'importDialog.separatorComma': 'Запятая (,)',
                 'importDialog.separatorTab': 'Табуляция (↹)',
-                'importDialog.validLots': 'валидных лотов',
+                'importDialog.validLots': 'валидных лотов,',
                 'importDialog.errors': 'ошибок',
                 'importDialog.previewBtn': '👁️ Просмотр',
                 'importDialog.importBtn': '📥 Импортировать',
-                'importDialog.previewTitle': 'Предпросмотр:',
+                'importDialog.previewTitle': 'Предпросмотр',
                 'importDialog.linkPlaceholder': 'Импорт по ссылке скоро...',
                 'importDialog.clickPreviewFirst': 'Нажмите «Просмотр» для парсинга CSV-данных.',
                 'importDialog.noValidLots': 'Нет валидных лотов для импорта.',

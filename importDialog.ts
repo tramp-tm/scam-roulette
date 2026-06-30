@@ -61,42 +61,48 @@ export class ImportDialog extends ModalDialog {
     private renderTabsAndContent(): void {
         const html = `
             <!-- Tab Navigation -->
+            <!-- Tab Navigation -->
             <div class="tab-navigation">
-                <button class="tab-button active" data-tab="csv">CSV Import</button>
-                <button class="tab-button" data-tab="link">Link Import</button>
+                <button class="tab-button active" data-tab="csv">${t('importDialog.tabCsv')}</button>
+                <button class="tab-button" data-tab="link">${t('importDialog.tabLink')}</button>
             </div>
             
-            <!-- CSV Tab Content -->
+
+            <!-- CSV Tab Content (with translation keys) -->
             <div id="tab-csv" class="tab-content active">
                 <!-- Header row with instruction and separator switch -->
                 <div class="tab-header-row">
-                    <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
+                    <p class="tab-instruction">${t('importDialog.instruction')}</p>
                     <div class="switch">
                         <button id="sep-comma" class="switch-btn active" data-separator="comma">${t('importDialog.separatorComma')}</button>
                         <button id="sep-tab" class="switch-btn" data-separator="tab">${t('importDialog.separatorTab')}</button>
-                        <button id="sep-tab" class="switch-btn" data-separator="tab">Tab (↹)</button>
                     </div>
                 </div>
+
                 
                 <textarea 
                     id="import-textarea" 
+                    data-i18n-placeholder="importDialog.placeholder"
                     placeholder="${t('importDialog.placeholder')}"
                     rows="6"></textarea>
+
                 
                 <!-- Status Line (always visible) -->
                 <div id="import-status" class="import-status">
-                    <span id="valid-count">0</span> valid lots, 
-                    <span id="error-count">0</span> errors
+                    <span id="valid-count">${t('importDialog.validLots')}</span>, 
+                    <span id="error-count">${t('importDialog.errors')}</span>
                 </div>
                 
+
                 <div class="import-actions">
                     <button id="preview-btn" class="btn-secondary">${t('importDialog.previewBtn')}</button>
-                    <button id="import-btn" class="btn-primary">📥 Import</button>
+                    <button id="import-btn" class="btn-primary">${t('importDialog.importBtn')}</button>
                 </div>
                 
-                <!-- Preview Container -->
+
+                <!-- Preview Container (with translation key) -->
                 <div id="preview-container" class="preview-container hidden">
-                    <h4>Preview:</h4>
+                    <h4>${t('importDialog.previewTitle')}:</h4>
                     <ul id="preview-lots-list"></ul>
                 </div>
             </div>

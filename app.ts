@@ -149,12 +149,21 @@ export class App {
         this.setupEventListeners();
     }
 
+
+    /** Formats duration in seconds with localized unit */
+    private formatDuration(seconds: number): string {
+        const lang = i18n.language;
+        const unit = lang === 'ru' ? 'сек' : 's';
+        return `${seconds.toFixed(1)}${unit}`;
+    }
+
     /**
      * Updates result text to show current mode name when no winner is highlighted.
      */
     private updateResultTextWithModeName(): void {
         if (this.resultText && !this.highlightedLotId) {
-            this.resultText.textContent = this.modeConfig.name;
+            const modeKey = `mode.${this.settings.modeId}.name`;
+            this.resultText.textContent = t(modeKey);
         }
     }
 
@@ -210,18 +219,20 @@ export class App {
             this.render();
         });
         
+
         // Duration slider - uses non-linear mapping for better control at lower values
         this.durationSlider?.addEventListener('input', () => {
             if (this.durationSlider) {
                 const seconds = sliderToDuration(parseInt(this.durationSlider.value)); // Returns SECONDS
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
+
                 // Update number input and display value in SECONDS
                 if (this.durationInput) {
                     this.durationInput.value = String(Math.round(seconds));
                 }
                 if (this.durationValue) {
-                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                    this.durationValue.textContent = this.formatDuration(seconds);
                 }
             }
         });
@@ -241,11 +252,12 @@ export class App {
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
                 // Update slider position using durationToSlider with SECONDS (nearest allowed position)
+                // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
                 }
                 if (this.durationValue) {
-                    this.durationValue.textContent = `${seconds.toFixed(1)}s`;
+                    this.durationValue.textContent = this.formatDuration(seconds);
                 }
                 
                 // Update the input field to show corrected value
@@ -280,18 +292,29 @@ export class App {
             }
         });
 
+
         // Language select - changes i18n language and re-translates DOM
         this.languageSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
             const newLang = target.value;
+
 
             // Change language using i18next
             i18n.changeLanguage(newLang, () => {
                 // Re-translate all DOM elements after language change
                 translateDOM();
 
+
                 // Update result text to show mode name in new language (if no winner)
                 this.updateResultTextWithModeName();
+
+                // Reformat duration value with localized unit
+                if (this.durationValue && this.durationInput) {
+                    const seconds = parseFloat(this.durationInput.value);
+                    if (!isNaN(seconds)) {
+                        this.durationValue.textContent = this.formatDuration(seconds);
+                    }
+                }
             });
         });
         
