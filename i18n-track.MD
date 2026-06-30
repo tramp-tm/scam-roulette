@@ -15,7 +15,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `app.ts` | pending | Main application logic |
 | `csvParser.ts` | pending | CSV parsing utilities |
 | `errorDialog.ts` | translated | Uses existing i18n keys (dialog.errorTitle, button.ok) - no new strings found |
-| `importConflictDialog.ts` | pending | Import conflict resolution dialog |
+| `importConflictDialog.ts` | translated | Import conflict resolution dialog with new translation keys added |
 | `importDialog.ts` | pending | Import dialog with preview |
 | `importStrategies.ts` | pending | Import strategy definitions |
 | `index.html` | pending | Main HTML template |
