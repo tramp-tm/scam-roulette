@@ -21,7 +21,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `index.html` | pending | Main HTML template |
 | `lotManager.ts` | translated | 3 error messages replaced with i18n keys (error.invalidName, error.invalidAmount, error.maxLotsReached) - all translations verified in both EN/RU |
 | `modalDialog.ts` | analyzed | No UI strings found - base structural class, all content passed as parameters to renderHeader/renderContent/renderFooter methods |
-| `modalManager.ts` | pending | Modal manager singleton |
+| `modalManager.ts` | analyzed | No UI strings found - pure utility/singleton class for modal stacking and z-index management, no user-facing text |
 | `rendererFactory.ts` | pending | Renderer factory function |
 | `rouletteEngine.ts` | pending | Roulette calculation engine |
 | `stripRenderer.ts` | pending | Strip visualization renderer |
