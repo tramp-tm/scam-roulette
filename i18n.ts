@@ -260,3 +260,6 @@ export function translateDOM(): void {
 }
 
 export default i18n;
+
+/** Named export of translation function for convenience */
+export const t = i18n.t.bind(i18n);
