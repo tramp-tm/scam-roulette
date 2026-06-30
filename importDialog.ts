@@ -1,4 +1,6 @@
 import { ModalDialog } from './modalDialog.js';
+import { t } from './i18n.js';
+
 import { SeparatorType, ParsedLot, ImportCallback } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
@@ -70,14 +72,15 @@ export class ImportDialog extends ModalDialog {
                 <div class="tab-header-row">
                     <p class="tab-instruction">Paste your lots below (name, amount per line):</p>
                     <div class="switch">
-                        <button id="sep-comma" class="switch-btn active" data-separator="comma">Comma (,)</button>
+                        <button id="sep-comma" class="switch-btn active" data-separator="comma">${t('importDialog.separatorComma')}</button>
+                        <button id="sep-tab" class="switch-btn" data-separator="tab">${t('importDialog.separatorTab')}</button>
                         <button id="sep-tab" class="switch-btn" data-separator="tab">Tab (↹)</button>
                     </div>
                 </div>
                 
                 <textarea 
                     id="import-textarea" 
-                    placeholder="Alice, 100&#10;Bob, 250&#10;Charlie, 75"
+                    placeholder="${t('importDialog.placeholder')}"
                     rows="6"></textarea>
                 
                 <!-- Status Line (always visible) -->
@@ -87,7 +90,7 @@ export class ImportDialog extends ModalDialog {
                 </div>
                 
                 <div class="import-actions">
-                    <button id="preview-btn" class="btn-secondary">👁️ Preview</button>
+                    <button id="preview-btn" class="btn-secondary">${t('importDialog.previewBtn')}</button>
                     <button id="import-btn" class="btn-primary">📥 Import</button>
                 </div>
                 
@@ -100,7 +103,7 @@ export class ImportDialog extends ModalDialog {
             
             <!-- Link Tab Content (Placeholder) -->
             <div id="tab-link" class="tab-content">
-                <p class="placeholder-text">Link import coming soon...</p>
+                <p class="placeholder-text">${t('importDialog.linkPlaceholder')}</p>
             </div>
         `;
 
@@ -301,11 +304,11 @@ export class ImportDialog extends ModalDialog {
         // Check if preview has been run with valid lots
         const parsedResult = this.parsedResult;
         if (!parsedResult) {
-            alert('Please click "Preview" first to parse the CSV data.');
+            alert(t('importDialog.clickPreviewFirst'));
             return;
         }
         if (parsedResult.validLots.length === 0) {
-            alert('No valid lots to import.');
+            alert(t('importDialog.noValidLots'));
             return;
         }
 

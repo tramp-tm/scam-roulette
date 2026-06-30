@@ -2,7 +2,7 @@
 
 This document tracks the iterative translate of UI strings for multi-language support using i18next.
 
----
+-
 ## Translation storage
  - i18n.ts
 
@@ -27,4 +27,4 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `stripRenderer.ts` | pending | Strip visualization renderer |
 | `types.ts` | pending | Type definitions and interfaces |
 
----
+-
