@@ -19,7 +19,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `importDialog.ts` | pending | Import dialog with preview |
 | `importStrategies.ts` | translated | Import strategy definitions with labels and descriptions properly translated |
 | `index.html` | pending | Main HTML template |
-| `lotManager.ts` | pending | Lot management logic |
+| `lotManager.ts` | translated | 3 error messages replaced with i18n keys (error.invalidName, error.invalidAmount, error.maxLotsReached) - all translations verified in both EN/RU |
 | `modalDialog.ts` | pending | Base modal dialog class |
 | `modalManager.ts` | pending | Modal manager singleton |
 | `rendererFactory.ts` | pending | Renderer factory function |

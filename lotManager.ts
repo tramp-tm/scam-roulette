@@ -1,4 +1,5 @@
 import { Lot } from './types.js';
+import { t } from './i18n.js';
 
 /**
  * Error information returned when addLot fails.
@@ -43,7 +44,7 @@ export class LotManager {
             return {
                 success: false,
                 reason: 'invalid_name',
-                message: 'Please enter a lot name.'
+                message: t('error.invalidName')
             };
         }
 
@@ -52,7 +53,7 @@ export class LotManager {
             return {
                 success: false,
                 reason: 'invalid_amount',
-                message: 'Please enter a valid amount greater than zero.'
+                message: t('error.invalidAmount')
             };
         }
 
@@ -61,7 +62,7 @@ export class LotManager {
             return {
                 success: false,
                 reason: 'max_lots_reached',
-                message: `Maximum lot limit reached (${LotManager.MAX_LOTS} lots). Please delete some existing lots before adding new ones.`
+                message: t('error.maxLotsReached', { max: LotManager.MAX_LOTS })
             };
         }
 
