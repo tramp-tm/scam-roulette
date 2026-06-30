@@ -1,4 +1,5 @@
-import { t } from './i18n.js';
+import { t, translateDOM } from './i18n.js';
+import i18n from './i18n.js';
 import { LotManager } from './lotManager.js';
 import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
@@ -75,6 +76,8 @@ export class App {
     private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
+    private languageSelect: HTMLSelectElement | null = null;
+
     
     // Sort control elements
     private sortByNameBtn: HTMLButtonElement | null = null;
@@ -114,6 +117,8 @@ export class App {
         this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value');
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
+        this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
+
         
         // Sort control elements
         this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
@@ -273,6 +278,21 @@ export class App {
                 default: // rouletteEaseOut is the default
                     this.easingFunction = EasingFunctions.rouletteEaseOut;
             }
+        });
+
+        // Language select - changes i18n language and re-translates DOM
+        this.languageSelect?.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            const newLang = target.value;
+
+            // Change language using i18next
+            i18n.changeLanguage(newLang, () => {
+                // Re-translate all DOM elements after language change
+                translateDOM();
+
+                // Update result text to show mode name in new language (if no winner)
+                this.updateResultTextWithModeName();
+            });
         });
         
         // Sort switch buttons - unified handler for both buttons
