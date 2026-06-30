@@ -18,6 +18,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `importConflictDialog.ts` | translated | Import conflict resolution dialog with translation keys added |
 | `importDialog.ts` | pending | Import dialog with preview |
 | `importStrategies.ts` | translated | Import strategy definitions with labels and descriptions properly translated |
+| `importDialog.ts` | pending | Import dialog with preview |
 | `index.html` | pending | Main HTML template |
 | `lotManager.ts` | translated | 3 error messages replaced with i18n keys (error.invalidName, error.invalidAmount, error.maxLotsReached) - all translations verified in both EN/RU |
 | `modalDialog.ts` | analyzed | No UI strings found - base structural class, all content passed as parameters to renderHeader/renderContent/renderFooter methods |
@@ -25,6 +26,6 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `rendererFactory.ts` | analyzed | No UI strings found - pure factory/utility function that delegates renderer creation to visualization packages, no user-facing text |
 | `rouletteEngine.ts` | analyzed | No UI strings found - pure computational/engine class for weighted selection and angle/position calculations, no user-facing text |
 | `stripRenderer.ts` | analyzed | No UI strings found - pure rendering class for strip/ribbon visualization, all lot data (names, amounts) passed through from Lot[] structure, no hardcoded user-facing text |
-| `types.ts` | pending | Type definitions and interfaces |
+| `types.ts` | translated | 7 mode-related strings replaced with i18n keys (mode.normal.name, mode.normal.description, mode.normal.resultWinner, mode.survival.name, mode.survival.description, mode.survival.resultEliminated, mode.survival.completionMessage) - all translations verified in both EN/RU |
 
 -

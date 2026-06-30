@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 // Lot interface - represents a single item in the roulette
 export interface Lot {
     id: string;
@@ -28,17 +30,17 @@ export interface ModeConfig {
 export const MODES: Record<Mode, ModeConfig> = {
     normal: {
         id: 'normal',
-        name: 'Normal',
-        description: 'Higher amount = Higher chance to win',
+        name: t('mode.normal.name'),
+        description: t('mode.normal.description'),
         calculateWeight: (lot: Lot) => lot.amount,
-        getResultText: (winner: Lot) => `Winner: ${winner.name}`,
+        getResultText: (winner: Lot) => t('mode.normal.resultWinner', { name: winner.name }),
     },
     survival: {
         id: 'survival',
-        name: 'Survival',
-        description: 'Lower amount = Higher chance to be eliminated',
+        name: t('mode.survival.name'),
+        description: t('mode.survival.description'),
         calculateWeight: (lot: Lot) => 1 / lot.amount,
-        getResultText: (winner: Lot) => `Eliminated: ${winner.name}`,
+        getResultText: (winner: Lot) => t('mode.survival.resultEliminated', { name: winner.name }),
         onRollEnd: (winner: Lot, activeLots: Lot[], totalLots: number) => {
             // In survival mode, the "winner" is actually eliminated
             const result = {
@@ -46,14 +48,16 @@ export const MODES: Record<Mode, ModeConfig> = {
                 isComplete: false as boolean,
                 completionMessage: '' as string
             };
+
             
             // Check if only one lot remains (survival complete)
             if (activeLots.length === 1 && totalLots > 1) {
                 result.isComplete = true;
                 const survivor = activeLots.find((l: Lot) => l.id !== winner.id);
-                result.completionMessage = `🏆 SURVIVAL COMPLETE! 🏆\n\nThe last lot standing is:\n${survivor?.name}`;
+                result.completionMessage = t('mode.survival.completionMessage', { name: survivor?.name });
             }
             
+
             return result;
         },
     },
