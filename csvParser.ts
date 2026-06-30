@@ -1,4 +1,5 @@
 import { SeparatorType, ParsedLot, ParseResult } from './types.js';
+import { t } from './i18n.js';
 
 /**
  * Parses CSV text into lots.
