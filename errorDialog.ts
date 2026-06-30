@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { ModalDialog } from './modalDialog.js';
 
 /**
@@ -7,7 +8,7 @@ export class ErrorDialog extends ModalDialog {
     constructor(message: string, title?: string) {
         super();
         
-        this.renderHeader(title || '⚠️ Error');
+        this.renderHeader(title || t('dialog.errorTitle'));
         this.renderErrorContent(message);
     }
     
@@ -18,7 +19,7 @@ export class ErrorDialog extends ModalDialog {
             </div>
             
             <div class="error-actions">
-                <button id="close-error-btn" class="btn-primary">OK</button>
+                <button id="close-error-btn" class="btn-primary">${t('button.ok')}</button>
             </div>
         `;
         
