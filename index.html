@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scam Roulette</title>
+    <title data-i18n="page.title">Scam Roulette</title>
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -13,27 +13,27 @@
             <div class="panel">
                 <!-- Header row with title and sort switch -->
                 <div class="lots-header-row">
-                    <h3>📋 Lots</h3>
+                    <h3 data-i18n="lots.title">📋 Lots</h3>
                     <div id="sort-controls" class="switch">
-                        <button id="sort-by-name" class="switch-btn active" data-sort-field="name" title="Sort by name (A-Z)">
+                        <button id="sort-by-name" class="switch-btn active" data-sort-field="name" data-i18n="sort.byName" data-i18n-title="sort.titleByName" title="Sort by name (A-Z)">
                             🅰️ Name
                         </button>
-                        <button id="sort-by-amount" class="switch-btn" data-sort-field="amount" title="Sort by amount ($ low-high)">
+                        <button id="sort-by-amount" class="switch-btn" data-sort-field="amount" data-i18n="sort.byAmount" data-i18n-title="sort.titleByAmount" title="Sort by amount ($ low-high)">
                             💵 Amount
                         </button>
                     </div>
                 </div>
-            
+
                 <!-- Scrollable lots list wrapper -->
                 <div id="lots-list-wrapper">
                     <ul id="lots-list"></ul>
                 </div>
-            
+
                 <!-- Add New Lot Row (outside scrollable area, always visible) -->
                 <li class="lot-item add-row">
                     <div id="new-lot-color-indicator" class="lot-color-indicator"></div>
-                    <input type="text" id="new-lot-name" placeholder="Lot Name" class="add-lot-input">
-                    <input type="number" id="new-lot-amount" placeholder="$" min="0.01" step="0.01" value="1" class="add-lot-amount">
+                    <input type="text" id="new-lot-name" data-i18n-placeholder="lots.placeholderName" placeholder="Lot Name" class="add-lot-input">
+                    <input type="number" id="new-lot-amount" data-i18n-placeholder="lots.placeholderAmount" placeholder="$" min="0.01" step="0.01" value="1" class="add-lot-amount">
                     <button id="add-lot-btn" class="btn-add">➕</button>
                 </li>
             </div>
@@ -41,8 +41,8 @@
 
         <!-- Center Panel: Canvas, Result Display, Stats, and Controls -->
         <div class="main-panel">
-            <h1>🎰 Scam Roulette 🎰</h1>
-            
+            <h1 data-i18n="main.title">🎰 Scam Roulette 🎰</h1>
+
             <!-- Combined container for result-display and stats (equal height) -->
             <div id="info-container">
                 <div id="result-display">
@@ -51,11 +51,11 @@
                 <div id="stats-display">
                     <div class="stat-item">
                         <div id="total-lots" class="stat-value">0</div>
-                        <div class="stat-label">Total Lots</div>
+                        <div class="stat-label" data-i18n="stats.totalLots">Total Lots</div>
                     </div>
                     <div class="stat-item">
                         <div id="active-lots" class="stat-value">0</div>
-                        <div class="stat-label">Active Lots</div>
+                        <div class="stat-label" data-i18n="stats.activeLots">Active Lots</div>
                     </div>
                 </div>
             </div>
@@ -65,12 +65,12 @@
             </div>
 
             <div class="panel">
-                <h3>Controls</h3>
+                <h3 data-i18n="controls.title">Controls</h3>
                 <div style="display: flex; gap: 15px;">
-                    <button id="spin-btn" class="btn-primary">🎲 SPIN!</button>
-                    <button id="reset-btn" class="btn-secondary">🔄 Reset</button>
-                    <button id="import-btn-controls" class="btn-secondary">📥 Import</button>
-                    <button id="clear-btn-controls" class="btn-secondary">🗑️ Clear</button>
+                    <button id="spin-btn" class="btn-primary" data-i18n="controls.spin">🎲 SPIN!</button>
+                    <button id="reset-btn" class="btn-secondary" data-i18n="controls.reset">🔄 Reset</button>
+                    <button id="import-btn-controls" class="btn-secondary" data-i18n="controls.import">📥 Import</button>
+                    <button id="clear-btn-controls" class="btn-secondary" data-i18n="controls.clear">🗑️ Clear</button>
                 </div>
             </div>
         </div>
@@ -82,66 +82,66 @@
             <!-- Settings Panel -->
             <div class="panel settings-panel">
                 <div class="settings-header-row">
-                    <h3>⚙️ Settings</h3>
+                    <h3 data-i18n="settings.title">⚙️ Settings</h3>
                     <button id="toggle-settings-subblock" class="settings-toggle-btn" title="Toggle additional settings">⁝</button>
                 </div>
-                
+
                 <!-- Main settings (always visible) -->
                 <div class="settings-main-block">
                     <div class="settings-group">
-                        <label for="mode-select">Game Mode</label>
+                        <label for="mode-select" data-i18n="settings.gameMode">Game Mode</label>
                     <select id="mode-select">
-                        <option value="normal" selected>Normal (Higher amount = Higher chance)</option>
-                        <option value="survival">Survival (Lower amount = Eliminated first)</option>
+                        <option value="normal" selected data-i18n="settings.modeNormal">Normal (Higher amount = Higher chance)</option>
+                        <option value="survival" data-i18n="settings.modeSurvival">Survival (Lower amount = Eliminated first)</option>
                     </select>
                 </div>
 
                 <div class="settings-group">
-                    <label for="visualization-select">Visualization</label>
+                    <label for="visualization-select" data-i18n="settings.visualization">Visualization</label>
                     <select id="visualization-select">
-                        <option value="wheel" selected>Wheel</option>
-                        <option value="strip">Strip</option>
+                        <option value="wheel" selected data-i18n="settings.vizWheel">Wheel</option>
+                        <option value="strip" data-i18n="settings.vizStrip">Strip</option>
                     </select>
                 </div>
 
                 <div class="settings-group">
-                    <label for="duration-slider">Animation Duration</label>
+                    <label for="duration-slider" data-i18n="settings.animationDuration">Animation Duration</label>
                     <div class="slider-container">
                         <input type="range" id="duration-slider" min="1" max="68" step="1" value="3">
                         <input type="number" id="duration-input" min="1" max="300" step="1" value="3" class="duration-number-input">
                         <span id="duration-value" class="slider-value">3.0s</span>
                     </div>
                 </div>
-                
+
                 <!-- Collapsible sub-block (hidden by default) -->
                 <div id="settings-subblock" class="settings-sub-block hidden">
-                    <h4>Additional Options</h4>
-                    
+                    <h4 data-i18n="settings.additionalOptions">Additional Options</h4>
+
                     <div class="settings-group">
-                        <label for="sound-toggle">Sound Effects</label>
+                        <label for="sound-toggle" data-i18n="settings.soundEffects">Sound Effects</label>
                         <select id="sound-toggle">
-                            <option value="on" selected>On</option>
-                            <option value="off">Off</option>
+                            <option value="on" selected data-i18n="settings.soundOn">On</option>
+                            <option value="off" data-i18n="settings.soundOff">Off</option>
                         </select>
                     </div>
-                    
+
                     <div class="settings-group">
-                        <label for="theme-select">Theme</label>
+                        <label for="theme-select" data-i18n="settings.theme">Theme</label>
                         <select id="theme-select">
-                            <option value="dark" selected>Dark</option>
-                            <option value="light">Light</option>
+                            <option value="dark" selected data-i18n="settings.themeDark">Dark</option>
+                            <option value="light" data-i18n="settings.themeLight">Light</option>
                         </select>
                     </div>
-                    
+
                     <div class="settings-group">
-                        <label for="easing-select">Easing Function</label>
+                        <label for="easing-select" data-i18n="settings.easingFunction">Easing Function</label>
                         <select id="easing-select">
-                            <option value="rouletteEaseOut" selected>Roulette Ease Out (Default)</option>
-                            <option value="easeOutCubic">Cubic Ease Out</option>
-                            <option value="easeOutQuart">Quartic Ease Out</option>
-                            <option value="easeOutQuint">Quintic Ease Out</option>
-                            <option value="easeOutExpo">Exponential Ease Out</option>
-                            <option value="linear">Linear (No Easing)</option>
+                            <option value="rouletteEaseOut" selected data-i18n="settings.easingRoulette">Roulette Ease Out (Default)</option>
+                            <option value="easeOutCubic" data-i18n="settings.easingCubic">Cubic Ease Out</option>
+                            <option value="easeOutQuart" data-i18n="settings.easingQuart">Quartic Ease Out</option>
+                            <option value="easeOutQuint" data-i18n="settings.easingQuint">Quintic Ease Out</option>
+                            <option value="easeOutExpo" data-i18n="settings.easingExpo">Exponential Ease Out</option>
+                            <option value="linear" data-i18n="settings.easingLinear">Linear (No Easing)</option>
                         </select>
                     </div>
                 </div>
