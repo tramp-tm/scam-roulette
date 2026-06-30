@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { ModalDialog } from './modalDialog.js';
 import { ImportStrategy } from './types.js';
 import { IMPORT_STRATEGIES } from './importStrategies.js';
@@ -16,7 +17,7 @@ export class ImportConflictDialog extends ModalDialog {
         this.resolutionCallback = resolutionCallback;
         
         // Build the dialog UI
-        this.renderHeader('⚠️ Import Conflict');
+        this.renderHeader(t('importConflict.title'));
         this.renderConflictContent();
     }
 
@@ -30,16 +31,16 @@ export class ImportConflictDialog extends ModalDialog {
 
         const html = `
             <div class="conflict-message">
-                <p>You have <strong>${this.existingCount}</strong> existing lot(s).</p>
-                <p>How would you like to proceed?</p>
+                <p>${t('importConflict.existingLotsMessage', { count: this.existingCount })}</p>
+                <p>${t('importConflict.proceedQuestion')}</p>
             </div>
             
             <div class="strategy-buttons">
                 ${strategyButtonsHtml}
                 
                 <button id="btn-cancel" class="strategy-btn cancel">
-                    ❌ Cancel
-                    <span class="strategy-desc">Abort import operation</span>
+                    ${t('button.cancel')}
+                    <span class="strategy-desc">${t('importConflict.cancelDescription')}</span>
                 </button>
             </div>
         `;
