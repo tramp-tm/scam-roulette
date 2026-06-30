@@ -17,7 +17,7 @@ This document tracks the iterative translate of UI strings for multi-language su
 | `errorDialog.ts` | translated | Uses existing i18n keys (dialog.errorTitle, button.ok) - no new strings found |
 | `importConflictDialog.ts` | translated | Import conflict resolution dialog with translation keys added |
 | `importDialog.ts` | pending | Import dialog with preview |
-| `importStrategies.ts` | pending | Import strategy definitions |
+| `importStrategies.ts` | analyzed | Import strategy definitions with labels and descriptions requiring i18n support |
 | `index.html` | pending | Main HTML template |
 | `lotManager.ts` | pending | Lot management logic |
 | `modalDialog.ts` | pending | Base modal dialog class |
