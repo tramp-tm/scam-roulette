@@ -8,11 +8,10 @@ This document tracks the iterative analysis of UI strings for multi-language sup
 
 | File | Status | Notes |
 |------|--------|-------|
-| `i18n.ts` | analyzed | Core i18n configuration file |
 | `animation.ts` | analyzed | No UI strings found - pure logic file |
 | `app.ts` | pending | Main application logic |
 | `csvParser.ts` | pending | CSV parsing utilities |
-| `errorDialog.ts` | pending | Error dialog component |
+| `errorDialog.ts` | analyzed | Uses existing i18n keys (dialog.errorTitle, button.ok) - no new strings found |
 | `importConflictDialog.ts` | pending | Import conflict resolution dialog |
 | `importDialog.ts` | pending | Import dialog with preview |
 | `importStrategies.ts` | pending | Import strategy definitions |
@@ -55,12 +54,12 @@ This document tracks the iterative analysis of UI strings for multi-language sup
 ### Completed Analyses:
 - `animation.ts`: No user-facing strings found. Pure animation logic with easing functions and AnimationController class.
 - `app.ts`: Main application controller. Found 8 already-translated strings using t() function, plus 2 hardcoded strings needing translation ('⚠️ Error' and 'OK').
+- `errorDialog.ts`: Error dialog component. Already uses i18n keys (`dialog.errorTitle`, `button.ok`) via t() function. No new strings found - these keys were already tracked in app.ts analysis as pending translation.
 
 ### Pending Files (in order):
-1. `errorDialog.ts` - Contains error dialog component with title and button text
-2. `importConflictDialog.ts` - Import conflict resolution dialog
-3. `importDialog.ts` - Import dialog with preview
-4. ... (remaining files)
+1. `importConflictDialog.ts` - Import conflict resolution dialog
+2. `importDialog.ts` - Import dialog with preview
+3. ... (remaining files)
 
 ---
 
