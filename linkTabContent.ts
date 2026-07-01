@@ -49,10 +49,12 @@ export class LinkTabContent {
         // Apply translations to newly created elements - use setTimeout for proper timing
         if (typeof translateDOM === 'function') {
             setTimeout(() => {
+                console.log("DEBUG: About to call translateDOM in LinkTabContent.render()");
                 try {
                     translateDOM();
+                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
                 } catch (e) {
-                    console.warn("translateDOM failed:", e);
+                    console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
                 }
             }, 0);
         }

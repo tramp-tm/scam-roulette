@@ -71,7 +71,15 @@ export abstract class ModalDialog {
         }
         
         // Apply translations after modal is opened
-        setTimeout(() => translateDOM(), 0); // Ensure DOM is fully rendered
+        setTimeout(() => {
+            console.log("DEBUG: About to call translateDOM in modalDialog.open()");
+            try {
+                translateDOM();
+                console.log("DEBUG: translateDOM completed successfully");
+            } catch (e) {
+                console.error("DEBUG: translateDOM failed:", e);
+            }
+        }, 0); // Ensure DOM is fully rendered
         
         this.onOpen?.();
     }
