@@ -13,6 +13,16 @@ import { ModalManager } from './modalManager.js';
 export class ImportDialog extends ModalDialog {
     private textarea: HTMLTextAreaElement | null = null;
     private previewBtn: HTMLButtonElement | null = null;
+    private importBtn: HTMLButtonElement | null = null;
+    private statusEl: HTMLElement | null = null;
+    private validCountSpan: HTMLElement | null = null;
+    private errorCountSpan: HTMLElement | null = null;
+    private previewContainer: HTMLElement | null = null;
+    private previewList: HTMLUListElement | null = null;
+    private linkUrlInput: HTMLInputElement | null = null;
+    private fetchBtn: HTMLButtonElement | null = null;
+    private linkTextarea: HTMLTextAreaElement | null = null;
+    private linkStatusEl: HTMLElement | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
