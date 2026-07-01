@@ -102,6 +102,18 @@ i18n.init({
                 'importDialog.clickPreviewFirst': 'Please click "Preview" first to parse the CSV data.',
                 'importDialog.noValidLots': 'No valid lots to import.',
 
+                // ── Link Import (new keys) ──
+                'importDialog.linkInstruction': 'Enter a URL to fetch CSV data:',
+                'importDialog.linkUrlPlaceholder': 'https://example.com/lots.csv',
+                'importDialog.fetchBtn': '📡 Fetch',
+                'importDialog.loading': 'Loading...',
+                'importDialog.fetchSuccess': '✓ Fetched successfully!',
+                'importDialog.fetchError': '✗ Failed to fetch data',
+                'importDialog.corsError': '✗ CORS error - the server may not allow cross-origin requests. Try using a proxy or hosting the file on a server that allows CORS.',
+                'importDialog.invalidUrl': '✗ Please enter a valid URL',
+                'importDialog.fetching': 'Fetching...',
+                'importDialog.linkTextareaPlaceholder': 'Fetched content will appear here...',
+
                 // ── Import conflict dialog ──
                 'importConflict.title': 'Import Conflict',
                 'importConflict.existingLotsMessage': 'There are already {{count}} existing lots.',

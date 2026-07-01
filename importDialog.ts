@@ -25,6 +25,138 @@ export class ImportDialog extends ModalDialog {
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
+        // Link tab elements
+        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
+        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
+        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
+        this.linkStatusEl = document.getElementById('link-status');
+
+        // Link tab event listeners
+        if (this.fetchBtn) {
+            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
+        }
+
+        if (this.linkUrlInput) {
+            this.linkUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleFetchFromUrl();
+                }
+            });
+        }
+
+        // Link textarea input - auto-update parsed result on fly
+        if (this.linkTextarea) {
+            this.linkTextarea.addEventListener('input', () => {
+                this.autoUpdateLinkParsedResult();
+            });
+        }
+    }
+
+    /** Auto-updates parsed result for link tab textarea input */
+    private autoUpdateLinkParsedResult(): void {
+        if (!this.linkTextarea) return;
+
+        const csvText = this.linkTextarea.value;
+
+        // Parse CSV text with current separator
+        const parsedResult = parseCSV(csvText, this.currentSeparator);
+        this.parsedResult = parsedResult;
+
+        // Update status line (always visible now) - show count + type
+        if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
+            this.validCountSpan.textContent = `${parsedResult.validLots.length} ${t('importDialog.validLots')}`;
+            this.errorCountSpan.textContent = `${parsedResult.errorCount} ${t('importDialog.errors')}`;
+        }
+
+        // Disable Import button if there are errors (per spec requirement)
+        if (this.importBtn) {
+            this.importBtn.disabled = parsedResult.errorCount > 0;
+        }
+
+        // Update preview container ONLY if it's already visible
+        if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
+            if (parsedResult.validLots.length > 0) {
+                // Generate random colors for preview lots
+                const previewLots = parsedResult.validLots.map(lot => ({
+                    ...lot,
+                    color: generateRandomReadableColor()
+                }));
+
+                // Render to preview area
+                this.renderPreviewList(previewLots);
+            } else {
+                // Clear preview if no valid lots
+                if (this.previewList) {
+                    this.previewList.innerHTML = '';
+                }
+            }
+        }
+    }
+
+    /** Handles fetching CSV from URL */
+    private async handleFetchFromUrl(): Promise<void> {
+        if (!this.linkUrlInput || !this.fetchBtn || !this.linkTextarea) return;
+
+        const url = this.linkUrlInput.value.trim();
+
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (e) {
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.invalidUrl');
+                this.linkStatusEl.style.color = '#ff6b6b';
+            }
+            return;
+        }
+
+        // Show loading state
+        const originalBtnText = this.fetchBtn.textContent;
+        this.fetchBtn.disabled = true;
+        this.fetchBtn.textContent = t('importDialog.fetching');
+
+        if (this.linkStatusEl) {
+            this.linkStatusEl.textContent = t('importDialog.loading');
+            this.linkStatusEl.style.color = '#f39c12';
+        }
+
+        try {
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const text = await response.text();
+            this.linkTextarea.value = text;
+
+            // Auto-parse the fetched content
+            this.autoUpdateLinkParsedResult();
+
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
+                this.linkStatusEl.style.color = '#27ae60';
+            }
+        } catch (error: unknown) {
+            let errorMessage = t('importDialog.fetchError');
+
+            // Check for CORS error
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                errorMessage = t('importDialog.corsError');
+            } else if (error instanceof Error) {
+                errorMessage = `${t('importDialog.fetchError')}: ${error.message}`;
+            }
+
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = errorMessage;
+                this.linkStatusEl.style.color = '#ff6b6b';
+            }
+        } finally {
+            // Restore button state
+            this.fetchBtn.disabled = false;
+            this.fetchBtn.textContent = originalBtnText;
+        }
         super();
         this.importCallback = importCallback;
         
@@ -109,7 +241,32 @@ export class ImportDialog extends ModalDialog {
             
             <!-- Link Tab Content (Placeholder) -->
             <div id="tab-link" class="tab-content">
-                <p class="placeholder-text">${t('importDialog.linkPlaceholder')}</p>
+                <!-- Header row with instruction -->
+                <div class="tab-header-row">
+                    <p class="tab-instruction">${t('importDialog.linkInstruction')}</p>
+                </div>
+
+                <!-- URL input and fetch button -->
+                <div class="link-input-container">
+                    <input 
+                        type="url" 
+                        id="link-url-input" 
+                        data-i18n-placeholder="importDialog.linkUrlPlaceholder"
+                        placeholder="${t('importDialog.linkUrlPlaceholder')}"
+                        class="link-url-input">
+                    <button id="fetch-btn" class="btn-secondary">${t('importDialog.fetchBtn')}</button>
+                </div>
+
+                <!-- Status line for link tab -->
+                <div id="link-status" class="link-status"></div>
+
+                <!-- Textarea to display fetched content (read-only) -->
+                <textarea 
+                    id="link-textarea" 
+                    data-i18n-placeholder="importDialog.linkTextareaPlaceholder"
+                    placeholder="${t('importDialog.linkTextareaPlaceholder')}"
+                    rows="6"
+                    readonly></textarea>
             </div>
         `;
 
