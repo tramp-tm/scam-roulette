@@ -29,19 +29,12 @@ export class LinkTabContent {
                     type="url" 
                     id="link-url-input" 
                     placeholder="Enter URL to fetch CSV..."
-                    class="link-url-input">
+                    class="link-url-input full-width">
                 <button id="fetch-btn" class="btn-secondary">Fetch</button>
             </div>
 
             <!-- Status line for link tab -->
             <div id="link-status" class="link-status"></div>
-
-            <!-- Textarea to display fetched content (read-only) -->
-            <textarea 
-                id="link-textarea" 
-                placeholder="Fetched CSV will appear here..."
-                rows="6"
-                readonly></textarea>
         `;
 
         container.innerHTML = html;
@@ -49,7 +42,7 @@ export class LinkTabContent {
         // Cache element references
         this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
         this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
-        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
+        this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
     }
 
