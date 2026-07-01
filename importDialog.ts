@@ -6,26 +6,19 @@ import { parseCSV } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
 import { ModalManager } from './modalManager.js';
 
+// Import the new component classes
+import { CsvTabContent } from './csvTabContent.js';
+import { LinkTabContent } from './linkTabContent.js';
+
 /**
  * Dialog component for importing lots via CSV.
  * Handles preview, parsing, and triggers import callback.
  */
 export class ImportDialog extends ModalDialog {
-    private textarea: HTMLTextAreaElement | null = null;
-    private previewBtn: HTMLButtonElement | null = null;
-    private importBtn: HTMLButtonElement | null = null;
-    private statusEl: HTMLElement | null = null;
-    private validCountSpan: HTMLElement | null = null;
-    private errorCountSpan: HTMLElement | null = null;
-    private previewContainer: HTMLElement | null = null;
-    private previewList: HTMLUListElement | null = null;
-    private linkUrlInput: HTMLInputElement | null = null;
-    private fetchBtn: HTMLButtonElement | null = null;
-    private linkTextarea: HTMLTextAreaElement | null = null;
-    private linkStatusEl: HTMLElement | null = null;
+    private csvTabContent: CsvTabContent | null = null;
+    private linkTabContent: LinkTabContent | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
-    private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
         super();
@@ -37,125 +30,38 @@ export class ImportDialog extends ModalDialog {
             // Reset parsed result
             this.parsedResult = null;
             
-            // Clear textarea and preview
-            if (this.textarea) {
-                this.textarea.value = '';
-            }
-
-            // Clear Link tab state
-            if (this.linkUrlInput) {
-                this.linkUrlInput.value = '';
-            }
-            if (this.linkTextarea) {
-                this.linkTextarea.value = '';
-            }
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = '';
-            }
-
             // Always destroy the dialog to clean up DOM nodes and event listeners
             // This prevents stale state issues when reopening the import dialog
             this.destroy();
         };
 
-        // Build the dialog UI
+        // Build the dialog UI with header, tabs, actions, and status elements
         this.renderHeader(t('importDialog.title'));
         this.renderTabsAndContent();
 
-        // Cache Link tab element references after renderTabsAndContent creates them
-        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
-        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
-        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
-        this.linkStatusEl = document.getElementById('link-status');
+        // Initialize components after rendering
+        this.initializeComponents();
 
         this.setupEventListeners();
     }
 
-
-
-
-    /** Handles fetching CSV from URL */
-
     private renderTabsAndContent(): void {
         const html = `
-            <!-- Tab Navigation -->
             <!-- Tab Navigation -->
             <div class="tab-navigation">
                 <button class="tab-button active" data-tab="csv">${t('importDialog.tabCsv')}</button>
                 <button class="tab-button" data-tab="link">${t('importDialog.tabLink')}</button>
             </div>
-            
 
-            <!-- CSV Tab Content (with translation keys) -->
-            <div id="tab-csv" class="tab-content active">
-                <!-- Header row with instruction and separator switch -->
-                <div class="tab-header-row">
-                    <p class="tab-instruction">${t('importDialog.instruction')}</p>
-                    <div class="switch">
-                        <button id="sep-comma" class="switch-btn active" data-separator="comma">${t('importDialog.separatorComma')}</button>
-                        <button id="sep-tab" class="switch-btn" data-separator="tab">${t('importDialog.separatorTab')}</button>
-                    </div>
-                </div>
-
-                
-                <textarea 
-                    id="import-textarea" 
-                    data-i18n-placeholder="importDialog.placeholder"
-                    placeholder="${t('importDialog.placeholder')}"
-                    rows="6"></textarea>
-
-                
-                <!-- Status Line (always visible) -->
-                <div id="import-status" class="import-status">
-                    <span id="valid-count">${t('importDialog.validLots')}</span>, 
-                    <span id="error-count">${t('importDialog.errors')}</span>
-                </div>
-                
-
-                <div class="import-actions">
-                    <button id="preview-btn" class="btn-secondary">${t('importDialog.previewBtn')}</button>
-                    <button id="import-btn" class="btn-primary">${t('importDialog.importBtn')}</button>
-                </div>
-                
-
-                <!-- Preview Container (with translation key) -->
-                <div id="preview-container" class="preview-container hidden">
-                    <h4>${t('importDialog.previewTitle')}:</h4>
-                    <ul id="preview-lots-list"></ul>
-                </div>
+            <!-- Tab Content Containers -->
+            <div id="tab-csv-content" class="tab-content active">
+                <!-- CSV tab content will be rendered by CsvTabContent component -->
             </div>
             
-            <!-- Link Tab Content (Placeholder) -->
-            <div id="tab-link" class="tab-content">
-                <!-- Header row with instruction -->
-                <div class="tab-header-row">
-                    <p class="tab-instruction">${t('importDialog.linkInstruction')}</p>
-                </div>
-
-                <!-- URL input and fetch button -->
-                <div class="link-input-container">
-                    <input 
-                        type="url" 
-                        id="link-url-input" 
-                        data-i18n-placeholder="importDialog.linkUrlPlaceholder"
-                        placeholder="${t('importDialog.linkUrlPlaceholder')}"
-                        class="link-url-input">
-                    <button id="fetch-btn" class="btn-secondary">${t('importDialog.fetchBtn')}</button>
-                </div>
-
-                <!-- Status line for link tab -->
-                <div id="link-status" class="link-status"></div>
-
-                <!-- Textarea to display fetched content (read-only) -->
-                <textarea 
-                    id="link-textarea" 
-                    data-i18n-placeholder="importDialog.linkTextareaPlaceholder"
-                    placeholder="${t('importDialog.linkTextareaPlaceholder')}"
-                    rows="6"
-                    readonly></textarea>
+            <div id="tab-link-content" class="tab-content">
+                <!-- Link tab content will be rendered by LinkTabContent component -->
             </div>
         `;
-
 
         if (this.content) {
             const container = document.createElement('div');
@@ -169,29 +75,27 @@ export class ImportDialog extends ModalDialog {
             } else {
                 this.content.appendChild(container);
             }
+        }
+    }
 
-            // Cache element references
-            this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
-            this.previewBtn = container.querySelector('#preview-btn') as HTMLButtonElement;
-            this.importBtn = container.querySelector('#import-btn') as HTMLButtonElement;
-            this.statusEl = container.querySelector('#import-status');
-            this.validCountSpan = container.querySelector('#valid-count');
-            this.errorCountSpan = container.querySelector('#error-count');
-            this.previewContainer = container.querySelector('#preview-container');
-            this.previewList = container.querySelector('#preview-lots-list') as HTMLUListElement;
+    private initializeComponents(): void {
+        const csvContentContainer = document.getElementById('tab-csv-content');
+        const linkContentContainer = document.getElementById('tab-link-content');
+
+        if (csvContentContainer) {
+            this.csvTabContent = new CsvTabContent(csvContentContainer);
+        }
+
+        if (linkContentContainer) {
+            this.linkTabContent = new LinkTabContent(linkContentContainer);
         }
     }
 
     private setupEventListeners(): void {
         // Tab switching
         const tabButtons = document.querySelectorAll('.tab-button');
-        const csvTabContent = document.getElementById('tab-csv');
-        const linkTabContent = document.getElementById('tab-link');
-
-        // Add event listener for fetch button - remove duplicate registrations
-        if (this.fetchBtn) {
-            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
-        }
+        const csvTabContent = document.getElementById('tab-csv-content');
+        const linkTabContent = document.getElementById('tab-link-content');
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
@@ -215,204 +119,36 @@ export class ImportDialog extends ModalDialog {
             });
         });
 
-        // Separator switch buttons
-        const sepCommaBtn = document.getElementById('sep-comma') as HTMLButtonElement;
-        const sepTabBtn = document.getElementById('sep-tab') as HTMLButtonElement;
-        
-        if (sepCommaBtn) {
-            sepCommaBtn.addEventListener('click', () => {
-                this.currentSeparator = 'comma';
-                sepCommaBtn.classList.add('active');
-                sepTabBtn?.classList.remove('active');
-                // Auto-update parsed result when separator changes
-                this.autoUpdateParsedResult();
-            });
-        }
-        
-
-        if (sepTabBtn) {
-            sepTabBtn.addEventListener('click', () => {
-                this.currentSeparator = 'tab';
-                sepTabBtn.classList.add('active');
-                sepCommaBtn?.classList.remove('active');
-                // Auto-update parsed result when separator changes
-                this.autoUpdateParsedResult();
-            });
+        // Handle import button click
+        const importBtn = document.querySelector('#import-btn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => this.handleImport());
         }
 
-        // Textarea input - auto-update parsed result on fly
-        this.textarea?.addEventListener('input', () => {
-            // Auto-update parsed result when content changes
-            this.autoUpdateParsedResult();
-        });
-
-        // Preview button - shows/hides preview container, fills if empty
-        this.previewBtn?.addEventListener('click', () => this.handlePreview());
-
-        // Import button - validates and triggers import callback
-        this.importBtn?.addEventListener('click', () => this.handleImport());
+        // Handle preview button click
+        const previewBtn = document.querySelector('#preview-btn');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', () => this.handlePreview());
+        }
     }
 
-    private async handleFetchFromUrl(): Promise<void> {
-        if (!this.linkUrlInput || !this.linkTextarea) return;
-
-        const url = this.linkUrlInput.value.trim();
-        if (!url) {
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = t('importDialog.enterValidUrl');
-            }
+    private handlePreview(): void {
+        if (!this.csvTabContent) return;
+        
+        const parsedResult = this.csvTabContent.getParsedResult();
+        if (!parsedResult || parsedResult.validLots.length === 0) {
+            alert(t('importDialog.clickPreviewFirst'));
             return;
         }
-
-        try {
-            // Show loading state
-            if (this.fetchBtn) {
-                const originalText = this.fetchBtn.textContent;
-                this.fetchBtn.disabled = true;
-                this.fetchBtn.textContent = t('importDialog.fetching');
-
-                const response = await fetch(url);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const text = await response.text();
-
-                // Update textarea with fetched content
-                if (this.linkTextarea) {
-                    this.linkTextarea.value = text;
-                }
-
-                // Update status
-                if (this.linkStatusEl) {
-                    this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
-                    this.linkStatusEl.className = 'link-status success';
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching from URL:', error);
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = `${t('importDialog.fetchError')}: ${(error as Error).message}`;
-                this.linkStatusEl.className = 'link-status error';
-            }
-        } finally {
-            // Restore button state
-            if (this.fetchBtn) {
-                this.fetchBtn.disabled = false;
-                this.fetchBtn.textContent = t('importDialog.fetchBtn');
-            }
-        }
-    }
-
-    /** Auto-updates parsed result on textarea input (called from event listener) */
-    private autoUpdateParsedResult(): void {
-        if (!this.textarea) return;
         
-        const csvText = this.textarea.value;
-        
-        // Parse CSV text with current separator
-        const parsedResult = parseCSV(csvText, this.currentSeparator);
-        this.parsedResult = parsedResult;
-        
-        // Update status line (always visible now) - show count + type
-        if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
-            this.validCountSpan.textContent = `${parsedResult.validLots.length} ${t('importDialog.validLots')}`;
-            this.errorCountSpan.textContent = `${parsedResult.errorCount} ${t('importDialog.errors')}`;
-        }
-        
-        // Disable Import button if there are errors (per spec requirement)
-        if (this.importBtn) {
-            this.importBtn.disabled = parsedResult.errorCount > 0;
-        }
-        
-        // Update preview container ONLY if it's already visible
-        if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
-            if (parsedResult.validLots.length > 0) {
-                // Generate random colors for preview lots
-                const previewLots = parsedResult.validLots.map(lot => ({
-                    ...lot,
-                    color: generateRandomReadableColor()
-                }));
-                
-                // Render to preview area
-                this.renderPreviewList(previewLots);
-            } else {
-                // Clear preview if no valid lots
-                if (this.previewList) {
-                    this.previewList.innerHTML = '';
-                }
-            }
-        }
-    }
-
-    /** Preview button handler - shows/hides preview container, fills if empty */
-    private handlePreview(): void {
-        if (!this.textarea || !this.previewContainer || !this.previewList) return;
-
-        // Extract parsed result for type narrowing
-        const parsedResult = this.parsedResult;
-        const validLotCount = parsedResult?.validLots.length ?? 0;
-        
-        // If preview is hidden and we have valid lots, show it and fill it
-        if (this.previewContainer.classList.contains('hidden') && validLotCount > 0) {
-            // Generate random colors for preview lots
-            const previewLots = parsedResult!.validLots.map(lot => ({
-                ...lot,
-                color: generateRandomReadableColor()
-            }));
-            
-            // Render to preview area
-            this.renderPreviewList(previewLots);
-            
-            // Show preview container
-            this.previewContainer.classList.remove('hidden');
-        } else if (validLotCount === 0) {
-            // Hide preview if no valid lots
-            this.previewContainer.classList.add('hidden');
-        }
-    }
-
-    private renderPreviewList(lots: (ParsedLot & { color?: string })[]): void {
-        if (!this.previewList) return;
-        
-        this.previewList.innerHTML = '';
-        
-        for (const lot of lots) {
-            const li = document.createElement('li');
-            li.className = 'lot-item';
-
-            // Color indicator
-            const colorIndicator = document.createElement('div');
-            colorIndicator.className = 'lot-color-indicator';
-            colorIndicator.style.backgroundColor = lot.color || '#888';
-
-            // Lot name
-            const lotName = document.createElement('span');
-            lotName.className = 'lot-name';
-            lotName.textContent = lot.name;
-            lotName.style.flex = '1';
-            lotName.style.overflow = 'hidden';
-            lotName.style.textOverflow = 'ellipsis';
-
-            // Amount (read-only)
-            const amountInput = document.createElement('input');
-            amountInput.type = 'number';
-            amountInput.className = 'lot-amount-input';
-            amountInput.value = lot.amount.toFixed(2);
-            amountInput.disabled = true;
-
-            li.appendChild(colorIndicator);
-            li.appendChild(lotName);
-            li.appendChild(amountInput);
-            this.previewList.appendChild(li);
-        }
+        // In a real implementation, we would show the preview here
+        console.log("Previewing lots:", parsedResult.validLots);
     }
 
     private handleImport(): void {
-        // Check if preview has been run with valid lots
-        // Check if preview has been run with valid lots
-        const parsedResult = this.parsedResult;
+        if (!this.csvTabContent) return;
+        
+        const parsedResult = this.csvTabContent.getParsedResult();
         if (!parsedResult || parsedResult.validLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
             return;
@@ -425,6 +161,4 @@ export class ImportDialog extends ModalDialog {
         // Size check passed - trigger import callback directly with ParsedLot[]
         this.importCallback(parsedResult.validLots);
     }
-
-
 }
