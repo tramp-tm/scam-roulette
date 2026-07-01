@@ -103,6 +103,10 @@ export class LinkTabContent {
                 // Update textarea with fetched content
                 if (this.linkTextarea) {
                     this.linkTextarea.value = text;
+                
+                    // Trigger input event to update shared state in ImportDialog
+                    const inputEvent = new Event('input', { bubbles: true });
+                    this.linkTextarea.dispatchEvent(inputEvent);
                 }
 
                 // Parse the CSV data and store result for ImportDialog to use
