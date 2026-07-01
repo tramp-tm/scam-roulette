@@ -20,79 +20,34 @@ export class ImportDialog extends ModalDialog {
     private previewContainer: HTMLElement | null = null;
     private previewList: HTMLUListElement | null = null;
 
+    // Link tab elements
+    private linkUrlInput: HTMLInputElement | null = null;
+    private fetchBtn: HTMLButtonElement | null = null;
+    private linkTextarea: HTMLTextAreaElement | null = null;
+    private linkStatusEl: HTMLElement | null = null;
+
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
-        // Link tab elements
-        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
-        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
-        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
-        this.linkStatusEl = document.getElementById('link-status');
 
-        // Link tab event listeners
-        if (this.fetchBtn) {
-            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
-        }
 
-        if (this.linkUrlInput) {
-            this.linkUrlInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.handleFetchFromUrl();
-                }
-            });
-        }
 
-        // Link textarea input - auto-update parsed result on fly
-        if (this.linkTextarea) {
-            this.linkTextarea.addEventListener('input', () => {
-                this.autoUpdateLinkParsedResult();
-            });
+        super();  // MUST BE FIRST STATEMENT
+
+        this.importCallback = importCallback;
+
+        // Set up onClose callback for cleanup when dialog closes
         }
     }
 
-    /** Auto-updates parsed result for link tab textarea input */
-    private autoUpdateLinkParsedResult(): void {
-        if (!this.linkTextarea) return;
 
-        const csvText = this.linkTextarea.value;
 
-        // Parse CSV text with current separator
-        const parsedResult = parseCSV(csvText, this.currentSeparator);
-        this.parsedResult = parsedResult;
 
-        // Update status line (always visible now) - show count + type
-        if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
-            this.validCountSpan.textContent = `${parsedResult.validLots.length} ${t('importDialog.validLots')}`;
-            this.errorCountSpan.textContent = `${parsedResult.errorCount} ${t('importDialog.errors')}`;
-        }
 
-        // Disable Import button if there are errors (per spec requirement)
-        if (this.importBtn) {
-            this.importBtn.disabled = parsedResult.errorCount > 0;
-        }
 
-        // Update preview container ONLY if it's already visible
-        if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
-            if (parsedResult.validLots.length > 0) {
-                // Generate random colors for preview lots
-                const previewLots = parsedResult.validLots.map(lot => ({
-                    ...lot,
-                    color: generateRandomReadableColor()
-                }));
 
-                // Render to preview area
-                this.renderPreviewList(previewLots);
-            } else {
-                // Clear preview if no valid lots
-                if (this.previewList) {
-                    this.previewList.innerHTML = '';
-                }
-            }
-        }
-    }
 
     /** Handles fetching CSV from URL */
     private async handleFetchFromUrl(): Promise<void> {
@@ -178,15 +133,35 @@ export class ImportDialog extends ModalDialog {
             if (this.importBtn) {
                 this.importBtn.disabled = false;
             }
+
+            // Clear Link tab state
+            if (this.linkUrlInput) {
+                this.linkUrlInput.value = '';
+            }
+            if (this.linkTextarea) {
+                this.linkTextarea.value = '';
+            }
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = '';
+            }
+
             
             // Always destroy the dialog to clean up DOM nodes and event listeners
             // This prevents stale state issues when reopening the import dialog
             this.destroy();
         };
+
         
         // Build the dialog UI
         this.renderHeader('Import Lots');
         this.renderTabsAndContent();
+
+        // Cache Link tab element references after renderTabsAndContent creates them
+        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
+        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
+        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
+        this.linkStatusEl = document.getElementById('link-status');
+
         this.setupEventListeners();
     }
 

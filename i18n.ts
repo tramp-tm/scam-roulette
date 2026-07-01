@@ -94,7 +94,6 @@ i18n.init({
                 'importDialog.separatorTab': 'Tab (↹)',
                 'importDialog.validLots': 'valid lots',
                 'importDialog.errors': 'errors',
-                'importDialog.validLots': 'valid lots',
                 'importDialog.previewBtn': '👁️ Preview',
                 'importDialog.importBtn': '📥 Import',
                 'importDialog.previewTitle': 'Preview',
