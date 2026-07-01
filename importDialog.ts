@@ -53,6 +53,18 @@ export class ImportDialog extends ModalDialog {
                 <button class="tab-button" data-tab="link">${t('importDialog.tabLink')}</button>
             </div>
 
+            <!-- Status Line (always visible) -->
+            <div id="import-status" class="import-status">
+                <span id="valid-count">0 valid lots</span>, 
+                <span id="error-count">0 errors</span>
+            </div>
+
+            <!-- Import Actions -->
+            <div class="import-actions">
+                <button id="preview-btn" class="btn-secondary">Preview</button>
+                <button id="import-btn" class="btn-primary">Import</button>
+            </div>
+
             <!-- Tab Content Containers -->
             <div id="tab-csv-content" class="tab-content active">
                 <!-- CSV tab content will be rendered by CsvTabContent component -->
