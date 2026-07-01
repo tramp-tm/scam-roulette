@@ -73,11 +73,9 @@ export class ImportDialog extends ModalDialog {
 
             <!-- Tab Content Containers -->
             <div id="tab-csv-content" class="tab-content active">
-                <!-- CSV tab content will be rendered by CsvTabContent component -->
             </div>
             
             <div id="tab-link-content" class="tab-content">
-                <!-- Link tab content will be rendered by LinkTabContent component -->
             </div>
 
             <!-- Status Line (always visible) -->
@@ -196,6 +194,8 @@ export class ImportDialog extends ModalDialog {
         const csvTabContent = document.getElementById('tab-csv-content');
         const linkTabContent = document.getElementById('tab-link-content');
 
+        if (!csvTabContent || !linkTabContent) return;
+
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = (button as HTMLElement).dataset.tab;
@@ -206,14 +206,12 @@ export class ImportDialog extends ModalDialog {
                 button.classList.add('active');
                 
                 // Show corresponding tab content
-                if (csvTabContent && linkTabContent) {
-                    if (targetTab === 'csv') {
-                        csvTabContent.classList.add('active');
-                        linkTabContent.classList.remove('active');
-                    } else if (targetTab === 'link') {
-                        linkTabContent.classList.add('active');
-                        csvTabContent.classList.remove('active');
-                    }
+                if (targetTab === 'csv') {
+                    csvTabContent.classList.add('active');
+                    linkTabContent.classList.remove('active');
+                } else if (targetTab === 'link') {
+                    linkTabContent.classList.add('active');
+                    csvTabContent.classList.remove('active');
                 }
                 
                 // Update shared parsed lots when switching tabs
