@@ -61,12 +61,6 @@ export class ImportDialog extends ModalDialog {
                 <span id="error-count">0 errors</span>
             </div>
 
-            <!-- Import Actions -->
-            <div class="import-actions">
-                <button id="preview-btn" class="btn-secondary">Preview</button>
-                <button id="import-btn" class="btn-primary">Import</button>
-            </div>
-
             <!-- Tab Content Containers -->
             <div id="tab-csv-content" class="tab-content active">
                 <!-- CSV tab content will be rendered by CsvTabContent component -->
@@ -74,6 +68,12 @@ export class ImportDialog extends ModalDialog {
             
             <div id="tab-link-content" class="tab-content">
                 <!-- Link tab content will be rendered by LinkTabContent component -->
+            </div>
+
+            <!-- Import Actions (moved outside tab containers) -->
+            <div class="import-actions">
+                <button id="preview-btn" class="btn-secondary">Preview</button>
+                <button id="import-btn" class="btn-primary">Import</button>
             </div>
         `;
 
