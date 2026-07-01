@@ -83,6 +83,12 @@ export class CsvTabContent {
                 this.currentSeparator = 'comma';
                 sepCommaBtn.classList.add('active');
                 sepTabBtn?.classList.remove('active');
+                
+                // Trigger re-parse when separator changes
+                if (this.textarea) {
+                    const event = new Event('input', { bubbles: true });
+                    this.textarea.dispatchEvent(event);
+                }
             });
         }
         
@@ -92,14 +98,22 @@ export class CsvTabContent {
                 this.currentSeparator = 'tab';
                 sepTabBtn.classList.add('active');
                 sepCommaBtn?.classList.remove('active');
+                
+                // Trigger re-parse when separator changes
+                if (this.textarea) {
+                    const event = new Event('input', { bubbles: true });
+                    this.textarea.dispatchEvent(event);
+                }
             });
         }
 
         // Textarea input - auto-update parsed result on fly
-        this.textarea?.addEventListener('input', () => {
-            // Auto-update parsed result when content changes
-            this.autoUpdateParsedResult();
-        });
+        if (this.textarea) {
+            this.textarea.addEventListener('input', () => {
+                // Auto-update parsed result when content changes
+                this.autoUpdateParsedResult();
+            });
+        }
 
         // Preview button - shows/hides preview container, fills if empty
         this.previewBtn?.addEventListener('click', () => this.handlePreview());
