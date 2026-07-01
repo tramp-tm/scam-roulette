@@ -6,6 +6,7 @@ export class LinkTabContent {
     private fetchBtn: HTMLButtonElement | null = null;
     private linkTextarea: HTMLTextAreaElement | null = null;
     private linkStatusEl: HTMLElement | null = null;
+    private parseResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
 
     constructor(container: HTMLElement) {
         this.render(container);
@@ -63,18 +64,32 @@ export class LinkTabContent {
         if (!url) {
             if (this.linkStatusEl) {
                 this.linkStatusEl.textContent = 'Please enter a valid URL';
+                this.linkStatusEl.className = 'link-status error';
+            }
+            return;
+        }
+
+        // Validate and process Google Docs URL
+        const googleDocId = this.extractGoogleDocId(url);
+        if (!googleDocId) {
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = 'Invalid Google Docs URL. Please enter a valid spreadsheet URL.';
+                this.linkStatusEl.className = 'link-status error';
             }
             return;
         }
 
         try {
+            // Generate export link for CSV
+            const exportUrl = `https://docs.google.com/spreadsheets/d/${googleDocId}/export?format=csv`;
+            
             // Show loading state
             if (this.fetchBtn) {
                 const originalText = this.fetchBtn.textContent;
                 this.fetchBtn.disabled = true;
                 this.fetchBtn.textContent = 'Fetching...';
 
-                const response = await fetch(url);
+                const response = await fetch(exportUrl);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -87,9 +102,13 @@ export class LinkTabContent {
                     this.linkTextarea.value = text;
                 }
 
-                // Update status
+                // Parse the CSV data and store result for ImportDialog to use
+                this.parseResult = parseCSV(text, 'comma'); // Default to comma separator
+
+                // Update status - now we need to parse the CSV and update ImportDialog's parsed result
                 if (this.linkStatusEl) {
-                    this.linkStatusEl.textContent = 'Successfully fetched CSV';
+                    const count = this.parseResult.validLots.length;
+                    this.linkStatusEl.textContent = `Successfully fetched and parsed ${count} lots`;
                     this.linkStatusEl.className = 'link-status success';
                 }
             }
@@ -108,6 +127,32 @@ export class LinkTabContent {
         }
     }
 
+    private extractGoogleDocId(url: string): string | null {
+        try {
+            const urlObj = new URL(url);
+            
+            // Handle direct spreadsheet URLs like https://docs.google.com/spreadsheets/d/{id}/edit
+            if (urlObj.hostname === 'docs.google.com' && urlObj.pathname.includes('/spreadsheets/d/')) {
+                const pathParts = urlObj.pathname.split('/');
+                const idIndex = pathParts.indexOf('d') + 1;
+                if (idIndex > 0 && idIndex < pathParts.length) {
+                    return pathParts[idIndex];
+                }
+            }
+            
+            // Handle URLs with /edit or other paths
+            const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+            if (match && match[1]) {
+                return match[1];
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error parsing URL:', error);
+            return null;
+        }
+    }
+
     public getLinkUrlInput(): HTMLInputElement | null {
         return this.linkUrlInput;
     }
@@ -118,5 +163,9 @@ export class LinkTabContent {
 
     public getLinkStatusEl(): HTMLElement | null {
         return this.linkStatusEl;
+    }
+
+    public getParsedResult(): { validLots: ParsedLot[]; errorCount: number } | null {
+        return this.parseResult;
     }
 }
