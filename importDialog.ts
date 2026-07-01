@@ -133,9 +133,23 @@ export class ImportDialog extends ModalDialog {
     }
 
     private handlePreview(): void {
-        if (!this.csvTabContent) return;
+        let parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
         
-        const parsedResult = this.csvTabContent.getParsedResult();
+        if (this.csvTabContent) {
+            const csvResult = this.csvTabContent.getParsedResult();
+            if (csvResult && csvResult.validLots.length > 0) {
+                parsedResult = csvResult;
+            }
+        }
+        
+        // If no CSV result, check link tab
+        if (!parsedResult && this.linkTabContent) {
+            const linkResult = this.linkTabContent.getParsedResult();
+            if (linkResult && linkResult.validLots.length > 0) {
+                parsedResult = linkResult;
+            }
+        }
+
         if (!parsedResult || parsedResult.validLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
             return;
@@ -146,15 +160,26 @@ export class ImportDialog extends ModalDialog {
     }
 
     private handleImport(): void {
-        if (!this.csvTabContent) return;
+        // Check both CSV and Link tab contents for parsed results
+        let parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
         
-        const parsedResult = this.csvTabContent.getParsedResult();
+        if (this.csvTabContent) {
+            const csvResult = this.csvTabContent.getParsedResult();
+            if (csvResult && csvResult.validLots.length > 0) {
+                parsedResult = csvResult;
+            }
+        }
+        
+        // If no CSV result, check link tab
+        if (!parsedResult && this.linkTabContent) {
+            const linkResult = this.linkTabContent.getParsedResult();
+            if (linkResult && linkResult.validLots.length > 0) {
+                parsedResult = linkResult;
+            }
+        }
+
         if (!parsedResult || parsedResult.validLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
-            return;
-        }
-        if (parsedResult.validLots.length === 0) {
-            alert(t('importDialog.noValidLots'));
             return;
         }
 
