@@ -764,6 +764,23 @@ input[type="number"] {
 }
 
 /* ========================================
+   LINK TAB INPUT CONTAINER
+   ======================================== */
+.link-input-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.link-input-container input {
+    flex: 1; /* Input takes remaining space */
+}
+
+.link-input-container button {
+    flex-shrink: 0; /* Button doesn't shrink */
+}
+
+/* ========================================
    PLACEHOLDER TEXT FOR LINK TAB
    ======================================== */
 

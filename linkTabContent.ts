@@ -23,13 +23,15 @@ export class LinkTabContent {
                 <p class="tab-instruction">Import from URL</p>
             </div>
 
-            <!-- URL input and fetch button -->
-            <input 
-                type="url" 
-                id="link-url-input" 
-                placeholder="Enter URL to fetch CSV..."
-                class="full-width link-url-input">
-            <button id="fetch-btn" class="btn-secondary">Fetch</button>
+            <!-- URL input and fetch button container -->
+            <div class="link-input-container">
+                <input 
+                    type="url" 
+                    id="link-url-input" 
+                    placeholder="Enter URL to fetch CSV..."
+                    class="full-width link-url-input">
+                <button id="fetch-btn" class="btn-secondary">Fetch</button>
+            </div>
 
             <!-- Status line for link tab -->
             <div id="link-status" class="link-status"></div>
