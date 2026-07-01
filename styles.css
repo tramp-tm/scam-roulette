@@ -460,6 +460,10 @@ button:disabled {
     display: none !important;
 }
 
+.full-width {
+    width: 100%;
+}
+
 /* Remove increment/decrement spinner buttons from number inputs */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

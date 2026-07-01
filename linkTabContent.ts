@@ -24,14 +24,12 @@ export class LinkTabContent {
             </div>
 
             <!-- URL input and fetch button -->
-            <div class="link-input-container">
-                <input 
-                    type="url" 
-                    id="link-url-input" 
-                    placeholder="Enter URL to fetch CSV..."
-                    class="link-url-input full-width">
-                <button id="fetch-btn" class="btn-secondary">Fetch</button>
-            </div>
+            <input 
+                type="url" 
+                id="link-url-input" 
+                placeholder="Enter URL to fetch CSV..."
+                class="full-width link-url-input">
+            <button id="fetch-btn" class="btn-secondary">Fetch</button>
 
             <!-- Status line for link tab -->
             <div id="link-status" class="link-status"></div>
