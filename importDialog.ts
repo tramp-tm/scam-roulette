@@ -1,5 +1,5 @@
 import { ModalDialog } from './modalDialog.js';
-import { t } from './i18n.js';
+import { t, translateDOM } from './i18n.js';
 
 import { SeparatorType, ParsedLot, ImportCallback } from './types.js';
 import { parseCSV } from './csvParser.js';
@@ -47,7 +47,6 @@ export class ImportDialog extends ModalDialog {
         this.setupEventListeners();
         
         // Apply translations to the newly created content
-        import { translateDOM } from './i18n.js';
         setTimeout(() => translateDOM(), 0);
     }
 

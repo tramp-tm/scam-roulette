@@ -1,4 +1,5 @@
 import { ModalManager } from './modalManager.js';
+import { translateDOM } from './i18n.js';
 
 /**
  * Base class for modal dialogs.
@@ -70,7 +71,6 @@ export abstract class ModalDialog {
         }
         
         // Apply translations after modal is opened
-        import { translateDOM } from './i18n.js';
         setTimeout(() => translateDOM(), 0); // Ensure DOM is fully rendered
         
         this.onOpen?.();
