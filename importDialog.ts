@@ -72,8 +72,8 @@ export class ImportDialog extends ModalDialog {
 
             <!-- Import Actions (moved outside tab containers) -->
             <div class="import-actions">
-                <button id="preview-btn" class="btn-secondary" data-i18n="importDialog.previewBtn">Preview</button>
-                <button id="import-btn" class="btn-primary" data-i18n="importDialog.importBtn">Import</button>
+                <button id="preview-btn" class="btn-secondary" data-i18n="importDialog.previewBtn">👁️ Preview</button>
+                <button id="import-btn" class="btn-primary" data-i18n="importDialog.importBtn">📥 Import</button>
             </div>
 
             <!-- Shared Preview Container -->

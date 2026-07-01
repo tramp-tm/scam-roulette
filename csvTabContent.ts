@@ -21,17 +21,17 @@ export class CsvTabContent {
         const html = `
             <!-- Header row with instruction and separator switch -->
             <div class="tab-header-row">
-                <p class="tab-instruction" data-i18n="importDialog.instruction">CSV Import Instructions</p>
+                <p class="tab-instruction" data-i18n="importDialog.instruction">Paste your lots below (name, amount per line):</p>
                 <div class="switch">
-                    <button id="sep-comma" class="switch-btn active" data-separator="comma" data-i18n="importDialog.separatorComma">Comma</button>
-                    <button id="sep-tab" class="switch-btn" data-separator="tab" data-i18n="importDialog.separatorTab">Tab</button>
+                    <button id="sep-comma" class="switch-btn active" data-separator="comma" data-i18n="importDialog.separatorComma">Comma (,)</button>
+                    <button id="sep-tab" class="switch-btn" data-separator="tab" data-i18n="importDialog.separatorTab">Tab (↹)</button>
                 </div>
             </div>
 
             
             <textarea 
                 id="import-textarea" 
-                placeholder="Paste CSV content here..."
+                placeholder="Paste your lots below (name, amount per line):"
                 rows="6"
                 data-i18n-placeholder="importDialog.placeholder"></textarea>
 
