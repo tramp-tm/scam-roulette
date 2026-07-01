@@ -73,14 +73,58 @@ export class ImportDialog extends ModalDialog {
 
 
 
-        // Set up onClose callback for cleanup when dialog closes
+    /** Handles fetching CSV from URL */
+    private async handleFetchFromUrl(): Promise<void> {
+        if (!this.linkUrlInput || !this.linkTextarea) return;
 
+        const url = this.linkUrlInput.value.trim();
+        if (!url) {
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.enterValidUrl');
+            }
+            return;
+        }
 
+        try {
+            // Show loading state
+            if (this.fetchBtn) {
+                const originalText = this.fetchBtn.textContent;
+                this.fetchBtn.disabled = true;
+                this.fetchBtn.textContent = t('importDialog.fetching');
 
+                const response = await fetch(url);
 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
+                const text = await response.text();
 
+                // Update textarea with fetched content
+                if (this.linkTextarea) {
+                    this.linkTextarea.value = text;
+                }
 
+                // Update status
+                if (this.linkStatusEl) {
+                    this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
+                    this.linkStatusEl.className = 'link-status success';
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching from URL:', error);
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = `${t('importDialog.fetchError')}: ${(error as Error).message}`;
+                this.linkStatusEl.className = 'link-status error';
+            }
+        } finally {
+            // Restore button state
+            if (this.fetchBtn) {
+                this.fetchBtn.disabled = false;
+                this.fetchBtn.textContent = t('importDialog.fetchBtn');
+            }
+        }
+    }
 
     /** Handles fetching CSV from URL */
     private async handleFetchFromUrl(): Promise<void> {
