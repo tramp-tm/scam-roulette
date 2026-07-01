@@ -60,15 +60,6 @@ export class ImportDialog extends ModalDialog {
             if (this.textarea) {
                 this.textarea.value = '';
             }
-            if (this.previewContainer) {
-                this.previewContainer.classList.add('hidden');
-            }
-            if (this.statusEl) {
-                this.statusEl.classList.add('hidden');
-            }
-            if (this.importBtn) {
-                this.importBtn.disabled = false;
-            }
 
             // Clear Link tab state
             if (this.linkUrlInput) {
@@ -98,15 +89,6 @@ export class ImportDialog extends ModalDialog {
             // Clear textarea and preview
             if (this.textarea) {
                 this.textarea.value = '';
-            }
-            if (this.previewContainer) {
-                this.previewContainer.classList.add('hidden');
-            }
-            if (this.statusEl) {
-                this.statusEl.classList.add('hidden');
-            }
-            if (this.importBtn) {
-                this.importBtn.disabled = false;
             }
 
             // Clear Link tab state
