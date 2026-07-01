@@ -28,9 +28,48 @@ export class ImportDialog extends ModalDialog {
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(importCallback: ImportCallback) {
+        super();
+        
+        this.importCallback = importCallback;
+        
+        // Set up onClose callback for cleanup when dialog closes
+        this.onClose = (data?: unknown) => {
+            // Reset parsed result
+            this.parsedResult = null;
+            
+            // Clear textarea and preview
+            if (this.textarea) {
+                this.textarea.value = '';
+            }
 
+            // Clear Link tab state
+            if (this.linkUrlInput) {
+                this.linkUrlInput.value = '';
+            }
+            if (this.linkTextarea) {
+                this.linkTextarea.value = '';
+            }
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = '';
+            }
 
+            // Always destroy the dialog to clean up DOM nodes and event listeners
+            // This prevents stale state issues when reopening the import dialog
+            this.destroy();
+        };
 
+        // Build the dialog UI
+        this.renderHeader(t('importDialog.title'));
+        this.renderTabsAndContent();
+
+        // Cache Link tab element references after renderTabsAndContent creates them
+        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
+        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
+        this.linkTextarea = document.getElementById('link-textarea') as HTMLTextAreaElement | null;
+        this.linkStatusEl = document.getElementById('link-status');
+
+        this.setupEventListeners();
+    }
 
 
 
@@ -232,22 +271,11 @@ export class ImportDialog extends ModalDialog {
         const csvTabContent = document.getElementById('tab-csv');
         const linkTabContent = document.getElementById('tab-link');
 
-        // Add event listener for fetch button
+        // Add event listener for fetch button - remove duplicate registrations
         if (this.fetchBtn) {
             this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
         }
 
-        // Add event listener for fetch button - remove duplicate
-        if (this.fetchBtn) {
-            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
-        }
-
-        // Add event listener for fetch button
-        if (this.fetchBtn) {
-            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
-        }
-
-        // Add event listener for fetch button
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = (button as HTMLElement).dataset.tab;
@@ -280,7 +308,6 @@ export class ImportDialog extends ModalDialog {
                 sepCommaBtn.classList.add('active');
                 sepTabBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
-                // Auto-update parsed result when content changes
                 this.autoUpdateParsedResult();
             });
         }
@@ -292,7 +319,6 @@ export class ImportDialog extends ModalDialog {
                 sepTabBtn.classList.add('active');
                 sepCommaBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
-                // Auto-update parsed result when content changes
                 this.autoUpdateParsedResult();
             });
         }
@@ -384,7 +410,6 @@ export class ImportDialog extends ModalDialog {
         }
         
         // Update preview container ONLY if it's already visible
-        // Update preview container ONLY if it's already visible
         if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
             if (parsedResult.validLots.length > 0) {
                 // Generate random colors for preview lots
@@ -408,8 +433,6 @@ export class ImportDialog extends ModalDialog {
     private handlePreview(): void {
         if (!this.textarea || !this.previewContainer || !this.previewList) return;
 
-        // Extract parsed result for type narrowing
-        
         // Extract parsed result for type narrowing
         const parsedResult = this.parsedResult;
         const validLotCount = parsedResult?.validLots.length ?? 0;
