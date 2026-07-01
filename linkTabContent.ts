@@ -51,10 +51,18 @@ export class LinkTabContent {
         if (this.fetchBtn) {
             this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
         }
+        
+        // Add input listener to URL input field 
+        if (this.linkUrlInput) {
+            this.linkUrlInput.addEventListener('input', () => {
+                // Trigger update when URL changes - but we don't need to do anything special here since 
+                // the fetch process will trigger an event after successful fetch anyway
+            });
+        }
     }
 
     private async handleFetchFromUrl(): Promise<void> {
-        if (!this.linkUrlInput || !this.linkTextarea) return;
+        if (!this.linkUrlInput) return;
 
         const url = this.linkUrlInput.value.trim();
         if (!url) {
@@ -93,15 +101,6 @@ export class LinkTabContent {
 
                 const text = await response.text();
 
-                // Update textarea with fetched content
-                if (this.linkTextarea) {
-                    this.linkTextarea.value = text;
-                
-                    // Trigger input event to update shared state in ImportDialog
-                    const inputEvent = new Event('input', { bubbles: true });
-                    this.linkTextarea.dispatchEvent(inputEvent);
-                }
-
                 // Parse the CSV data and store result for ImportDialog to use
                 this.parseResult = parseCSV(text, 'comma'); // Default to comma separator
 
@@ -110,6 +109,12 @@ export class LinkTabContent {
                     const count = this.parseResult.validLots.length;
                     this.linkStatusEl.textContent = `Successfully fetched and parsed ${count} lots`;
                     this.linkStatusEl.className = 'link-status success';
+                }
+                
+                // Trigger input event to update shared state in ImportDialog
+                if (this.linkUrlInput) {
+                    const inputEvent = new Event('input', { bubbles: true });
+                    this.linkUrlInput.dispatchEvent(inputEvent);
                 }
             }
         } catch (error) {
