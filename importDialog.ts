@@ -45,6 +45,10 @@ export class ImportDialog extends ModalDialog {
         this.initializeComponents();
 
         this.setupEventListeners();
+        
+        // Apply translations to the newly created content
+        import { translateDOM } from './i18n.js';
+        setTimeout(() => translateDOM(), 0);
     }
 
     private renderTabsAndContent(): void {

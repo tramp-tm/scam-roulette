@@ -68,6 +68,11 @@ export abstract class ModalDialog {
             this.overlay.classList.remove('hidden');
             manager.registerModal(this.overlay);
         }
+        
+        // Apply translations after modal is opened
+        import { translateDOM } from './i18n.js';
+        setTimeout(() => translateDOM(), 0); // Ensure DOM is fully rendered
+        
         this.onOpen?.();
     }
 
