@@ -45,6 +45,9 @@ export class LinkTabContent {
         this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
         this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
+        
+        // Apply translations to newly created elements
+        setTimeout(() => translateDOM(), 0);
     }
 
     private setupEventListeners(): void {
