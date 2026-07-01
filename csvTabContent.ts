@@ -1,14 +1,11 @@
 import { SeparatorType, ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
-import { generateRandomReadableColor } from './utils.js';
 
 /**
  * Component for CSV tab content in ImportDialog
  */
 export class CsvTabContent {
     private textarea: HTMLTextAreaElement | null = null;
-    private previewBtn: HTMLButtonElement | null = null;
-    private importBtn: HTMLButtonElement | null = null;
     private statusEl: HTMLElement | null = null;
     private validCountSpan: HTMLElement | null = null;
     private errorCountSpan: HTMLElement | null = null;
@@ -45,8 +42,6 @@ export class CsvTabContent {
         
         // Cache element references
         this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
-        this.previewBtn = container.querySelector('#preview-btn') as HTMLButtonElement;
-        this.importBtn = container.querySelector('#import-btn') as HTMLButtonElement;
     }
 
     private setupEventListeners(): void {
@@ -90,9 +85,6 @@ export class CsvTabContent {
                 this.autoUpdateParsedResult();
             });
         }
-
-        // Import button - validates and triggers import callback
-        this.importBtn?.addEventListener('click', () => this.handleImport());
     }
 
     /** Auto-updates parsed result on textarea input (called from event listener) */
@@ -104,44 +96,6 @@ export class CsvTabContent {
         // Parse CSV text with current separator
         const parsedResult = parseCSV(csvText, this.currentSeparator);
         this.parsedResult = parsedResult;
-        
-        
-        // Disable Import button if there are errors (per spec requirement)
-        if (this.importBtn) {
-            this.importBtn.disabled = parsedResult.errorCount > 0;
-        }
-        
-        // Update preview container ONLY if it's already visible
-        if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
-            if (parsedResult.validLots.length > 0) {
-                // Generate random colors for preview lots
-                const previewLots = parsedResult.validLots.map(lot => ({
-                    ...lot,
-                    color: generateRandomReadableColor()
-                }));
-                
-                // Render to preview area
-                this.renderPreviewList(previewLots);
-            } else {
-                // Clear preview if no valid lots
-                if (this.previewList) {
-                    this.previewList.innerHTML = '';
-                }
-            }
-        }
-    }
-
-
-    private handleImport(): void {
-        // Check if we have parsed result
-        const parsedResult = this.parsedResult;
-        if (!parsedResult || parsedResult.validLots.length === 0) {
-            alert('Please click Preview first');
-            return;
-        }
-        
-        // Size check passed - trigger import callback directly with ParsedLot[]
-        console.log("Importing lots:", parsedResult.validLots);
     }
 
     public getTextArea(): HTMLTextAreaElement | null {
