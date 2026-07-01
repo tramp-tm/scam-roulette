@@ -47,7 +47,11 @@ export class LinkTabContent {
         this.linkStatusEl = document.getElementById('link-status');
         
         // Apply translations to newly created elements
-        translateDOM();
+        try {
+            translateDOM();
+        } catch (e) {
+            console.error("Failed to translate DOM:", e);
+        }
     }
 
     private setupEventListeners(): void {
