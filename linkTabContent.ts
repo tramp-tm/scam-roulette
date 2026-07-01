@@ -47,14 +47,29 @@ export class LinkTabContent {
         this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
         
-        // Apply translations to newly created elements
-        console.log("DEBUG: About to call translateDOM in LinkTabContent.render()");
-        try {
-            translateDOM();
-            console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
-        } catch (e) {
-            console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
-        }
+        // Apply translations to newly created elements - use setTimeout for proper timing
+        console.log("DEBUG: Scheduling translateDOM call for link tab content");
+        setTimeout(() => {
+            try {
+                // Ensure we have access to the translation function
+                if (typeof translateDOM === 'function') {
+                    console.log("DEBUG: Calling translateDOM directly");
+                    translateDOM();
+                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
+                } else {
+                    console.log("DEBUG: translateDOM not available, trying window object");
+                    // Try to access it from the global scope
+                    if (typeof window !== 'undefined' && typeof (window as any).translateDOM === 'function') {
+                        (window as any).translateDOM();
+                        console.log("DEBUG: translateDOM found on window and called successfully");
+                    } else {
+                        console.log("DEBUG: translateDOM still not available");
+                    }
+                }
+            } catch (e) {
+                console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
+            }
+        }, 0);
     }
 
     private setupEventListeners(): void {
