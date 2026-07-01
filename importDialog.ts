@@ -50,7 +50,7 @@ export class ImportDialog extends ModalDialog {
 
 
     /** Handles fetching CSV from URL */
-    private async handleFetchFromUrl(): Promise<void> {
+    private handleFetchFromUrl(): void {
         if (!this.linkUrlInput || !this.fetchBtn || !this.linkTextarea) return;
 
         const url = this.linkUrlInput.value.trim();
@@ -109,11 +109,7 @@ export class ImportDialog extends ModalDialog {
             }
         } finally {
             // Restore button state
-            this.fetchBtn.disabled = false;
-            this.fetchBtn.textContent = originalBtnText;
-        }
-        super();
-        this.importCallback = importCallback;
+
         
         // Set up onClose callback for cleanup when dialog closes
         this.onClose = (data?: unknown) => {
