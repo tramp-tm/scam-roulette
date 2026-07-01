@@ -118,11 +118,11 @@ export class ImportDialog extends ModalDialog {
             this.linkTabContent = new LinkTabContent(linkContentContainer);
             
             // Add listener for link tab updates  
-            if (this.linkTabContent && this.linkTabContent.getLinkTextarea()) {
-                const textarea = this.linkTabContent.getLinkTextarea()!;
-                textarea.addEventListener('input', () => {
-                    // Update when link content changes
-                    setTimeout(() => this.updateSharedParsedLots(), 0);
+            if (this.linkTabContent && this.linkTabContent.getLinkUrlInput()) {
+                const urlInput = this.linkTabContent.getLinkUrlInput()!;
+                urlInput.addEventListener('input', () => {
+                    // Update when URL changes
+                    this.updateSharedParsedLots();
                 });
             }
         }
