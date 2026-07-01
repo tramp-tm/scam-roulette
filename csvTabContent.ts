@@ -12,8 +12,6 @@ export class CsvTabContent {
     private statusEl: HTMLElement | null = null;
     private validCountSpan: HTMLElement | null = null;
     private errorCountSpan: HTMLElement | null = null;
-    private previewContainer: HTMLElement | null = null;
-    private previewList: HTMLUListElement | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
@@ -48,11 +46,6 @@ export class CsvTabContent {
             </div>
             
 
-            <!-- Preview Container -->
-            <div id="preview-container" class="preview-container hidden">
-                <h4>Preview:</h4>
-                <ul id="preview-lots-list"></ul>
-            </div>
         `;
 
         container.innerHTML = html;
@@ -61,8 +54,6 @@ export class CsvTabContent {
         this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
         this.previewBtn = container.querySelector('#preview-btn') as HTMLButtonElement;
         this.importBtn = container.querySelector('#import-btn') as HTMLButtonElement;
-        this.previewContainer = container.querySelector('#preview-container');
-        this.previewList = container.querySelector('#preview-lots-list') as HTMLUListElement;
     }
 
     private setupEventListeners(): void {
@@ -107,9 +98,6 @@ export class CsvTabContent {
             });
         }
 
-        // Preview button - shows/hides preview container, fills if empty
-        this.previewBtn?.addEventListener('click', () => this.handlePreview());
-
         // Import button - validates and triggers import callback
         this.importBtn?.addEventListener('click', () => this.handleImport());
     }
@@ -150,81 +138,15 @@ export class CsvTabContent {
         }
     }
 
-    /** Preview button handler - shows/hides preview container, fills if empty */
-    private handlePreview(): void {
-        if (!this.textarea || !this.previewContainer || !this.previewList) return;
-
-        // Extract parsed result for type narrowing
-        const parsedResult = this.parsedResult;
-        const validLotCount = parsedResult?.validLots.length ?? 0;
-        
-        // If preview is hidden and we have valid lots, show it and fill it
-        if (this.previewContainer.classList.contains('hidden') && validLotCount > 0) {
-            // Generate random colors for preview lots
-            const previewLots = parsedResult!.validLots.map(lot => ({
-                ...lot,
-                color: generateRandomReadableColor()
-            }));
-            
-            // Render to preview area
-            this.renderPreviewList(previewLots);
-            
-            // Show preview container
-            this.previewContainer.classList.remove('hidden');
-        } else if (validLotCount === 0) {
-            // Hide preview if no valid lots
-            this.previewContainer.classList.add('hidden');
-        }
-    }
-
-    private renderPreviewList(lots: (ParsedLot & { color?: string })[]): void {
-        if (!this.previewList) return;
-        
-        this.previewList.innerHTML = '';
-        
-        for (const lot of lots) {
-            const li = document.createElement('li');
-            li.className = 'lot-item';
-
-            // Color indicator
-            const colorIndicator = document.createElement('div');
-            colorIndicator.className = 'lot-color-indicator';
-            colorIndicator.style.backgroundColor = lot.color || '#888';
-
-            // Lot name
-            const lotName = document.createElement('span');
-            lotName.className = 'lot-name';
-            lotName.textContent = lot.name;
-            lotName.style.flex = '1';
-            lotName.style.overflow = 'hidden';
-            lotName.style.textOverflow = 'ellipsis';
-
-            // Amount (read-only)
-            const amountInput = document.createElement('input');
-            amountInput.type = 'number';
-            amountInput.className = 'lot-amount-input';
-            amountInput.value = lot.amount.toFixed(2);
-            amountInput.disabled = true;
-
-            li.appendChild(colorIndicator);
-            li.appendChild(lotName);
-            li.appendChild(amountInput);
-            this.previewList.appendChild(li);
-        }
-    }
 
     private handleImport(): void {
-        // Check if preview has been run with valid lots
+        // Check if we have parsed result
         const parsedResult = this.parsedResult;
         if (!parsedResult || parsedResult.validLots.length === 0) {
             alert('Please click Preview first');
             return;
         }
-        if (parsedResult.validLots.length === 0) {
-            alert('No valid lots to import');
-            return;
-        }
-
+        
         // Size check passed - trigger import callback directly with ParsedLot[]
         console.log("Importing lots:", parsedResult.validLots);
     }

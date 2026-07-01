@@ -75,6 +75,12 @@ export class ImportDialog extends ModalDialog {
                 <button id="preview-btn" class="btn-secondary">Preview</button>
                 <button id="import-btn" class="btn-primary">Import</button>
             </div>
+
+            <!-- Shared Preview Container -->
+            <div id="preview-container" class="preview-container hidden">
+                <h4>Preview:</h4>
+                <ul id="preview-lots-list"></ul>
+            </div>
         `;
 
         if (this.content) {
@@ -212,6 +218,43 @@ export class ImportDialog extends ModalDialog {
         }
     }
 
+    private renderPreviewList(lots: (ParsedLot & { color?: string })[]): void {
+        const previewList = document.getElementById('preview-lots-list') as HTMLUListElement | null;
+        if (!previewList) return;
+        
+        previewList.innerHTML = '';
+        
+        for (const lot of lots) {
+            const li = document.createElement('li');
+            li.className = 'lot-item';
+
+            // Color indicator
+            const colorIndicator = document.createElement('div');
+            colorIndicator.className = 'lot-color-indicator';
+            colorIndicator.style.backgroundColor = lot.color || '#888';
+
+            // Lot name
+            const lotName = document.createElement('span');
+            lotName.className = 'lot-name';
+            lotName.textContent = lot.name;
+            lotName.style.flex = '1';
+            lotName.style.overflow = 'hidden';
+            lotName.style.textOverflow = 'ellipsis';
+
+            // Amount (read-only)
+            const amountInput = document.createElement('input');
+            amountInput.type = 'number';
+            amountInput.className = 'lot-amount-input';
+            amountInput.value = lot.amount.toFixed(2);
+            amountInput.disabled = true;
+
+            li.appendChild(colorIndicator);
+            li.appendChild(lotName);
+            li.appendChild(amountInput);
+            previewList.appendChild(li);
+        }
+    }
+
     private handlePreview(): void {
         // Update shared parsed lots first
         this.updateSharedParsedLots();
@@ -220,8 +263,20 @@ export class ImportDialog extends ModalDialog {
             alert(t('importDialog.clickPreviewFirst'));
             return;
         }
-        
-        console.log("Previewing lots:", this.parsedLots);
+
+        // Show preview container and render lots
+        const previewContainer = document.getElementById('preview-container');
+        if (previewContainer) {
+            previewContainer.classList.remove('hidden');
+            
+            // Generate random colors for preview lots
+            const previewLots = this.parsedLots.map(lot => ({
+                ...lot,
+                color: generateRandomReadableColor()
+            }));
+            
+            this.renderPreviewList(previewLots);
+        }
     }
 
     private handleImport(): void {
