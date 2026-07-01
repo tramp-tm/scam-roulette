@@ -1,5 +1,6 @@
 import { SeparatorType, ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
+import { translateDOM } from './i18n.js';
 
 /**
  * Component for Link tab content in ImportDialog
@@ -46,17 +47,13 @@ export class LinkTabContent {
         this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
         
-        // Apply translations to newly created elements - use setTimeout for proper timing
-        if (typeof translateDOM === 'function') {
-            setTimeout(() => {
-                console.log("DEBUG: About to call translateDOM in LinkTabContent.render()");
-                try {
-                    translateDOM();
-                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
-                } catch (e) {
-                    console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
-                }
-            }, 0);
+        // Apply translations to newly created elements
+        console.log("DEBUG: About to call translateDOM in LinkTabContent.render()");
+        try {
+            translateDOM();
+            console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
+        } catch (e) {
+            console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
         }
     }
 
