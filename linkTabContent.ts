@@ -20,7 +20,7 @@ export class LinkTabContent {
         const html = `
             <!-- Header row with instruction -->
             <div class="tab-header-row">
-                <p class="tab-instruction">Import from URL</p>
+                <p class="tab-instruction" data-i18n="importDialog.linkInstruction">Import from URL</p>
             </div>
 
             <!-- URL input and fetch button container -->
@@ -29,8 +29,9 @@ export class LinkTabContent {
                     type="url" 
                     id="link-url-input" 
                     placeholder="Enter URL to fetch CSV..."
-                    class="full-width link-url-input">
-                <button id="fetch-btn" class="btn-secondary">Fetch</button>
+                    class="full-width link-url-input"
+                    data-i18n-placeholder="importDialog.linkUrlPlaceholder">
+                <button id="fetch-btn" class="btn-secondary" data-i18n="importDialog.fetchBtn">Fetch</button>
             </div>
 
             <!-- Status line for link tab -->

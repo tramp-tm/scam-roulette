@@ -51,8 +51,8 @@ export class ImportDialog extends ModalDialog {
         const html = `
             <!-- Tab Navigation -->
             <div class="tab-navigation">
-                <button class="tab-button active" data-tab="csv">${t('importDialog.tabCsv')}</button>
-                <button class="tab-button" data-tab="link">${t('importDialog.tabLink')}</button>
+                <button class="tab-button active" data-tab="csv" data-i18n="importDialog.tabCsv">CSV Import</button>
+                <button class="tab-button" data-tab="link" data-i18n="importDialog.tabLink">Link Import</button>
             </div>
 
             <!-- Tab Content Containers -->
@@ -66,19 +66,19 @@ export class ImportDialog extends ModalDialog {
 
             <!-- Status Line (always visible) -->
             <div id="import-status" class="import-status">
-                <span id="valid-count">0 valid lots</span>, 
-                <span id="error-count">0 errors</span>
+                <span id="valid-count" data-i18n="importDialog.validLots">0 valid lots</span>, 
+                <span id="error-count" data-i18n="importDialog.errors">0 errors</span>
             </div>
 
             <!-- Import Actions (moved outside tab containers) -->
             <div class="import-actions">
-                <button id="preview-btn" class="btn-secondary">Preview</button>
-                <button id="import-btn" class="btn-primary">Import</button>
+                <button id="preview-btn" class="btn-secondary" data-i18n="importDialog.previewBtn">Preview</button>
+                <button id="import-btn" class="btn-primary" data-i18n="importDialog.importBtn">Import</button>
             </div>
 
             <!-- Shared Preview Container -->
             <div id="preview-container" class="preview-container hidden">
-                <h4>Preview:</h4>
+                <h4 data-i18n="importDialog.previewTitle">Preview:</h4>
                 <ul id="preview-lots-list"></ul>
             </div>
         `;
