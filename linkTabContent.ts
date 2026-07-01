@@ -47,7 +47,7 @@ export class LinkTabContent {
         this.linkStatusEl = document.getElementById('link-status');
         
         // Apply translations to newly created elements
-        setTimeout(() => translateDOM(), 0);
+        translateDOM();
     }
 
     private setupEventListeners(): void {
