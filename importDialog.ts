@@ -1,3 +1,5 @@
+import { ModalManager } from './modalManager.js';
+
 import { ModalDialog } from './modalDialog.js';
 import { t } from './i18n.js';
 
@@ -32,10 +34,11 @@ export class ImportDialog extends ModalDialog {
 
     constructor(importCallback: ImportCallback) {
 
+        super();
 
 
 
-        this.importCallback = importCallback;
+
 
         // Set up onClose callback for cleanup when dialog closes
 
@@ -146,6 +149,8 @@ export class ImportDialog extends ModalDialog {
         };
 
         
+
+
         // Build the dialog UI
         this.renderHeader('Import Lots');
         this.renderTabsAndContent();
@@ -239,6 +244,70 @@ export class ImportDialog extends ModalDialog {
             </div>
         `;
 
+    private async handleFetchFromUrl(): Promise<void> {
+        if (!this.linkUrlInput || !this.fetchBtn || !this.linkTextarea) return;
+
+        const url = this.linkUrlInput.value.trim();
+
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (e) {
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.invalidUrl');
+                this.linkStatusEl.style.color = '#ff6b6b';
+            }
+            return;
+        }
+
+        // Show loading state
+        const originalBtnText = this.fetchBtn.textContent;
+        this.fetchBtn.disabled = true;
+        this.fetchBtn.textContent = t('importDialog.fetching');
+
+        if (this.linkStatusEl) {
+            this.linkStatusEl.textContent = t('importDialog.loading');
+            this.linkStatusEl.style.color = '#f39c12';
+        }
+
+        try {
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const text = await response.text();
+            this.linkTextarea.value = text;
+
+            // Auto-parse the fetched content
+            this.autoUpdateLinkParsedResult();
+
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
+                this.linkStatusEl.style.color = '#27ae60';
+            }
+        } catch (error: unknown) {
+            let errorMessage = t('importDialog.fetchError');
+
+            // Check for CORS error
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                errorMessage = t('importDialog.corsError');
+            } else if (error instanceof Error) {
+                errorMessage = `${t('importDialog.fetchError')}: ${error.message}`;
+            }
+
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = errorMessage;
+                this.linkStatusEl.style.color = '#ff6b6b';
+            }
+        } finally {
+            // Restore button state
+            this.fetchBtn.disabled = false;
+            this.fetchBtn.textContent = originalBtnText;
+        }
+    }
+
         if (this.content) {
             const container = document.createElement('div');
             container.className = 'modal-body';
@@ -270,6 +339,7 @@ export class ImportDialog extends ModalDialog {
         const csvTabContent = document.getElementById('tab-csv');
         const linkTabContent = document.getElementById('tab-link');
 
+        // Add event listener for fetch button
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = (button as HTMLElement).dataset.tab;
@@ -302,7 +372,8 @@ export class ImportDialog extends ModalDialog {
                 sepCommaBtn.classList.add('active');
                 sepTabBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
-                this.autoUpdateParsedResult();
+                // Auto-update parsed result when content changes
+        this.autoUpdateParsedResult();
             });
         }
         
@@ -312,13 +383,15 @@ export class ImportDialog extends ModalDialog {
                 sepTabBtn.classList.add('active');
                 sepCommaBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
-                this.autoUpdateParsedResult();
+                // Auto-update parsed result when content changes
+        this.autoUpdateParsedResult();
             });
         }
 
         // Textarea input - auto-update parsed result on fly
         this.textarea?.addEventListener('input', () => {
-            this.autoUpdateParsedResult();
+            // Auto-update parsed result when content changes
+        this.autoUpdateParsedResult();
         });
 
         // Preview button - shows/hides preview container, fills if empty
@@ -435,7 +508,7 @@ export class ImportDialog extends ModalDialog {
     private handleImport(): void {
         // Check if preview has been run with valid lots
         const parsedResult = this.parsedResult;
-        if (!parsedResult) {
+        if (!parsedResult || parsedResult.validLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
             return;
         }
