@@ -40,11 +40,6 @@ export class CsvTabContent {
                 rows="6"></textarea>
 
             
-            <!-- Status Line (always visible) -->
-            <div id="import-status" class="import-status">
-                <span id="valid-count">0 valid lots</span>, 
-                <span id="error-count">0 errors</span>
-            </div>
             
 
             <div class="import-actions">
@@ -66,9 +61,6 @@ export class CsvTabContent {
         this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
         this.previewBtn = container.querySelector('#preview-btn') as HTMLButtonElement;
         this.importBtn = container.querySelector('#import-btn') as HTMLButtonElement;
-        this.statusEl = container.querySelector('#import-status');
-        this.validCountSpan = container.querySelector('#valid-count');
-        this.errorCountSpan = container.querySelector('#error-count');
         this.previewContainer = container.querySelector('#preview-container');
         this.previewList = container.querySelector('#preview-lots-list') as HTMLUListElement;
     }
@@ -132,11 +124,6 @@ export class CsvTabContent {
         const parsedResult = parseCSV(csvText, this.currentSeparator);
         this.parsedResult = parsedResult;
         
-        // Update status line (always visible now) - show count + type
-        if (this.statusEl && this.validCountSpan && this.errorCountSpan) {
-            this.validCountSpan.textContent = `${parsedResult.validLots.length} valid lots`;
-            this.errorCountSpan.textContent = `${parsedResult.errorCount} errors`;
-        }
         
         // Disable Import button if there are errors (per spec requirement)
         if (this.importBtn) {
