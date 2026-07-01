@@ -32,7 +32,6 @@ export class ImportDialog extends ModalDialog {
 
     constructor(importCallback: ImportCallback) {
 
-        super();
 
 
 
@@ -49,64 +48,9 @@ export class ImportDialog extends ModalDialog {
 
     /** Handles fetching CSV from URL */
     private handleFetchFromUrl(): void {
-        if (!this.linkUrlInput || !this.fetchBtn || !this.linkTextarea) return;
+        `;
 
-        const url = this.linkUrlInput.value.trim();
 
-        // Validate URL
-        try {
-            new URL(url);
-        } catch (e) {
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = t('importDialog.invalidUrl');
-                this.linkStatusEl.style.color = '#ff6b6b';
-            }
-            return;
-        }
-
-        // Show loading state
-        const originalBtnText = this.fetchBtn.textContent;
-        this.fetchBtn.disabled = true;
-        this.fetchBtn.textContent = t('importDialog.fetching');
-
-        if (this.linkStatusEl) {
-            this.linkStatusEl.textContent = t('importDialog.loading');
-            this.linkStatusEl.style.color = '#f39c12';
-        }
-
-        try {
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const text = await response.text();
-            this.linkTextarea.value = text;
-
-            // Auto-parse the fetched content
-            this.autoUpdateLinkParsedResult();
-
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
-                this.linkStatusEl.style.color = '#27ae60';
-            }
-        } catch (error: unknown) {
-            let errorMessage = t('importDialog.fetchError');
-
-            // Check for CORS error
-            if (error instanceof TypeError && error.message.includes('fetch')) {
-                errorMessage = t('importDialog.corsError');
-            } else if (error instanceof Error) {
-                errorMessage = `${t('importDialog.fetchError')}: ${error.message}`;
-            }
-
-            if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = errorMessage;
-                this.linkStatusEl.style.color = '#ff6b6b';
-            }
-        } finally {
-            // Restore button state
 
         
         // Set up onClose callback for cleanup when dialog closes
@@ -273,6 +217,11 @@ export class ImportDialog extends ModalDialog {
         const tabButtons = document.querySelectorAll('.tab-button');
         const csvTabContent = document.getElementById('tab-csv');
         const linkTabContent = document.getElementById('tab-link');
+
+        // Add event listener for fetch button
+        if (this.fetchBtn) {
+            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
+        }
 
         // Add event listener for fetch button
         if (this.fetchBtn) {
