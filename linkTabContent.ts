@@ -46,9 +46,15 @@ export class LinkTabContent {
         this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
         
-        // Apply translations to newly created elements - ensure translateDOM is available
-        if (typeof window !== 'undefined' && typeof translateDOM === 'function') {
-            translateDOM();
+        // Apply translations to newly created elements - use setTimeout for proper timing
+        if (typeof translateDOM === 'function') {
+            setTimeout(() => {
+                try {
+                    translateDOM();
+                } catch (e) {
+                    console.warn("translateDOM failed:", e);
+                }
+            }, 0);
         }
     }
 
