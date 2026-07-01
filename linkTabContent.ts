@@ -47,34 +47,7 @@ export class LinkTabContent {
         this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
         
-        // Apply translations to newly created elements - use setTimeout for proper timing
-        console.log("DEBUG: Scheduling translateDOM call for link tab content");
-        setTimeout(() => {
-            try {
-                // Ensure translation function is available and apply it
-                if (typeof window !== 'undefined' && typeof (window as any).translateDOM === 'function') {
-                    console.log("DEBUG: Calling translateDOM via window object");
-                    (window as any).translateDOM();
-                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
-                } else if (typeof translateDOM === 'function') {
-                    console.log("DEBUG: Calling translateDOM directly");
-                    translateDOM();
-                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
-                } else {
-                    console.log("DEBUG: No translation function available, trying manual approach");
-                    // Try to manually apply translations if needed
-                    const elements = container.querySelectorAll('[data-i18n]');
-                    elements.forEach(el => {
-                        const key = el.getAttribute('data-i18n');
-                        if (key && typeof t === 'function') {
-                            el.textContent = t(key);
-                        }
-                    });
-                }
-            } catch (e) {
-                console.error("DEBUG: translateDOM failed in LinkTabContent:", e);
-            }
-        }, 0);
+        // No need for manual translateDOM calls - let modal manager handle it
     }
 
     private setupEventListeners(): void {
