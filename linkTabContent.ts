@@ -51,20 +51,25 @@ export class LinkTabContent {
         console.log("DEBUG: Scheduling translateDOM call for link tab content");
         setTimeout(() => {
             try {
-                // Ensure we have access to the translation function
-                if (typeof translateDOM === 'function') {
+                // Ensure translation function is available and apply it
+                if (typeof window !== 'undefined' && typeof (window as any).translateDOM === 'function') {
+                    console.log("DEBUG: Calling translateDOM via window object");
+                    (window as any).translateDOM();
+                    console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
+                } else if (typeof translateDOM === 'function') {
                     console.log("DEBUG: Calling translateDOM directly");
                     translateDOM();
                     console.log("DEBUG: translateDOM completed successfully in LinkTabContent");
                 } else {
-                    console.log("DEBUG: translateDOM not available, trying window object");
-                    // Try to access it from the global scope
-                    if (typeof window !== 'undefined' && typeof (window as any).translateDOM === 'function') {
-                        (window as any).translateDOM();
-                        console.log("DEBUG: translateDOM found on window and called successfully");
-                    } else {
-                        console.log("DEBUG: translateDOM still not available");
-                    }
+                    console.log("DEBUG: No translation function available, trying manual approach");
+                    // Try to manually apply translations if needed
+                    const elements = container.querySelectorAll('[data-i18n]');
+                    elements.forEach(el => {
+                        const key = el.getAttribute('data-i18n');
+                        if (key && typeof t === 'function') {
+                            el.textContent = t(key);
+                        }
+                    });
                 }
             } catch (e) {
                 console.error("DEBUG: translateDOM failed in LinkTabContent:", e);

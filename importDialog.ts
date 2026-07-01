@@ -141,8 +141,10 @@ export class ImportDialog extends ModalDialog {
             }
         }
         
-        // Initialize with first tab's data
-        this.updateSharedParsedLots();
+        // Initialize with first tab's data - make sure DOM is ready
+        setTimeout(() => {
+            this.updateSharedParsedLots();
+        }, 10);
     }
 
     private updateSharedParsedLots(): void {
