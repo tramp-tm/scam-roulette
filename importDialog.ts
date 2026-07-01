@@ -19,6 +19,8 @@ export class ImportDialog extends ModalDialog {
     private linkTabContent: LinkTabContent | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
+    private parsedLots: ParsedLot[] = [];
+    private errorCount: number = 0;
 
     constructor(importCallback: ImportCallback) {
         super();
@@ -96,10 +98,73 @@ export class ImportDialog extends ModalDialog {
 
         if (csvContentContainer) {
             this.csvTabContent = new CsvTabContent(csvContentContainer);
+            
+            // Add listener for CSV tab updates
+            if (this.csvTabContent && this.csvTabContent.getTextArea()) {
+                this.csvTabContent.getTextArea()!.addEventListener('input', () => {
+                    // Update when CSV content changes
+                    setTimeout(() => this.updateSharedParsedLots(), 0);
+                });
+            }
         }
 
         if (linkContentContainer) {
             this.linkTabContent = new LinkTabContent(linkContentContainer);
+            
+            // Add listener for link tab updates  
+            if (this.linkTabContent && this.linkTabContent.getLinkTextarea()) {
+                const textarea = this.linkTabContent.getLinkTextarea()!;
+                textarea.addEventListener('input', () => {
+                    // Update when link content changes
+                    setTimeout(() => this.updateSharedParsedLots(), 0);
+                });
+            }
+        }
+        
+        // Initialize with first tab's data
+        this.updateSharedParsedLots();
+    }
+
+    private updateSharedParsedLots(): void {
+        let tabParsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
+        
+        // Check which tab is currently active
+        const activeTab = document.querySelector('.tab-button.active')?.dataset.tab || 'csv';
+        
+        if (activeTab === 'csv' && this.csvTabContent) {
+            const csvResult = this.csvTabContent.getParsedResult();
+            if (csvResult) {
+                tabParsedResult = csvResult;
+            }
+        } else if (activeTab === 'link' && this.linkTabContent) {
+            const linkResult = this.linkTabContent.getParsedResult();
+            if (linkResult) {
+                tabParsedResult = linkResult;
+            }
+        }
+
+        // Update shared parsed lots
+        if (tabParsedResult) {
+            this.parsedLots = tabParsedResult.validLots;
+            this.errorCount = tabParsedResult.errorCount;
+        } else {
+            this.parsedLots = [];
+            this.errorCount = 0;
+        }
+        
+        // Update the shared status elements
+        this.updateSharedStatus();
+    }
+
+    private updateSharedStatus(): void {
+        const validCountSpan = document.getElementById('valid-count');
+        const errorCountSpan = document.getElementById('error-count');
+        
+        if (validCountSpan) {
+            validCountSpan.textContent = `${this.parsedLots.length} valid lots`;
+        }
+        if (errorCountSpan) {
+            errorCountSpan.textContent = `${this.errorCount} errors`;
         }
     }
 
@@ -128,6 +193,9 @@ export class ImportDialog extends ModalDialog {
                         csvTabContent.classList.remove('active');
                     }
                 }
+                
+                // Update shared parsed lots when switching tabs
+                this.updateSharedParsedLots();
             });
         });
 
@@ -145,57 +213,27 @@ export class ImportDialog extends ModalDialog {
     }
 
     private handlePreview(): void {
-        let parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
+        // Update shared parsed lots first
+        this.updateSharedParsedLots();
         
-        if (this.csvTabContent) {
-            const csvResult = this.csvTabContent.getParsedResult();
-            if (csvResult && csvResult.validLots.length > 0) {
-                parsedResult = csvResult;
-            }
-        }
-        
-        // If no CSV result, check link tab
-        if (!parsedResult && this.linkTabContent) {
-            const linkResult = this.linkTabContent.getParsedResult();
-            if (linkResult && linkResult.validLots.length > 0) {
-                parsedResult = linkResult;
-            }
-        }
-
-        if (!parsedResult || parsedResult.validLots.length === 0) {
+        if (this.parsedLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
             return;
         }
         
-        // In a real implementation, we would show the preview here
-        console.log("Previewing lots:", parsedResult.validLots);
+        console.log("Previewing lots:", this.parsedLots);
     }
 
     private handleImport(): void {
-        // Check both CSV and Link tab contents for parsed results
-        let parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
+        // Update shared parsed lots first
+        this.updateSharedParsedLots();
         
-        if (this.csvTabContent) {
-            const csvResult = this.csvTabContent.getParsedResult();
-            if (csvResult && csvResult.validLots.length > 0) {
-                parsedResult = csvResult;
-            }
-        }
-        
-        // If no CSV result, check link tab
-        if (!parsedResult && this.linkTabContent) {
-            const linkResult = this.linkTabContent.getParsedResult();
-            if (linkResult && linkResult.validLots.length > 0) {
-                parsedResult = linkResult;
-            }
-        }
-
-        if (!parsedResult || parsedResult.validLots.length === 0) {
+        if (this.parsedLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
             return;
         }
 
         // Size check passed - trigger import callback directly with ParsedLot[]
-        this.importCallback(parsedResult.validLots);
+        this.importCallback(this.parsedLots);
     }
 }
