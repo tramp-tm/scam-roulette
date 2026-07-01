@@ -13,19 +13,6 @@ import { ModalManager } from './modalManager.js';
 export class ImportDialog extends ModalDialog {
     private textarea: HTMLTextAreaElement | null = null;
     private previewBtn: HTMLButtonElement | null = null;
-    private importBtn: HTMLButtonElement | null = null;
-    private statusEl: HTMLElement | null = null;
-    private validCountSpan: HTMLElement | null = null;
-    private errorCountSpan: HTMLElement | null = null;
-    private previewContainer: HTMLElement | null = null;
-    private previewList: HTMLUListElement | null = null;
-
-    // Link tab elements
-    private linkUrlInput: HTMLInputElement | null = null;
-    private fetchBtn: HTMLButtonElement | null = null;
-    private linkTextarea: HTMLTextAreaElement | null = null;
-    private linkStatusEl: HTMLElement | null = null;
-
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
@@ -93,8 +80,43 @@ export class ImportDialog extends ModalDialog {
         
 
 
+        // Set up onClose callback for cleanup when dialog closes
+        this.onClose = (data?: unknown) => {
+            // Reset parsed result
+            this.parsedResult = null;
+
+            // Clear textarea and preview
+            if (this.textarea) {
+                this.textarea.value = '';
+            }
+            if (this.previewContainer) {
+                this.previewContainer.classList.add('hidden');
+            }
+            if (this.statusEl) {
+                this.statusEl.classList.add('hidden');
+            }
+            if (this.importBtn) {
+                this.importBtn.disabled = false;
+            }
+
+            // Clear Link tab state
+            if (this.linkUrlInput) {
+                this.linkUrlInput.value = '';
+            }
+            if (this.linkTextarea) {
+                this.linkTextarea.value = '';
+            }
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = '';
+            }
+
+            // Always destroy the dialog to clean up DOM nodes and event listeners
+            // This prevents stale state issues when reopening the import dialog
+            this.destroy();
+        };
+
         // Build the dialog UI
-        this.renderHeader('Import Lots');
+        this.renderHeader(t('importDialog.title'));
         this.renderTabsAndContent();
 
         // Cache Link tab element references after renderTabsAndContent creates them
@@ -223,6 +245,11 @@ export class ImportDialog extends ModalDialog {
             this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
         }
 
+        // Add event listener for fetch button - remove duplicate
+        if (this.fetchBtn) {
+            this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
+        }
+
         // Add event listener for fetch button
         if (this.fetchBtn) {
             this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
@@ -262,10 +289,11 @@ export class ImportDialog extends ModalDialog {
                 sepTabBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
                 // Auto-update parsed result when content changes
-        this.autoUpdateParsedResult();
+                this.autoUpdateParsedResult();
             });
         }
         
+
         if (sepTabBtn) {
             sepTabBtn.addEventListener('click', () => {
                 this.currentSeparator = 'tab';
@@ -273,14 +301,14 @@ export class ImportDialog extends ModalDialog {
                 sepCommaBtn?.classList.remove('active');
                 // Auto-update parsed result when separator changes
                 // Auto-update parsed result when content changes
-        this.autoUpdateParsedResult();
+                this.autoUpdateParsedResult();
             });
         }
 
         // Textarea input - auto-update parsed result on fly
         this.textarea?.addEventListener('input', () => {
             // Auto-update parsed result when content changes
-        this.autoUpdateParsedResult();
+            this.autoUpdateParsedResult();
         });
 
         // Preview button - shows/hides preview container, fills if empty
@@ -288,6 +316,58 @@ export class ImportDialog extends ModalDialog {
 
         // Import button - validates and triggers import callback
         this.importBtn?.addEventListener('click', () => this.handleImport());
+    }
+
+    private async handleFetchFromUrl(): Promise<void> {
+        if (!this.linkUrlInput || !this.linkTextarea) return;
+
+        const url = this.linkUrlInput.value.trim();
+        if (!url) {
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = t('importDialog.enterValidUrl');
+            }
+            return;
+        }
+
+        try {
+            // Show loading state
+            if (this.fetchBtn) {
+                const originalText = this.fetchBtn.textContent;
+                this.fetchBtn.disabled = true;
+                this.fetchBtn.textContent = t('importDialog.fetching');
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const text = await response.text();
+
+                // Update textarea with fetched content
+                if (this.linkTextarea) {
+                    this.linkTextarea.value = text;
+                }
+
+                // Update status
+                if (this.linkStatusEl) {
+                    this.linkStatusEl.textContent = t('importDialog.fetchSuccess');
+                    this.linkStatusEl.className = 'link-status success';
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching from URL:', error);
+            if (this.linkStatusEl) {
+                this.linkStatusEl.textContent = `${t('importDialog.fetchError')}: ${(error as Error).message}`;
+                this.linkStatusEl.className = 'link-status error';
+            }
+        } finally {
+            // Restore button state
+            if (this.fetchBtn) {
+                this.fetchBtn.disabled = false;
+                this.fetchBtn.textContent = t('importDialog.fetchBtn');
+            }
+        }
     }
 
     /** Auto-updates parsed result on textarea input (called from event listener) */
@@ -312,6 +392,7 @@ export class ImportDialog extends ModalDialog {
         }
         
         // Update preview container ONLY if it's already visible
+        // Update preview container ONLY if it's already visible
         if (this.previewContainer && !this.previewContainer.classList.contains('hidden')) {
             if (parsedResult.validLots.length > 0) {
                 // Generate random colors for preview lots
@@ -334,6 +415,8 @@ export class ImportDialog extends ModalDialog {
     /** Preview button handler - shows/hides preview container, fills if empty */
     private handlePreview(): void {
         if (!this.textarea || !this.previewContainer || !this.previewList) return;
+
+        // Extract parsed result for type narrowing
         
         // Extract parsed result for type narrowing
         const parsedResult = this.parsedResult;
@@ -396,6 +479,7 @@ export class ImportDialog extends ModalDialog {
 
     private handleImport(): void {
         // Check if preview has been run with valid lots
+        // Check if preview has been run with valid lots
         const parsedResult = this.parsedResult;
         if (!parsedResult || parsedResult.validLots.length === 0) {
             alert(t('importDialog.clickPreviewFirst'));
@@ -409,5 +493,6 @@ export class ImportDialog extends ModalDialog {
         // Size check passed - trigger import callback directly with ParsedLot[]
         this.importCallback(parsedResult.validLots);
     }
+
 
 }
