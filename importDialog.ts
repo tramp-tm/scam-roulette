@@ -34,13 +34,10 @@ export class ImportDialog extends ModalDialog {
 
 
 
-        super();  // MUST BE FIRST STATEMENT
 
         this.importCallback = importCallback;
 
         // Set up onClose callback for cleanup when dialog closes
-        }
-    }
 
 
 
@@ -112,7 +109,8 @@ export class ImportDialog extends ModalDialog {
 
         
         // Set up onClose callback for cleanup when dialog closes
-        this.onClose = (data?: unknown) => {
+         // Set up onClose callback for cleanup when dialog closes
+       this.onClose = (data?: unknown) => {
             // Reset parsed result
             this.parsedResult = null;
             
