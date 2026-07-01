@@ -39,13 +39,6 @@ export class CsvTabContent {
 
             
             
-
-            <div class="import-actions">
-                <button id="preview-btn" class="btn-secondary">Preview</button>
-                <button id="import-btn" class="btn-primary">Import</button>
-            </div>
-            
-
         `;
 
         container.innerHTML = html;
