@@ -510,15 +510,15 @@ export class App {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
                                             console.log("rollResult.isComplete Lots=" + JSON.stringify(rollResult) )
-                        // For survival mode, when all lots are eliminated or only one remains,
-                        // we need to find the last survivor properly
+                        // In survival mode, when complete, the last remaining active lot IS the survivor
                         const allLots = this.lotManager.getAllLots();
-                        if (allLots.length > 0) {
-                            // Find any active lot that's not the winner
-                            const survivor = allLots.find(lot => lot.active && lot.id !== winner.id);
-                            this.highlightedLotId = survivor?.id || null;
+                        const activeLots = this.lotManager.getActiveLots();
+                        
+                        if (activeLots.length === 1) {
+                            // The only remaining active lot is the survivor
+                            this.highlightedLotId = activeLots[0].id;
                         } else {
-                            // If no lots exist, clear highlight
+                            // Clear highlight if no lots or multiple lots remain
                             this.highlightedLotId = null;
                         }
                     }, 500);
