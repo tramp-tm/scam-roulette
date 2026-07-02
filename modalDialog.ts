@@ -70,14 +70,12 @@ export abstract class ModalDialog {
             manager.registerModal(this.overlay);
         }
         
-        // Apply translations after modal is opened
+        // Apply translations after modal is opened - let modalManager handle it
         setTimeout(() => {
-            console.log("DEBUG: About to call translateDOM in modalDialog.open()");
             try {
                 translateDOM();
-                console.log("DEBUG: translateDOM completed successfully");
             } catch (e) {
-                console.error("DEBUG: translateDOM failed:", e);
+                console.error("translateDOM failed:", e);
             }
         }, 0); // Ensure DOM is fully rendered
         

@@ -50,17 +50,6 @@ export class ImportDialog extends ModalDialog {
         console.log("DEBUG: ImportDialog constructor - initialized components");
 
         this.setupEventListeners();
-        
-        // Apply translations to the newly created content
-        setTimeout(() => {
-            console.log("DEBUG: About to call translateDOM in ImportDialog constructor");
-            try {
-                translateDOM();
-                console.log("DEBUG: translateDOM completed successfully in ImportDialog");
-            } catch (e) {
-                console.error("DEBUG: translateDOM failed in ImportDialog:", e);
-            }
-        }, 0);
     }
 
     private renderTabsAndContent(): void {
