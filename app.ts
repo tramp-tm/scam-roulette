@@ -828,5 +828,9 @@ export class App {
 
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    new App();
+    // Initialize the app first
+    const app = new App();
+    
+    // Ensure translations are applied after everything is set up
+    translateDOM();
 });
