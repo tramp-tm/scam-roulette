@@ -275,7 +275,18 @@ export function translateDOM(): void {
     });
 }
 
+/**
+ * Re-translates all currently open modals
+ */
+export function retranslateAllModals(): void {
+    const manager = ModalManager.getInstance();
+    manager.retranslateAllOpenModals();
+}
+
 export default i18n;
 
 /** Named export of translation function for convenience */
 export const t = i18n.t.bind(i18n);
+
+/** Export additional functions */
+export { translateDOM, retranslateAllModals };

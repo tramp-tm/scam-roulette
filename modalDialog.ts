@@ -61,6 +61,15 @@ export abstract class ModalDialog {
         (this as any)._escapeHandler = escapeHandler;
     }
 
+    /**
+     * Re-translates the modal content
+     */
+    protected retranslate(): void {
+        if (this.content) {
+            translateDOM();
+        }
+    }
+
     /** Opens the dialog and registers with manager */
     public open(): void {
         const manager = ModalManager.getInstance();
@@ -70,6 +79,8 @@ export abstract class ModalDialog {
             manager.registerModal(this.overlay);
         }
         
+        // Ensure content is translated when opened
+        this.retranslate();
         this.onOpen?.();
     }
 

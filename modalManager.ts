@@ -55,4 +55,31 @@ export class ModalManager {
         const topmost = this.getTopmostModal();
         return topmost === modalElement;
     }
+
+    /**
+     * Re-translates all currently open modals
+     */
+    public retranslateAllOpenModals(): void {
+        this.openModals.forEach(modal => {
+            if (modal.classList.contains('hidden')) return;
+            
+            // Find the modal content container and translate it
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                // Re-translate the content
+                translateDOM();
+                
+                // Trigger any custom translation logic in subclasses if needed
+                this.handleModalTranslation(content);
+            }
+        });
+    }
+
+    /**
+     * Handle custom translation logic for modals
+     */
+    private handleModalTranslation(content: HTMLElement): void {
+        // This can be overridden by subclasses to handle specific modal translation needs
+        // For now, we just ensure DOM elements are re-translated
+    }
 }
