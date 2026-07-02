@@ -201,14 +201,6 @@ export class ImportDialog extends ModalDialog {
                     csvTabContent.classList.remove('active');
                 }
                 
-                // Force translation of newly revealed tab content
-                setTimeout(() => {
-                    try {
-                        translateDOM();
-                    } catch (e) {
-                        console.error("translateDOM failed:", e);
-                    }
-                }, 0);
                 
                 // Update shared parsed lots when switching tabs
                 this.updateSharedParsedLots();
