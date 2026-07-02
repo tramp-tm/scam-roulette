@@ -1,6 +1,6 @@
 import { SeparatorType, ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
-import { translateDOM } from './i18n.js';
+import { t } from './i18n.js';
 
 /**
  * Component for Link tab content in ImportDialog
