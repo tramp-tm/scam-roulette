@@ -528,6 +528,9 @@ export class App {
                         // Update UI to reflect completion state
                         this.updateUI();
                     }, 500);
+                } else {
+                    // If not complete, unlock settings for next spin
+                    this.isSettingsLocked = false;
                 }
             }
 
@@ -540,8 +543,10 @@ export class App {
             console.log(`${action} lot: "${winner.name}"`);
         }
 
-        // Unlock settings
-        this.isSettingsLocked = false;
+        // Only unlock settings if not in a completion state
+        if (!this.isSettingsLocked) {
+            this.isSettingsLocked = false;
+        }
         this.updateControlsState();
         
         // Re-render with updated state
