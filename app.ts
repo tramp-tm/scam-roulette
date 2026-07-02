@@ -543,10 +543,7 @@ export class App {
             console.log(`${action} lot: "${winner.name}"`);
         }
 
-        // Only unlock settings if not in a completion state
-        if (!this.isSettingsLocked) {
-            this.isSettingsLocked = false;
-        }
+        // Update controls state - don't override isSettingsLocked here!
         this.updateControlsState();
         
         // Re-render with updated state
