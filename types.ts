@@ -66,6 +66,9 @@ export const MODES: Record<Mode, ModeConfig> = {
                 // All lots eliminated - this shouldn't happen in normal gameplay but handle gracefully
                 result.isComplete = true;
                 result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
+            } else if (activeLots.length > 1) {
+                // Still multiple active lots, not complete yet
+                result.isComplete = false;
             }
 
             return result;
