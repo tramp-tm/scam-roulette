@@ -1,0 +1,54 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "app",
+      "version": "1.0.0",
+      "license": "ISC",
+      "devDependencies": {
+        "typescript": "^6.0.3"
+      }
+    },
+    "node_modules/typescript": {
+      "version": "6.0.3",
+      "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
+      "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+      "dev": true,
+      "license": "Apache-2.0",
+      "bin": {
+        "tsc": "bin/tsc",
+        "tsserver": "bin/tsserver"
+      },
+      "engines": {
+        "node": ">=14.17"
+      }
+    }
+  },
+  "description": "This project was written entirely by AI, with a few attempts on my part to get it to write code that wasn't quite so strange",
+  "main": "index.js",
+  "devDependencies": {
+    "@types/i18next": "^12.1.0",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tramp-tm/scam-roulette.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tramp-tm/scam-roulette/issues"
+  },
+  "homepage": "https://github.com/tramp-tm/scam-roulette#readme",
+  "dependencies": {
+    "i18next": "^26.3.4"
+  }
+}
