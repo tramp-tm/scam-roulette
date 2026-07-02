@@ -102,9 +102,9 @@ i18n.init({
                 'importDialog.noValidLots': 'No valid lots to import.',
 
                 // ── Link Import (new keys) ──
-                'importDialog.linkInstruction': 'Enter a URL to fetch CSV data:',
+                'importDialog.linkInstruction': 'Введите URL для получения данных CSV:',
                 'importDialog.linkUrlPlaceholder': 'https://example.com/lots.csv',
-                'importDialog.fetchBtn': '📡 Fetch',
+                'importDialog.fetchBtn': '📡 Загрузить',
                 'importDialog.loading': 'Loading...',
                 'importDialog.fetchSuccess': '✓ Fetched successfully!',
                 'importDialog.fetchError': '✗ Failed to fetch data',
