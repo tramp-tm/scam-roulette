@@ -43,6 +43,8 @@ export const MODES: Record<Mode, ModeConfig> = {
         getResultText: (winner: Lot) => t('mode.survival.resultEliminated', { name: winner.name }),
         onRollEnd: (winner: Lot, activeLots: Lot[], totalLots: number) => {
             // In survival mode, the "winner" is actually eliminated
+
+            console.log("survival.onRollEnd start activeLots=" + JSON.stringify(activeLots) )
             const result = {
                 eliminatedLotId: winner.id,
                 isComplete: false as boolean,

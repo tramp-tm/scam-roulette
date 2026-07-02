@@ -425,7 +425,9 @@ export class App {
 
     private spin(): void {
         const activeLots = this.lotManager.getActiveLots();
-        
+
+        console.log("apps.spin start Lots=" +  JSON.stringify(this.lotManager.getAllLots()) )
+
         if (!RouletteEngine.canSpin(activeLots)) {
             alert(t('validation.noLotsToSpin'));
             return;
@@ -481,6 +483,9 @@ export class App {
      * Finishes the spin and applies results.
      */
     private finishSpin(winner: Lot | null): void {
+                console.log("apps.finishSpin start Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
+
+
         if (winner) {
             // Highlight the result
             this.highlightedLotId = winner.id;
