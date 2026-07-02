@@ -1,8 +1,9 @@
 import i18n from 'i18next';
 
-// Detect user's preferred language
-const userLang = navigator.language || navigator.languages[0] || 'en';
-const DEFAULT_LANG = userLang.split('-')[0]; // Get just the language code (e.g., "ru" from "ru-RU")
+import enTranslations from './locales/en.json';
+import ruTranslations from './locales/ru.json';
+
+const DEFAULT_LANG = 'en';
 const FALLBACK_LANG = 'en';
 
 export const AVAILABLE_LANGUAGES: Record<string, string> = {
@@ -19,8 +20,8 @@ i18n.init({
         escapeValue: false,
     },
     resources: {
-        en: { translation: {} }, // Will be populated at runtime from external file
-        ru: { translation: {} }  // Will be populated at runtime from external file
+        en: { translation: enTranslations },
+        ru: { translation: ruTranslations }
     },
 });
 
