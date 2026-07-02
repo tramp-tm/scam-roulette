@@ -70,15 +70,6 @@ export abstract class ModalDialog {
             manager.registerModal(this.overlay);
         }
         
-        // Apply translations after modal is opened - let modalManager handle it
-        setTimeout(() => {
-            try {
-                translateDOM();
-            } catch (e) {
-                console.error("translateDOM failed:", e);
-            }
-        }, 0); // Ensure DOM is fully rendered
-        
         this.onOpen?.();
     }
 

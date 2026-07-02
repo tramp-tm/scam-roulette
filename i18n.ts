@@ -261,12 +261,9 @@ i18n.init({
  * and [data-i18n-title] for title attributes.
  */
 export function translateDOM(): void {
-    console.log('data-i18n count:' + document.querySelectorAll('[data-i18n]').length);
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (key) el.textContent = i18n.t(key);
-        if (key) console.log('key translated: ' +   key);
-
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
         const key = el.getAttribute('data-i18n-placeholder');

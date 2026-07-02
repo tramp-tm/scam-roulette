@@ -43,8 +43,6 @@ export class CsvTabContent {
         
         // Cache element references
         this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
-        
-        console.log("DEBUG: CsvTabContent render completed");
     }
 
     private setupEventListeners(): void {

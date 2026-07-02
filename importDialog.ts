@@ -38,16 +38,12 @@ export class ImportDialog extends ModalDialog {
         };
 
         // Build the dialog UI with header, tabs, actions, and status elements
-        console.log("DEBUG: ImportDialog constructor - rendering header");
         this.renderHeader(t('importDialog.title'));
-        console.log("DEBUG: ImportDialog constructor - rendered header");
         
         this.renderTabsAndContent();
 
         // Initialize components after rendering
-        console.log("DEBUG: ImportDialog constructor - initializing components");
         this.initializeComponents();
-        console.log("DEBUG: ImportDialog constructor - initialized components");
 
         this.setupEventListeners();
     }
