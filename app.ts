@@ -509,8 +509,18 @@ export class App {
                 if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
-                        const survivor = activeLots.find(l => l.id !== winner.id);
-                        this.highlightedLotId = survivor?.id || null;
+                    
+                        // For survival mode, when all lots are eliminated or only one remains,
+                        // we need to find the last survivor properly
+                        const allLots = this.lotManager.getAllLots();
+                        if (allLots.length > 0) {
+                            // Find any active lot that's not the winner
+                            const survivor = allLots.find(lot => lot.active && lot.id !== winner.id);
+                            this.highlightedLotId = survivor?.id || null;
+                        } else {
+                            // If no lots exist, clear highlight
+                            this.highlightedLotId = null;
+                        }
                     }, 500);
                 }
             }

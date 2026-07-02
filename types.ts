@@ -62,8 +62,11 @@ export const MODES: Record<Mode, ModeConfig> = {
                     // Fallback for edge cases
                     result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
                 }
+            } else if (activeLots.length === 0) {
+                // All lots eliminated - this shouldn't happen in normal gameplay but handle gracefully
+                result.isComplete = true;
+                result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
             }
-            
 
             return result;
         },
