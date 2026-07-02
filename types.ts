@@ -53,8 +53,13 @@ export const MODES: Record<Mode, ModeConfig> = {
             // Check if only one lot remains (survival complete)
             if (activeLots.length === 1 && totalLots > 1) {
                 result.isComplete = true;
-                const survivor = activeLots.find((l: Lot) => l.id !== winner.id);
-                result.completionMessage = t('mode.survival.completionMessage', { name: survivor?.name });
+                const survivor = activeLots[0];
+                if (survivor?.name && survivor.name.trim() !== '') {
+                    result.completionMessage = t('mode.survival.completionMessage', { name: survivor.name });
+                } else {
+                    // Fallback for edge cases
+                    result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
+                }
             }
             
 
