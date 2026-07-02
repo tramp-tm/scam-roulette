@@ -106,10 +106,10 @@ i18n.init({
                 'importDialog.linkUrlPlaceholder': 'https://example.com/lots.csv',
                 'importDialog.fetchBtn': '📡 Загрузить',
                 'importDialog.loading': 'Загрузка...',
-                'importDialog.fetchSuccess': '✓ Успешно загружено!',
+                'importDialog.fetchSuccess': '✓ Успешно загружено {{count}} лотов!',
                 'importDialog.fetchError': '✗ Не удалось загрузить данные',
                 'importDialog.corsError': '✗ Ошибка CORS - сервер может не разрешать cross-origin запросы. Попробуйте использовать прокси или разместить файл на сервере с включенным CORS.',
-                'importDialog.invalidUrl': '✗ Пожалуйста, введите корректный URL',
+                'importDialog.invalidUrl': 'Пожалуйста, введите корректный URL',
                 'importDialog.fetching': 'Загрузка...',
                 'importDialog.linkTextareaPlaceholder': 'Сюда будет загружен контент...',
 

@@ -71,7 +71,7 @@ export class LinkTabContent {
         const url = this.linkUrlInput.value.trim();
         if (!url) {
             if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = 'Please enter a valid URL';
+                this.linkStatusEl.textContent = t('importDialog.invalidUrl');
                 this.linkStatusEl.className = 'link-status error';
             }
             return;
@@ -81,7 +81,7 @@ export class LinkTabContent {
         const googleDocId = this.extractGoogleDocId(url);
         if (!googleDocId) {
             if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = 'Invalid Google Docs URL. Please enter a valid spreadsheet URL.';
+                this.linkStatusEl.textContent = t('importDialog.invalidUrl');
                 this.linkStatusEl.className = 'link-status error';
             }
             return;
@@ -95,7 +95,7 @@ export class LinkTabContent {
             if (this.fetchBtn) {
                 const originalText = this.fetchBtn.textContent;
                 this.fetchBtn.disabled = true;
-                this.fetchBtn.textContent = 'Fetching...';
+                this.fetchBtn.textContent = t('importDialog.loading');
 
                 const response = await fetch(exportUrl);
 
@@ -111,7 +111,7 @@ export class LinkTabContent {
                 // Update status - now we need to parse the CSV and update ImportDialog's parsed result
                 if (this.linkStatusEl) {
                     const count = this.parseResult.validLots.length;
-                    this.linkStatusEl.textContent = `Successfully fetched and parsed ${count} lots`;
+                    this.linkStatusEl.textContent = t('importDialog.fetchSuccess', { count });
                     this.linkStatusEl.className = 'link-status success';
                 }
                 
@@ -124,14 +124,14 @@ export class LinkTabContent {
         } catch (error) {
             console.error('Error fetching from URL:', error);
             if (this.linkStatusEl) {
-                this.linkStatusEl.textContent = `Error: ${(error as Error).message}`;
+                this.linkStatusEl.textContent = t('importDialog.fetchError');
                 this.linkStatusEl.className = 'link-status error';
             }
         } finally {
             // Restore button state
             if (this.fetchBtn) {
                 this.fetchBtn.disabled = false;
-                this.fetchBtn.textContent = 'Fetch';
+                this.fetchBtn.textContent = t('importDialog.fetchBtn');
             }
         }
     }
