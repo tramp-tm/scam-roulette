@@ -509,7 +509,7 @@ export class App {
                 if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
-                    
+                                            console.log("rollResult.isComplete Lots=" + JSON.stringify(rollResult) )
                         // For survival mode, when all lots are eliminated or only one remains,
                         // we need to find the last survivor properly
                         const allLots = this.lotManager.getAllLots();
