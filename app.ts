@@ -426,8 +426,6 @@ export class App {
     private spin(): void {
         const activeLots = this.lotManager.getActiveLots();
 
-        console.log("apps.spin start Lots=" +  JSON.stringify(this.lotManager.getAllLots()) )
-
         if (!RouletteEngine.canSpin(activeLots)) {
             alert(t('validation.noLotsToSpin'));
             return;
@@ -483,9 +481,6 @@ export class App {
      * Finishes the spin and applies results.
      */
     private finishSpin(winner: Lot | null): void {
-                console.log("apps.finishSpin start Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
-
-
         if (winner) {
             // Highlight the result
             this.highlightedLotId = winner.id;
@@ -509,7 +504,7 @@ export class App {
                 if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
-                                            console.log("rollResult.isComplete Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
+                        
                         // In survival mode, when complete, the last remaining active lot IS the survivor
                         const allLots = this.lotManager.getAllLots();
                         const activeLots = this.lotManager.getActiveLots();
@@ -540,8 +535,8 @@ export class App {
 
         if (winner) {
             const action = this.settings.modeId === 'survival' ? 'Eliminated' : 'Winning';
+            // Log winner determination for survival mode tracking
             console.log(`${action} lot: "${winner.name}"`);
-                            console.log("after Eliminatin Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
         }
 
         // Update controls state - don't override isSettingsLocked here!
@@ -550,8 +545,6 @@ export class App {
         // Re-render with updated state
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
-
-         console.log("this.spinBtn.disabled=" + JSON.stringify(this.spinBtn.disabled) )
     }
 
     private reset(): void {
