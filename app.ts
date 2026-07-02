@@ -515,12 +515,18 @@ export class App {
                         const activeLots = this.lotManager.getActiveLots();
                         
                         if (activeLots.length === 1) {
-                            // The only remaining active lot is the survivor
+                            // The only remaining active lot is the survivor - highlight it
                             this.highlightedLotId = activeLots[0].id;
                         } else {
                             // Clear highlight if no lots or multiple lots remain
                             this.highlightedLotId = null;
                         }
+                        
+                        // Lock settings to prevent further spinning when complete
+                        this.isSettingsLocked = true;
+                        
+                        // Update UI to reflect completion state
+                        this.updateUI();
                     }, 500);
                 }
             }
