@@ -1,6 +1,8 @@
 import i18n from 'i18next';
 
-const DEFAULT_LANG = 'en';
+// Detect user's preferred language
+const userLang = navigator.language || navigator.languages[0] || 'en';
+const DEFAULT_LANG = userLang.split('-')[0]; // Get just the language code (e.g., "ru" from "ru-RU")
 const FALLBACK_LANG = 'en';
 
 export const AVAILABLE_LANGUAGES: Record<string, string> = {
