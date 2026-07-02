@@ -65,8 +65,8 @@ export class ImportDialog extends ModalDialog {
 
             <!-- Status Line (always visible) -->
             <div id="import-status" class="import-status">
-                <span id="valid-count" data-i18n="importDialog.validLots">0 valid lots</span>, 
-                <span id="error-count" data-i18n="importDialog.errors">0 errors</span>
+                <span id="valid-count"></span>, 
+                <span id="error-count"></span>
             </div>
 
             <!-- Import Actions (moved outside tab containers) -->
@@ -168,10 +168,10 @@ export class ImportDialog extends ModalDialog {
         const errorCountSpan = document.getElementById('error-count');
         
         if (validCountSpan) {
-            validCountSpan.textContent = `${this.parsedLots.length} valid lots`;
+            validCountSpan.textContent = `${t('importDialog.validLots')}: ${this.parsedLots.length}`;
         }
         if (errorCountSpan) {
-            errorCountSpan.textContent = `${this.errorCount} errors`;
+            errorCountSpan.textContent = `${t('importDialog.errors')}: ${this.errorCount}`;
         }
     }
 
