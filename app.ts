@@ -509,7 +509,7 @@ export class App {
                 if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
-                                            console.log("rollResult.isComplete Lots=" + JSON.stringify(rollResult) )
+                                            console.log("rollResult.isComplete Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
                         // In survival mode, when complete, the last remaining active lot IS the survivor
                         const allLots = this.lotManager.getAllLots();
                         const activeLots = this.lotManager.getActiveLots();
@@ -541,6 +541,7 @@ export class App {
         if (winner) {
             const action = this.settings.modeId === 'survival' ? 'Eliminated' : 'Winning';
             console.log(`${action} lot: "${winner.name}"`);
+                            console.log("after Eliminatin Lots=" + JSON.stringify(this.lotManager.getAllLots()) )
         }
 
         // Update controls state - don't override isSettingsLocked here!
@@ -549,6 +550,8 @@ export class App {
         // Re-render with updated state
         this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
         this.render();
+
+         console.log("this.spinBtn.disabled=" + JSON.stringify(this.spinBtn.disabled) )
     }
 
     private reset(): void {
