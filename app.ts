@@ -519,19 +519,18 @@ export class App {
                 if (rollResult.isComplete && rollResult.completionMessage) {
                     setTimeout(() => {
                         alert(rollResult.completionMessage);
+                        winnerDefined=true;
                         
                         // In survival mode, when complete, the last remaining active lot IS the survivor
                         const allLots = this.lotManager.getAllLots();
                         const activeLots = this.lotManager.getActiveLots();
                         
                         if (activeLots.length === 1) {
-                            // The only remaining active lot is the survivor - highlight it and set winnerDefined
+                            // The only remaining active lot is the survivor - highlight it
                             this.highlightedLotId = activeLots[0].id;
-                            winnerDefined = true;
                         } else {
                             // Clear highlight if no lots or multiple lots remain
                             this.highlightedLotId = null;
-                            winnerDefined = false;
                         }
                         
                         // Lock settings to prevent further spinning when complete
@@ -539,15 +538,19 @@ export class App {
                         
                         // Update UI to reflect completion state
                         this.updateUI();
+
+
+
+                        console.log(" 222 spinNumber = "+ spinNumber);
+                        console.log(" 222 activeLots size = "+ this.lotManager.getActiveLots().length);
+                        console.log(" 222 Winner defined? = "+  winnerDefined);
+                        if(this.lotManager.getActiveLots().length==1 && winnerDefined==false)  console.log("  222  В смысле блять? остался один  лот, но  победитель не  определён? это блять  баг!");
+                        if(this.lotManager.getActiveLots().length!=1 && winnerDefined==true)  console.log("  222  В смысле блять? победитель пределён  при этом не 1 активный слот?");
+
                     }, 500);
                 } else {
                     // If not complete, unlock settings for next spin
                     this.isSettingsLocked = false;
-                    
-                    // Check if we're in survival mode and only one lot remains - that's the winner!
-                    if (this.settings.modeId === 'survival' && activeLots.length === 1) {
-                        winnerDefined = true;
-                    }
                 }
             }
 
@@ -559,6 +562,15 @@ export class App {
             const action = this.settings.modeId === 'survival' ? 'Eliminated' : 'Winning';
             // Log winner determination for survival mode tracking
             console.log(`${action} lot: "${winner.name}"`);
+
+
+
+            console.log(" 333 spinNumber = "+ spinNumber);
+            console.log(" 333 activeLots size = "+ this.lotManager.getActiveLots().length);
+            console.log(" 333 Winner defined? = "+  winnerDefined);
+            if(this.lotManager.getActiveLots().length==1 && winnerDefined==false)  console.log("  333  В смысле блять? остался один  лот, но  победитель не  определён? это блять  баг!");
+            if(this.lotManager.getActiveLots().length!=1 && winnerDefined==true)  console.log("  333  В смысле блять? победитель пределён  при этом не 1 активный слот?");
+
         }
 
         // Update controls state - don't override isSettingsLocked here!
