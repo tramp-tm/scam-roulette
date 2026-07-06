@@ -29,7 +29,6 @@ export class LinkTabContent {
                 <input 
                     type="url" 
                     id="link-url-input" 
-                    placeholder="https://example.com/lots.csv"
                     class="full-width link-url-input"
                     data-i18n-placeholder="importDialog.linkUrlPlaceholder">
                 <button id="fetch-btn" class="btn-secondary" data-i18n="importDialog.fetchBtn">Fetch</button>

@@ -64,7 +64,7 @@
   "importDialog.clickPreviewFirst": "Нажмите «Просмотр» для парсинга CSV-данных.",
   "importDialog.noValidLots": "Нет валидных лотов для импорта.",
   "importDialog.linkInstruction": "Введите URL для получения данных CSV:",
-  "importDialog.linkUrlPlaceholder": "https://example.com/lots.csv",
+  "importDialog.linkUrlPlaceholder": "ссылка на документ google spreadsheets",
   "importDialog.fetchBtn": "📡 Загрузить",
   "importDialog.loading": "Загрузка...",
   "importDialog.fetchSuccess": "✓ Успешно загружено {{count}} лотов!",

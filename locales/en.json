@@ -64,7 +64,7 @@
   "importDialog.clickPreviewFirst": "Please click \"Preview\" first to parse the CSV data.",
   "importDialog.noValidLots": "No valid lots to import.",
   "importDialog.linkInstruction": "Enter a URL to fetch CSV data:",
-  "importDialog.linkUrlPlaceholder": "https://example.com/lots.csv",
+  "importDialog.linkUrlPlaceholder": "Google Spreadsheets document link",
   "importDialog.fetchBtn": "Fetch",
   "importDialog.loading": "Loading...",
   "importDialog.fetchSuccess": "✓ Successfully fetched {{count}} lots!",
