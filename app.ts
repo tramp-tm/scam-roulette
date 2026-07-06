@@ -22,10 +22,6 @@ import { ModalManager } from './modalManager.js';
 import { ErrorDialog } from './errorDialog.js';
 
 
- var spinNumber: number=0
-
- var winnerDefined: boolean=false
-
 
 /**
  * Main application controller for the roulette game.
@@ -432,7 +428,6 @@ export class App {
     }
 
     private spin(): void {
-        spinNumber=spinNumber+1;
         const activeLots = this.lotManager.getActiveLots();
 
         if (!RouletteEngine.canSpin(activeLots)) {
@@ -484,12 +479,6 @@ export class App {
 
         // Start animation
         this.animationController.start();
-
-        console.log("spinNumber = "+ spinNumber);
-        console.log("activeLots size = "+ this.lotManager.getActiveLots().length);
-        console.log("Winner defined? = "+  winnerDefined);
-        if(this.lotManager.getActiveLots().length==1 && winnerDefined==false)  console.log("В смысле блять? остался один  лот, но  победитель не  определён? это блять  баг!");
-         if(this.lotManager.getActiveLots().length!=1 && winnerDefined==true)  console.log("В смысле блять? победитель пределён  при этом не 1 активный слот?");
     }
 
     /**
@@ -582,8 +571,6 @@ export class App {
     }
 
     private reset(): void {
-        spinNumber=0;
-        winnerDefined=false;
         // Stop any running animation
         this.animationController.stop();
         
