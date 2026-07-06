@@ -1,5 +1,7 @@
 import i18n from 'i18next';
 
+import { ModalManager } from './modalManager.js';
+
 import enTranslations from './locales/en.json';
 import ruTranslations from './locales/ru.json';
 
