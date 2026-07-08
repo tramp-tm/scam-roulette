@@ -424,6 +424,7 @@ button:disabled {
     align-items: center;
     gap: 10px;
     width: 250px;
+    flex-wrap: nowrap;
 }
 
 .slider-container input[type="range"] {
@@ -441,6 +442,7 @@ button:disabled {
     color: #1a1a2e;
     font-size: 0.9em;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .slider-container input[type="number"].duration-number-input:focus {
@@ -455,6 +457,7 @@ button:disabled {
     color: #f39c12;
     font-size: 0.9em;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* ========================================
