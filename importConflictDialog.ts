@@ -24,23 +24,23 @@ export class ImportConflictDialog extends ModalDialog {
     private renderConflictContent(): void {
         const strategyButtonsHtml = IMPORT_STRATEGIES.map(strategy => `
             <button id="btn-${strategy.id}" class="strategy-btn ${strategy.id}">
-                ${strategy.label}
-                <span class="strategy-desc">${strategy.description}</span>
+                <span data-i18n="importStrategy.${strategy.id}.label">${strategy.label}</span>
+                <span class="strategy-desc" data-i18n="importStrategy.${strategy.id}.description">${strategy.description}</span>
             </button>
         `).join('');
 
         const html = `
             <div class="conflict-message">
-                <p>${t('importConflict.existingLotsMessage', { count: this.existingCount })}</p>
-                <p>${t('importConflict.proceedQuestion')}</p>
+                <p data-i18n="importConflict.existingLotsMessage" data-i18n-vars='{"count": ${this.existingCount}}'></p>
+                <p data-i18n="importConflict.proceedQuestion"></p>
             </div>
             
             <div class="strategy-buttons">
                 ${strategyButtonsHtml}
                 
                 <button id="btn-cancel" class="strategy-btn cancel">
-                    ${t('button.cancel')}
-                    <span class="strategy-desc">${t('importConflict.cancelDescription')}</span>
+                    <span data-i18n="button.cancel"></span>
+                    <span class="strategy-desc" data-i18n="importConflict.cancelDescription"></span>
                 </button>
             </div>
         `;
