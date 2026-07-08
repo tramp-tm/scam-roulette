@@ -79,7 +79,6 @@ export class App {
     private durationSlider: HTMLInputElement | null = null;
     private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
-    private durationValueUnit: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
     private languageSelect: HTMLSelectElement | null = null;
 
@@ -121,7 +120,6 @@ export class App {
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
         this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
         this.durationValue = document.getElementById('duration-value-number');
-        this.durationValueUnit = document.getElementById('duration-value-unit');
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
 
