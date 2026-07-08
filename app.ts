@@ -1,4 +1,4 @@
-import { t, translateDOM } from './i18n.js';
+import { t, translateDOM, i18n } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { createRenderer } from './rendererFactory.js';
@@ -156,8 +156,9 @@ export class App {
 
     /** Formats duration in seconds with localized unit */
     private formatDuration(seconds: number): string {
-        const lang = i18n.language;
-        const unit = lang === 'ru' ? 'сек' : 's';
+        // Use navigator language instead of i18n.language to avoid import issues
+        const lang = navigator.language || 'en';
+        const unit = lang.startsWith('ru') ? 'сек' : 's';
         return `${seconds.toFixed(1)}${unit}`;
     }
 
