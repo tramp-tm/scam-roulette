@@ -156,9 +156,8 @@ export class App {
 
     /** Formats duration in seconds with localized unit */
     private formatDuration(seconds: number): string {
-        // Use navigator language instead of i18n.language to avoid import issues
-        const lang = navigator.language || 'en';
-        const unit = lang.startsWith('ru') ? 'сек' : 's';
+        const lang = i18n.language;
+        const unit = lang === 'ru' ? 'сек' : 's';
         return `${seconds.toFixed(1)}${unit}`;
     }
 
