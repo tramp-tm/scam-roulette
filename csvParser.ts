@@ -1,5 +1,6 @@
 import { SeparatorType, ParsedLot, ParseResult } from './types.js';
 import { t } from './i18n.js';
+import Papa from 'papaparse';
 
 /**
  * Parses CSV text into lots.
@@ -18,32 +19,25 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         return result;
     }
 
-    // Split into rows, handling both \n and \r\n line endings
-    const rows = csvText.split(/\r?\n/);
+    // Use Papa Parse to properly handle CSV with quoted fields and various separators
+    const parsed = Papa.parse(csvText, {
+        header: false,
+        skipEmptyLines: true,
+        delimiter: separator === 'comma' ? ',' : '\t'
+    });
 
-    // Determine the separator character
-    const sepChar = separator === 'comma' ? ',' : '\t';
-
-    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-        const row = rows[rowIndex];
+    for (let rowIndex = 0; rowIndex < parsed.data.length; rowIndex++) {
+        const row = parsed.data[rowIndex];
         
-        // Skip empty rows
-        if (!row.trim()) {
-            continue;
-        }
-
-        // Split columns based on separator
-        const columns = row.split(sepChar);
-
         // Validate: at least 2 columns required
-        if (columns.length < 2) {
+        if (!row || row.length < 2) {
             result.errorCount++;
             continue;
         }
 
-        // Extract and trim values
-        const name = columns[0].trim();
-        const amountStr = columns[1].trim();
+        // Extract and trim values (Papa Parse already handles quoted fields properly)
+        const name = String(row[0]).trim();
+        const amountStr = String(row[1]).trim();
 
         // Validate: non-empty name required
         if (!name) {

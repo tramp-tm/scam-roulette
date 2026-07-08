@@ -1,6 +1,7 @@
 import { SeparatorType, ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { t } from './i18n.js';
+import Papa from 'papaparse';
 
 /**
  * Component for Link tab content in ImportDialog
