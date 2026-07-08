@@ -232,6 +232,7 @@ export class App {
                 }
                 if (this.durationValue && this.durationValueUnit) {
                     this.durationValue.textContent = seconds.toFixed(1);
+                    // The unit will be automatically translated via data-i18n attribute on duration-value-unit
                 }
             }
         });
