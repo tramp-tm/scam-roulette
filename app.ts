@@ -154,9 +154,11 @@ export class App {
     }
 
 
-    /** Formats duration in seconds (without unit) */
+    /** Formats duration with localized unit */
     private formatDuration(seconds: number): string {
-        return seconds.toFixed(1);
+        const formattedValue = seconds.toFixed(1);
+        const unit = t('duration.unit');
+        return `${formattedValue} ${unit}`;
     }
 
     /**
@@ -227,7 +229,6 @@ export class App {
             if (this.durationSlider) {
                 const seconds = sliderToDuration(parseInt(this.durationSlider.value)); // Returns SECONDS
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
-                
 
                 // Update number input and display value in SECONDS
                 if (this.durationInput) {
@@ -235,22 +236,6 @@ export class App {
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = this.formatDuration(seconds);
-                }
-                
-                // Update the unit element if it exists
-                const unitElement = document.getElementById('duration-value-unit');
-                if (unitElement) {
-                    const lang = i18n.language;
-                    const unit = lang === 'ru' ? 'сек' : 's';
-                    unitElement.textContent = unit;
-                }
-                
-                // Update the unit element if it exists
-                const unitElement = document.getElementById('duration-value-unit');
-                if (unitElement) {
-                    const lang = i18n.language;
-                    const unit = lang === 'ru' ? 'сек' : 's';
-                    unitElement.textContent = unit;
                 }
             }
         });
@@ -269,7 +254,6 @@ export class App {
                 
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
                 
-                // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
@@ -332,14 +316,6 @@ export class App {
                     if (!isNaN(seconds)) {
                         this.durationValue.textContent = this.formatDuration(seconds);
                     }
-                }
-                
-                // Update the unit element if it exists
-                const unitElement = document.getElementById('duration-value-unit');
-                if (unitElement) {
-                    const lang = i18n.language;
-                    const unit = lang === 'ru' ? 'сек' : 's';
-                    unitElement.textContent = unit;
                 }
             });
         });

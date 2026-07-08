@@ -37,6 +37,7 @@
   "settings.easingQuint": "Квинтическое замедление",
   "settings.easingExpo": "Экспоненциальное замедление",
   "settings.easingLinear": "Линейное (без сглаживания)",
+  "duration.unit": "сек",
   "mode.normal.name": "Обычный",
   "mode.normal.description": "Больше сумма = выше шанс выиграть",
   "mode.normal.resultWinner": "Победитель: {{name}}",

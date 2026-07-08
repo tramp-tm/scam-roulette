@@ -37,6 +37,7 @@
   "settings.easingQuint": "Quintic Ease Out",
   "settings.easingExpo": "Exponential Ease Out",
   "settings.easingLinear": "Linear (No Easing)",
+  "duration.unit": "s",
   "mode.normal.name": "Normal",
   "mode.normal.description": "Higher amount = Higher chance to win",
   "mode.normal.resultWinner": "Winner: {{name}}",
