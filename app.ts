@@ -154,12 +154,6 @@ export class App {
     }
 
 
-    /** Formats duration with localized unit */
-    private formatDuration(seconds: number): string {
-        const formattedValue = seconds.toFixed(1);
-        const unit = t('duration.unit');
-        return `${formattedValue} ${unit}`;
-    }
 
     /**
      * Updates result text to show current mode name when no winner is highlighted.
@@ -235,7 +229,7 @@ export class App {
                     this.durationInput.value = String(Math.round(seconds));
                 }
                 if (this.durationValue) {
-                    this.durationValue.textContent = this.formatDuration(seconds);
+                    this.durationValue.textContent = seconds.toFixed(1);
                 }
             }
         });
@@ -259,7 +253,7 @@ export class App {
                     this.durationSlider.value = String(durationToSlider(seconds));
                 }
                 if (this.durationValue) {
-                    this.durationValue.textContent = this.formatDuration(seconds);
+                    this.durationValue.textContent = seconds.toFixed(1);
                 }
                 
                 // Update the input field to show corrected value
@@ -314,7 +308,7 @@ export class App {
                 if (this.durationValue && this.durationInput) {
                     const seconds = parseFloat(this.durationInput.value);
                     if (!isNaN(seconds)) {
-                        this.durationValue.textContent = this.formatDuration(seconds);
+                        this.durationValue.textContent = seconds.toFixed(1);
                     }
                 }
             });
