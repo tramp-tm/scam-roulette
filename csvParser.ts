@@ -1,6 +1,18 @@
 import { SeparatorType, ParsedLot, ParseResult } from './types.js';
 import { t } from './i18n.js';
-import Papa from 'papaparse';
+
+declare const Papa: {
+    parse(
+        csv: string,
+        config: {
+            delimiter?: string;
+            skipEmptyLines?: boolean;
+            header?: boolean;
+        }
+    ): {
+        data: unknown[][];
+    };
+};
 
 /**
  * Parses CSV text into lots.

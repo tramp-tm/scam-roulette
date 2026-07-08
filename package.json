@@ -31,6 +31,7 @@
   "main": "index.js",
   "devDependencies": {
     "@types/i18next": "^12.1.0",
+    "@types/papaparse": "^5.5.2",
     "typescript": "^6.0.3"
   },
   "scripts": {
@@ -49,6 +50,7 @@
   },
   "homepage": "https://github.com/tramp-tm/scam-roulette#readme",
   "dependencies": {
-    "i18next": "^26.3.4"
+    "i18next": "^26.3.4",
+    "papaparse": "^5.5.4"
   }
 }
