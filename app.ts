@@ -1,5 +1,9 @@
+import i18n from './i18n.js';
 import { t, translateDOM } from './i18n.js';
 import { LotManager } from './lotManager.js';
+
+// Declare i18n as a global variable to avoid TypeScript errors
+declare const i18n: any;
 import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
