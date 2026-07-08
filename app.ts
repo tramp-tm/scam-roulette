@@ -79,6 +79,7 @@ export class App {
     private durationSlider: HTMLInputElement | null = null;
     private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
+    private durationValueUnit: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
     private languageSelect: HTMLSelectElement | null = null;
 
@@ -119,7 +120,8 @@ export class App {
         this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
         this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
-        this.durationValue = document.getElementById('duration-value');
+        this.durationValue = document.getElementById('duration-value-number');
+        this.durationValueUnit = document.getElementById('duration-value-unit');
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
 
@@ -228,7 +230,7 @@ export class App {
                 if (this.durationInput) {
                     this.durationInput.value = String(Math.round(seconds));
                 }
-                if (this.durationValue) {
+                if (this.durationValue && this.durationValueUnit) {
                     this.durationValue.textContent = seconds.toFixed(1);
                 }
             }
@@ -252,7 +254,7 @@ export class App {
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
                 }
-                if (this.durationValue) {
+                if (this.durationValue && this.durationValueUnit) {
                     this.durationValue.textContent = seconds.toFixed(1);
                 }
                 
