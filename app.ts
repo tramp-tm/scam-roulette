@@ -1,4 +1,5 @@
 import { t, translateDOM } from './i18n.js';
+import i18n from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { createRenderer } from './rendererFactory.js';
