@@ -152,6 +152,11 @@ export class App {
             const initialSeconds = 3; // Default 3 SECONDS
             this.durationSlider.value = String(durationToSlider(initialSeconds));
             this.durationInput.value = String(initialSeconds);
+            
+            // Update the display value as well
+            if (this.durationValue) {
+                this.durationValue.textContent = initialSeconds.toFixed(1);
+            }
         }
         
         // Set initial random color for new lot indicator

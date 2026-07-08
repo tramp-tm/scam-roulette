@@ -423,12 +423,13 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
-    width: 250px;
-    flex-wrap: nowrap;
+    width: 100%;
+    flex-wrap: wrap; /* Allow wrapping */
 }
 
 .slider-container input[type="range"] {
     flex: 1;
+    min-width: 150px; /* Prevents shrinking too much */
     height: 6px;
     padding: 0;
 }
@@ -450,8 +451,15 @@ button:disabled {
     background: rgba(255, 255, 255, 1);
 }
 
+.slider-container .duration-value-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: fit-content; /* Prevents overflow */
+}
+
 .slider-value {
-    min-width: 50px;
+    min-width: 40px;
     text-align: right;
     font-weight: bold;
     color: #f39c12;
