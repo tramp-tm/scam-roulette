@@ -1,4 +1,5 @@
-import * as i18n from 'i18next';
+// @ts-ignore
+import i18n from 'i18next';
 
 import { ModalManager } from './modalManager.js';
 
