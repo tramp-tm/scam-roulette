@@ -52,7 +52,16 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         }
 
         // Parse amount as number (handle European decimal separator)
-        const cleanAmountStr = amountStr.replace(',', '.');
+        let cleanAmountStr = amountStr;
+        
+        // Handle comma as decimal separator by replacing only the last comma with dot
+        if (cleanAmountStr.includes(',')) {
+            const parts = cleanAmountStr.split(',');
+            if (parts.length === 2) {
+                cleanAmountStr = parts[0] + '.' + parts[1];
+            }
+        }
+        
         let amount = parseFloat(cleanAmountStr);
 
         // Validate: valid numeric amount required (must be positive and finite)
@@ -68,8 +77,7 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         }
 
         // Additional check to ensure we're getting actual numeric values
-        // This prevents cases where parsing might return 0 incorrectly
-        if (amount === 0 && cleanAmountStr !== '0' && cleanAmountStr !== '0.0' && cleanAmountStr !== '0,0') {
+        if (amount === 0 && cleanAmountStr !== '0' && cleanAmountStr !== '0.0') {
             result.errorCount++;
             continue;
         }
