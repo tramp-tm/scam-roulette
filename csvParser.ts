@@ -52,16 +52,24 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         }
 
         // Parse amount as number (handle European decimal separator)
-        const amount = parseFloat(amountStr.replace(',', '.'));
+        const cleanAmountStr = amountStr.replace(',', '.');
+        let amount = parseFloat(cleanAmountStr);
 
-        // Validate: valid numeric amount required (must be positive)
-        if (isNaN(amount) || amount <= 0) {
+        // Validate: valid numeric amount required (must be positive and finite)
+        if (isNaN(amount) || !isFinite(amount) || amount <= 0) {
             // Check for header row auto-detection on first data row only
             if (rowIndex === 0) {
                 // If second column is not a valid number, treat as header and skip this row
                 continue;
             }
             
+            result.errorCount++;
+            continue;
+        }
+
+        // Additional check to ensure we're getting actual numeric values
+        // This prevents cases where parsing might return 0 incorrectly
+        if (amount === 0 && cleanAmountStr !== '0' && cleanAmountStr !== '0.0' && cleanAmountStr !== '0,0') {
             result.errorCount++;
             continue;
         }
