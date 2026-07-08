@@ -54,11 +54,15 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
         // Parse amount as number (handle European decimal separator)
         let cleanAmountStr = amountStr;
         
-        // Handle comma as decimal separator by replacing only the last comma with dot
+        // Handle comma as decimal separator - replace the first comma with dot
         if (cleanAmountStr.includes(',')) {
-            const parts = cleanAmountStr.split(',');
-            if (parts.length === 2) {
-                cleanAmountStr = parts[0] + '.' + parts[1];
+            const lastCommaIndex = cleanAmountStr.lastIndexOf(',');
+            if (lastCommaIndex !== -1) {
+                // Replace only the last comma with a dot to handle European format like "241,5"
+                cleanAmountStr = 
+                    cleanAmountStr.substring(0, lastCommaIndex) + 
+                    '.' + 
+                    cleanAmountStr.substring(lastCommaIndex + 1);
             }
         }
         
