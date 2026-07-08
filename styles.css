@@ -405,6 +405,7 @@ button:disabled {
    ======================================== */
 .settings-group {
     margin-bottom: 15px;
+    flex-wrap: wrap;
 }
 
 .settings-group label {
@@ -422,6 +423,7 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 250px;
 }
 
 .slider-container input[type="range"] {
@@ -451,6 +453,8 @@ button:disabled {
     text-align: right;
     font-weight: bold;
     color: #f39c12;
+    font-size: 0.9em;
+    white-space: nowrap;
 }
 
 /* ========================================
