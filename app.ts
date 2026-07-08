@@ -304,13 +304,6 @@ export class App {
                 // Update result text to show mode name in new language (if no winner)
                 this.updateResultTextWithModeName();
 
-                // Reformat duration value with localized unit
-                if (this.durationValue && this.durationInput) {
-                    const seconds = parseFloat(this.durationInput.value);
-                    if (!isNaN(seconds)) {
-                        this.durationValue.textContent = seconds.toFixed(1);
-                    }
-                }
             });
         });
         
