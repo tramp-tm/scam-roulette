@@ -154,11 +154,9 @@ export class App {
     }
 
 
-    /** Formats duration in seconds with localized unit */
+    /** Formats duration in seconds (without unit) */
     private formatDuration(seconds: number): string {
-        const lang = i18n.language;
-        const unit = lang === 'ru' ? 'сек' : 's';
-        return `${seconds.toFixed(1)}${unit}`;
+        return seconds.toFixed(1);
     }
 
     /**
@@ -237,6 +235,22 @@ export class App {
                 }
                 if (this.durationValue) {
                     this.durationValue.textContent = this.formatDuration(seconds);
+                }
+                
+                // Update the unit element if it exists
+                const unitElement = document.getElementById('duration-value-unit');
+                if (unitElement) {
+                    const lang = i18n.language;
+                    const unit = lang === 'ru' ? 'сек' : 's';
+                    unitElement.textContent = unit;
+                }
+                
+                // Update the unit element if it exists
+                const unitElement = document.getElementById('duration-value-unit');
+                if (unitElement) {
+                    const lang = i18n.language;
+                    const unit = lang === 'ru' ? 'сек' : 's';
+                    unitElement.textContent = unit;
                 }
             }
         });
@@ -318,6 +332,14 @@ export class App {
                     if (!isNaN(seconds)) {
                         this.durationValue.textContent = this.formatDuration(seconds);
                     }
+                }
+                
+                // Update the unit element if it exists
+                const unitElement = document.getElementById('duration-value-unit');
+                if (unitElement) {
+                    const lang = i18n.language;
+                    const unit = lang === 'ru' ? 'сек' : 's';
+                    unitElement.textContent = unit;
                 }
             });
         });
