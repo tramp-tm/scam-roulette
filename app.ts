@@ -230,9 +230,8 @@ export class App {
                 if (this.durationInput) {
                     this.durationInput.value = String(Math.round(seconds));
                 }
-                if (this.durationValue && this.durationValueUnit) {
+                if (this.durationValue) {
                     this.durationValue.textContent = seconds.toFixed(1);
-                    // The unit will be automatically translated via data-i18n attribute on duration-value-unit
                 }
             }
         });
@@ -255,7 +254,7 @@ export class App {
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
                 }
-                if (this.durationValue && this.durationValueUnit) {
+                if (this.durationValue) {
                     this.durationValue.textContent = seconds.toFixed(1);
                 }
                 
