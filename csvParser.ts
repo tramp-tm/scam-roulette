@@ -27,7 +27,8 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
     });
 
     for (let rowIndex = 0; rowIndex < parsed.data.length; rowIndex++) {
-        const row = parsed.data[rowIndex];
+        // Type assertion to handle Papa Parse's data structure properly
+        const row = parsed.data[rowIndex] as any[];
         
         // Validate: at least 2 columns required
         if (!row || row.length < 2) {
