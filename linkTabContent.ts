@@ -76,9 +76,9 @@ export class LinkTabContent {
             return;
         }
 
-        // Validate and process Google Docs URL
-        const googleDocId = this.extractGoogleDocId(url);
-        if (!googleDocId) {
+        // Извлекаем оба значения из объекта
+        const extracted = this.extractGoogleDocId(url);
+        if (!extracted) {
             if (this.linkStatusEl) {
                 this.linkStatusEl.textContent = t('importDialog.invalidUrl');
                 this.linkStatusEl.className = 'link-status error';
@@ -86,10 +86,13 @@ export class LinkTabContent {
             return;
         }
 
+        const { id, gid } = extracted;
+
         try {
-            // Generate export link for CSV
-            const exportUrl = `https://docs.google.com/spreadsheets/d/${googleDocId}/export?format=csv`;
-            
+            // Формируем URL, используя полученные id и gid
+            const exportUrl =
+            `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`;
+
             // Show loading state
             if (this.fetchBtn) {
                 const originalText = this.fetchBtn.textContent;
@@ -98,11 +101,15 @@ export class LinkTabContent {
 
                 const response = await fetch(exportUrl);
 
+                console.log(exportUrl);
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const text = await response.text();
+
+                                console.log(text);
 
                 // Parse the CSV data and store result for ImportDialog to use
                 this.parseResult = parseCSV(text, 'comma'); // Default to comma separator
@@ -113,7 +120,7 @@ export class LinkTabContent {
                     this.linkStatusEl.textContent = t('importDialog.fetchSuccess', { count });
                     this.linkStatusEl.className = 'link-status success';
                 }
-                
+
                 // Trigger input event to update shared state in ImportDialog
                 if (this.linkUrlInput) {
                     const inputEvent = new Event('input', { bubbles: true });
@@ -135,28 +142,36 @@ export class LinkTabContent {
         }
     }
 
-    private extractGoogleDocId(url: string): string | null {
+
+    private extractGoogleDocId(url: string): { id: string; gid: string } | null {
         try {
             const urlObj = new URL(url);
-            
-            // Handle direct spreadsheet URLs like https://docs.google.com/spreadsheets/d/{id}/edit
-            if (urlObj.hostname === 'docs.google.com' && urlObj.pathname.includes('/spreadsheets/d/')) {
-                const pathParts = urlObj.pathname.split('/');
-                const idIndex = pathParts.indexOf('d') + 1;
-                if (idIndex > 0 && idIndex < pathParts.length) {
-                    return pathParts[idIndex];
-                }
+
+            if (
+                urlObj.hostname !== 'docs.google.com' ||
+                !urlObj.pathname.includes('/spreadsheets/d/')
+            ) {
+                return null;
             }
-            
-            // Handle URLs with /edit or other paths
-            const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-            if (match && match[1]) {
-                return match[1];
+
+            const match = urlObj.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+            if (!match) {
+                return null;
             }
-            
-            return null;
+
+            const id = match[1];
+
+            let gid = urlObj.searchParams.get('gid');
+
+            if (!gid && urlObj.hash.startsWith('#gid=')) {
+                gid = urlObj.hash.substring(5);
+            }
+
+            gid ??= '0';
+
+            return { id, gid };
         } catch (error) {
-            console.error('Error parsing URL:', error);
+            console.error('Invalid URL passed to extractor:', error);
             return null;
         }
     }

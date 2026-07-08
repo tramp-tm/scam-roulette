@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES6",
+    "target": "ES2022",
     "module": "ESNext",
+    /* ИСПРАВЛЕНО: Современный стандарт для ESM */
     "moduleResolution": "bundler",
+
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
@@ -10,11 +12,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "lib": ["ES2015", "DOM", "DOM.Iterable"],
+
+    /* ИСПРАВЛЕНО: Позволяет tsc нормально генерировать код с moduleResolution: bundler */
+    "isolatedModules": false,
+
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "sourceMap": true,
     "declaration": false
   },
-  "include": ["*.ts"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

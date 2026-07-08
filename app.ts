@@ -1,5 +1,4 @@
-import { t, translateDOM } from './i18n.js';
-import i18n from './i18n.js';
+import i18n, { t, translateDOM, initI18n } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { createRenderer } from './rendererFactory.js';
@@ -21,6 +20,19 @@ import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
 import { ModalManager } from './modalManager.js';
 import { ErrorDialog } from './errorDialog.js';
+
+
+// Оберните инициализацию приложения или просто вызовите функцию на старте:
+async function startApp() {
+    try {
+        await initI18n();
+        console.log('i18n готов, приложение запускается...');
+
+        // Тут должен идти весь остальной код инициализации вашего приложения (подключение кнопок, генерация рулетки и т.д.)
+    } catch (err) {
+        console.error('Ошибка инициализации приложения:', err);
+    }
+}
 
 
 
@@ -837,6 +849,9 @@ export class App {
 
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+
+    startApp();
+
     // Initialize the app first
     const app = new App();
     

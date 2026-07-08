@@ -136,7 +136,10 @@ export class ImportDialog extends ModalDialog {
         let tabParsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
         
         // Check which tab is currently active
-        const activeTab = document.querySelector('.tab-button.active')?.dataset.tab || 'csv';
+        // Находим элемент и сразу приводим его к HTMLElement | null
+        const activeTabButton = document.querySelector('.tab-button.active') as HTMLElement | null;
+        const activeTab = activeTabButton?.dataset.tab || 'csv';
+
         
         if (activeTab === 'csv' && this.csvTabContent) {
             const csvResult = this.csvTabContent.getParsedResult();
