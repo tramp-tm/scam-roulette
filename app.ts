@@ -169,6 +169,13 @@ export class App {
         
         // Event listeners
         this.setupEventListeners();
+        
+        // Initialize language select with current language after a short delay to ensure i18n is ready
+        setTimeout(() => {
+            if (this.languageSelect && i18n.language) {
+                this.languageSelect.value = i18n.language;
+            }
+        }, 0);
     }
 
 
@@ -325,11 +332,6 @@ export class App {
             });
         });
 
-        // Initialize language select with current language
-        if (this.languageSelect) {
-            this.languageSelect.value = i18n.language;
-                console.log("i18n.language: "+i18n.language)
-        }
         
         // Sort switch buttons - unified handler for both buttons
         const sortButtons = document.querySelectorAll('#sort-controls .switch-btn');
