@@ -324,6 +324,11 @@ export class App {
 
             });
         });
+
+        // Initialize language select with current language
+        if (this.languageSelect) {
+            this.languageSelect.value = i18n.language;
+        }
         
         // Sort switch buttons - unified handler for both buttons
         const sortButtons = document.querySelectorAll('#sort-controls .switch-btn');
