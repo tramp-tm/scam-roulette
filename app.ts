@@ -99,7 +99,7 @@ export class App {
     private durationInput: HTMLInputElement | null = null;
     private durationValue: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
-    private languageSelect: HTMLSelectElement | null = null;
+    public languageSelect: HTMLSelectElement | null = null;
 
     
     // Sort control elements
