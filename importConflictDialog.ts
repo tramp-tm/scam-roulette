@@ -24,8 +24,8 @@ export class ImportConflictDialog extends ModalDialog {
     private renderConflictContent(): void {
         const strategyButtonsHtml = IMPORT_STRATEGIES.map(strategy => `
             <button id="btn-${strategy.id}" class="strategy-btn ${strategy.id}">
-                <span data-i18n="importStrategy.${strategy.id}.label">${strategy.label}</span>
-                <span class="strategy-desc" data-i18n="importStrategy.${strategy.id}.description">${strategy.description}</span>
+                <span data-i18n="importStrategy.${strategy.id}.label"></span>
+                <span class="strategy-desc" data-i18n="importStrategy.${strategy.id}.description"></span>
             </button>
         `).join('');
 
