@@ -31,7 +31,7 @@ export class ImportConflictDialog extends ModalDialog {
 
         const html = `
             <div class="conflict-message">
-                <p data-i18n="importConflict.existingLotsMessage" data-i18n-vars='{"count": ${this.existingCount}}'></p>
+                <p>${t('importConflict.existingLotsMessage', { count: this.existingCount })}</p>
                 <p data-i18n="importConflict.proceedQuestion"></p>
             </div>
             
