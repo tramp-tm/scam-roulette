@@ -28,7 +28,13 @@ async function startApp() {
         await initI18n();
         console.log('i18n готов, приложение запускается...');
 
-        // Тут должен идти весь остальной код инициализации вашего приложения (подключение кнопок, генерация рулетки и т.д.)
+        // Initialize the app first
+        const app = new App();
+
+        // Now initialize language select properly since i18n is definitely ready
+        if (app.languageSelect) {
+            app.languageSelect.value = i18n.language;
+        }
     } catch (err) {
         console.error('Ошибка инициализации приложения:', err);
     }
@@ -859,8 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startApp();
 
-    // Initialize the app first
-    const app = new App();
+
     
     // Ensure translations are applied after everything is set up
     translateDOM();
