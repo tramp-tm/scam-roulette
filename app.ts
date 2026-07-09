@@ -175,6 +175,7 @@ export class App {
             if (this.languageSelect && i18n.language) {
                 this.languageSelect.value = i18n.language;
             }
+            console.log("i18n.language: "+i18n.language +" this.languageSelect:" + this.languageSelect)
         }, 0);
     }
 
