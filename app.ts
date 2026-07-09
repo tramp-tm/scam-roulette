@@ -170,13 +170,6 @@ export class App {
         // Event listeners
         this.setupEventListeners();
         
-        // Initialize language select with current language after a short delay to ensure i18n is ready
-        setTimeout(() => {
-            if (this.languageSelect && i18n.language) {
-                this.languageSelect.value = i18n.language;
-            }
-            console.log("i18n.language: "+i18n.language +" this.languageSelect:" + this.languageSelect)
-        }, 0);
     }
 
 
