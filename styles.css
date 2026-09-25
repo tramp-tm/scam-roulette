@@ -116,8 +116,8 @@
     --surface-active: rgba(46, 204, 113, 0.25);
     --lot-bg: rgba(16, 44, 41, 0.3);
     --lot-hover: rgba(46, 204, 113, 0.1);
-    --add-row-bg: rgba(0, 255, 136, 0.06);
-    --add-row-border: rgba(0, 255, 136, 0.4);
+    --add-row-bg: rgba(0, 235, 136, 0.06);
+    --add-row-border: rgba(0, 235, 136, 0.4);
     --status-bg: rgba(255, 255, 255, 0.03);
     --switch-bg: rgba(46, 204, 113, 0.15);
     --modal-bg: linear-gradient(135deg, #0f332f 0%, #0a1f1d 100%);
@@ -133,7 +133,7 @@
 
     /* Inputs */
     --input-bg: #102c29;
-    --input-color: #00ff88; /* Неоново-зеленый текст при вводе */
+    --input-color: #00f088; /* Неоново-зеленый текст при вводе */
 
     /* Accents - Смещены в сторону Киберпанк-Мяты и Изумруда */
     --accent: #00ff88; /* Главный светящийся мятный акцент */
@@ -158,6 +158,59 @@
 
     /* Shadows */
     --modal-shadow: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="nordic"] {
+    /* [NEW THEME: NORDIC FROST - МАТОВЫЙ АРКТИЧЕСКИЙ] */
+    --bg-gradient: linear-gradient(135deg, #2e3440 0%, #242933 100%); /* Глубокий матовый серо-синий */
+    --panel-bg: rgba(143, 149, 160, 0.2); /* Приглушенные холодные панели */
+    --surface-bg: rgba(255, 255, 255, 0.04);
+    --surface-hover: rgba(136, 192, 208, 0.12); /* Мягкий ледяной ховер */
+    --surface-active: rgba(136, 192, 208, 0.2);
+    --lot-bg: rgba(43, 49, 60, 0.4);
+    --lot-hover: rgba(136, 192, 208, 0.08);
+    --add-row-bg: rgba(163, 190, 140, 0.08);
+    --add-row-border: rgba(163, 190, 140, 0.4);
+    --status-bg: rgba(255, 255, 255, 0.03);
+    --switch-bg: rgba(136, 192, 208, 0.15);
+    --modal-bg: linear-gradient(135deg, #3b4252 0%, #2e3440 100%);
+    --overlay-bg: rgba(15, 20, 30, 0.7);
+
+    /* Text */
+    --text-primary: #d8dee9; /* Мягкий пастельно-белый, не бьет по глазам */
+    --switch-btn-color: rgba(216, 222, 233, 0.7);
+
+    /* Borders */
+    --border-subtle: rgba(136, 192, 208, 0.2); /* Сдержанные ледяные границы */
+    --modal-border: rgba(136, 192, 208, 0.25);
+
+    /* Inputs */
+    --input-bg: #3b4252;
+    --input-color: #88c0d0; /* Приглушенный ледяной синий при вводе */
+
+    /* Accents - Пастельные и спокойные тона */
+    --accent: #88c0d0; /* Спокойный ледяной синий */
+    --accent-2: #81a1c1; /* Дымчато-синий */
+    --accent-danger: #bf616a; /* Приглушенный красный */
+    --accent-danger-dark: #ab545c;
+    --accent-success: #a3be8c; /* Пастельный оливково-зеленый */
+    --accent-success-dark: #8fbcbb;
+    --accent-glow: rgba(136, 192, 208, 0.2);
+    --accent-glow-soft: rgba(136, 192, 208, 0.1);
+    --highlight-bg: rgba(136, 192, 208, 0.12);
+    --result-bg: rgba(136, 192, 208, 0.12);
+
+    /* Buttons */
+    --btn-secondary-bg: rgba(136, 192, 208, 0.1);
+    --btn-secondary-hover: rgba(136, 192, 208, 0.2);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(36, 41, 51, 0.5);
+    --scrollbar-thumb: rgba(136, 192, 208, 0.2);
+    --scrollbar-thumb-hover: rgba(136, 192, 208, 0.4);
+
+    /* Shadows */
+    --modal-shadow: rgba(15, 20, 30, 0.5);
 }
 
 /* ========================================
