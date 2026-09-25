@@ -101,6 +101,7 @@ export class App {
     private durationValue: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
     public languageSelect: HTMLSelectElement | null = null;
+    private themeSelect: HTMLSelectElement | null = null;
 
     
     // Sort control elements
@@ -142,6 +143,7 @@ export class App {
         this.durationValue = document.getElementById('duration-value-number');
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
+        this.themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 
         
         // Sort control elements
@@ -168,6 +170,18 @@ export class App {
         
         // Set initial random color for new lot indicator
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
+
+        // Apply the saved theme preference (defaults to dark) and sync the selector
+        let savedTheme = 'dark';
+        try {
+            savedTheme = localStorage.getItem('theme') || 'dark';
+        } catch (e) {
+            // localStorage may be unavailable (e.g. private mode); fall back to dark
+        }
+        this.applyTheme(savedTheme);
+        if (this.themeSelect) {
+            this.themeSelect.value = savedTheme;
+        }
         
         // Update result display with current mode name initially
         if (this.resultText) {
@@ -187,6 +201,19 @@ export class App {
     private updateResultTextWithModeName(): void {
         if (this.resultText && !this.highlightedLotId) {
             this.resultText.textContent = this.mode.name;
+        }
+    }
+
+    /**
+     * Applies the given theme to the document and persists the preference.
+     * The theme drives CSS custom properties defined on :root / :root[data-theme="light"].
+     */
+    private applyTheme(theme: string): void {
+        document.documentElement.setAttribute('data-theme', theme);
+        try {
+            localStorage.setItem('theme', theme);
+        } catch (e) {
+            // Ignore storage errors (e.g. private browsing); theme still applies for the session
         }
     }
 
@@ -330,6 +357,15 @@ export class App {
                 this.updateResultTextWithModeName();
 
             });
+        });
+
+        // Theme select - applies the theme and persists the preference
+        this.themeSelect?.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            this.applyTheme(target.value);
+
+            // Re-render so canvas-based visuals pick up the new theme (if applicable)
+            this.render();
         });
 
         
