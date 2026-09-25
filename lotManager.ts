@@ -1,4 +1,4 @@
-import { Lot } from './types.js';
+import type { Lot, GameState } from './types.js';
 import { t } from './i18n.js';
 
 /**
@@ -131,6 +131,25 @@ export class LotManager {
 
         lot.active = false;
         return true;
+    }
+
+    /**
+     * Deactivates multiple lots. IDs that don't exist are silently ignored.
+     */
+    deactivateMany(ids: readonly string[]): void {
+        for (const id of ids) {
+            this.deactivateLot(id);
+        }
+    }
+
+    /**
+     * Snapshot of the current lot state, for the game-mode strategy.
+     */
+    getState(): GameState {
+        return {
+            allLots: this.getAllLots(),
+            activeLots: this.getActiveLots()
+        };
     }
 
     /**

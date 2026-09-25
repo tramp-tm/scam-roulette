@@ -1,4 +1,4 @@
-import { Lot, Segment, ModeConfig } from './types.js';
+import { Lot, Segment, GameMode } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { IRenderer } from './types.js';
 import { brightenColor } from './utils.js';
@@ -52,8 +52,8 @@ export class StripRenderer implements IRenderer {
     /**
      * Updates the segments to render.
      */
-    updateSegments(lots: Lot[], modeConfig: ModeConfig): void {
-        this.segments = RouletteEngine.calculateSegments(lots, modeConfig);
+    updateSegments(lots: Lot[], mode: GameMode): void {
+        this.segments = RouletteEngine.calculateSegments(lots, mode);
     }
 
     /**

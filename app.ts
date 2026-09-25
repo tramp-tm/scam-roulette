@@ -5,8 +5,9 @@ import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
-import { IRenderer, VisualizationType, Settings, Mode, Lot, ModeConfig, getModeConfig, MODES, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction } from './types.js';
+import { IRenderer, VisualizationType, Settings, Mode, Lot, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction, RollResult } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './importStrategies.js';
+import { getMode } from './modes.js';
 import { 
     generateRandomReadableColor, 
     sliderToDuration, 
@@ -61,9 +62,9 @@ export class App {
     // Easing function setting - source of truth for user preference
     private easingFunction: EasingFunction = DEFAULT_EASING;
     
-    // Get current mode config (cached for performance)
-    get modeConfig(): ModeConfig {
-        return getModeConfig(this.settings.modeId);
+    // Get current mode (cached for performance)
+    get mode(): GameMode {
+        return getMode(this.settings.modeId);
     }
     
     private highlightedLotId: string | null = null;
@@ -185,8 +186,7 @@ export class App {
      */
     private updateResultTextWithModeName(): void {
         if (this.resultText && !this.highlightedLotId) {
-            const modeKey = `mode.${this.settings.modeId}.name`;
-            this.resultText.textContent = t(modeKey);
+            this.resultText.textContent = this.mode.name;
         }
     }
 
@@ -223,7 +223,7 @@ export class App {
             const target = e.target as HTMLSelectElement;
             this.settings.modeId = target.value as Mode;
             // Re-render wheel with new mode's weight calculation
-            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
             this.render();
             // Update result text to show new mode name if no winner highlighted
             this.updateResultTextWithModeName();
@@ -238,7 +238,7 @@ export class App {
             this.renderer = createRenderer(this.settings.visualization, canvas);
             
             // Re-initialize segments and render
-            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
             this.render();
         });
         
@@ -434,7 +434,7 @@ export class App {
         
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         this.render();
     }
 
@@ -450,13 +450,13 @@ export class App {
         this.isSettingsLocked = true;
         this.updateControlsState();
         
-        // Select winner using mode's weight calculation (BEFORE animation)
-        const winner = RouletteEngine.selectWeighted(activeLots, this.modeConfig);
-        if (!winner) return;
+        // Select rolled lot using mode's weight calculation (BEFORE animation)
+        const rolledLot = RouletteEngine.roll(activeLots, this.mode);
+        if (!rolledLot) return;
 
         // Calculate final position using visualization strategy pattern
         const currentRotation = this.renderer.getCurrentRotation();
-        const targetLotId = winner.id;
+        const targetLotId = rolledLot.id;
         const animationDuration = this.settings.animationDuration;
         
         // Get canvas dimensions
@@ -466,7 +466,7 @@ export class App {
         const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
         const endRotation = vizPackage.computeFinalPosition(
             activeLots,
-            this.modeConfig,
+            this.mode,
             targetLotId,
             currentRotation,
             animationDuration,
@@ -484,7 +484,7 @@ export class App {
                 this.render();
             },
             onComplete: () => {
-                this.finishSpin(winner);
+                this.finishSpin(rolledLot);
             }
         });
 
@@ -495,71 +495,49 @@ export class App {
     /**
      * Finishes the spin and applies results.
      */
-    private finishSpin(winner: Lot | null): void {
-        if (winner) {
-            // Highlight the result
-            this.highlightedLotId = winner.id;
-
-            // Show result display using mode's getResultText function
-            if (this.resultText) {
-                this.resultText.textContent = this.modeConfig.getResultText(winner);
-            }
-
-            // Call mode-specific onRollEnd hook if defined
-            const activeLots = this.lotManager.getActiveLots();
-            if (this.modeConfig.onRollEnd) {
-                const rollResult = this.modeConfig.onRollEnd(winner, activeLots, this.lotManager.getTotalCount());
-                
-                // Handle lot elimination (e.g., survival mode)
-                if (rollResult.eliminatedLotId) {
-                    this.lotManager.deactivateLot(rollResult.eliminatedLotId);
-                }
-                
-                // Check for completion
-                if (rollResult.isComplete && rollResult.completionMessage) {
-                    setTimeout(() => {
-                        alert(rollResult.completionMessage);
-                        
-                        // In survival mode, when complete, the last remaining active lot IS the survivor
-                        const allLots = this.lotManager.getAllLots();
-                        const activeLots = this.lotManager.getActiveLots();
-                        
-                        if (activeLots.length === 1) {
-                            // The only remaining active lot is the survivor - highlight it
-                            this.highlightedLotId = activeLots[0].id;
-                        } else {
-                            // Clear highlight if no lots or multiple lots remain
-                            this.highlightedLotId = null;
-                        }
-                        
-                        // Lock settings to prevent further spinning when complete
-                        this.isSettingsLocked = true;
-                        
-                        // Update UI to reflect completion state
-                        this.updateUI();
-                    }, 500);
-                } else {
-                    // If not complete, unlock settings for next spin
-                    this.isSettingsLocked = false;
-                }
-            }
-
-            // Update UI to reflect changes
-            this.updateUI();
+    private finishSpin(rolledLot: Lot | null): void {
+        if (!rolledLot) {
+            this.updateControlsState();
+            return;
         }
 
-        if (winner) {
-            const action = this.settings.modeId === 'survival' ? 'Eliminated' : 'Winning';
-            // Log winner determination for survival mode tracking
-            console.log(`${action} lot: "${winner.name}"`);
+        // Immediate visual: show the rolled lot highlighted and its roll text
+        this.highlightedLotId = rolledLot.id;
+        if (this.resultText) {
+            this.resultText.textContent = this.mode.getRollText(rolledLot);
         }
 
-        // Update controls state - don't override isSettingsLocked here!
-        this.updateControlsState();
-        
-        // Re-render with updated state
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        // Let the mode decide what this roll means.
+        const state = this.lotManager.getState();
+        const result: RollResult = this.mode.processRoll(rolledLot, state);
+
+        // Apply eliminations
+        if (result.deactivate.length > 0) {
+            this.lotManager.deactivateMany(result.deactivate);
+        }
+
+        if (result.finished) {
+            // A surviving winner (e.g. SurvivalMode) may differ from the rolled lot
+            if (result.winner) {
+                this.highlightedLotId = result.winner.id;
+            }
+
+            if (result.message) {
+                setTimeout(() => alert(result.message), 500);
+            }
+
+            // Lock until the user presses Reset
+            this.isSettingsLocked = true;
+        } else {
+            // More spins to go
+            this.isSettingsLocked = false;
+        }
+
+        // Refresh UI + renderer to reflect the new active-lot list
+        this.updateUI();
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         this.render();
+        this.updateControlsState();
     }
 
     private reset(): void {
@@ -573,7 +551,7 @@ export class App {
         
         // Reset renderer
         this.renderer.reset();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
@@ -738,7 +716,7 @@ export class App {
                 if (!id) return; // Safety check for undefined id
                 this.lotManager.updateLot(id, { amount: newAmount });
                 // Re-render wheel to reflect weight changes
-                this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+                this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
                 this.render();
             }
         });
@@ -756,7 +734,7 @@ export class App {
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         this.render();
     }
 
@@ -790,7 +768,7 @@ export class App {
         
         // Update UI and renderer
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         this.render();
     }
 
@@ -836,7 +814,7 @@ export class App {
         
         // Update UI and renderer after import completes
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.modeConfig);
+        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
         this.render();
         
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)

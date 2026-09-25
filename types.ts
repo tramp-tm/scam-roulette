@@ -1,5 +1,3 @@
-import { t } from './i18n.js';
-
 // Lot interface - represents a single item in the roulette
 export interface Lot {
     id: string;
@@ -9,76 +7,39 @@ export interface Lot {
     active: boolean;
 }
 
-// Mode configuration interface - encapsulates all mode-specific behavior
-export interface ModeConfig {
-    id: Mode;
-    name: string;
-    description: string;
-    /** Calculates weight for a lot in this mode */
-    calculateWeight: (lot: Lot, allLots: Lot[]) => number;
-    /** Generates the result text shown after a roll */
-    getResultText: (winner: Lot) => string;
-    /** Optional hook called after each roll completes (for survival elimination, etc.) */
-    onRollEnd?: (winner: Lot, activeLots: Lot[], totalLots: number) => {
-        eliminatedLotId?: string;
-        isComplete?: boolean;
-        completionMessage?: string;
-    };
+// ========================================
+// GAME MODE STRATEGY TYPES
+// ========================================
+
+/**
+ * Snapshot of the game state, passed to a mode's roll-processing logic.
+ */
+export interface GameState {
+    allLots: Lot[];
+    activeLots: Lot[];
 }
 
-// Mode configurations - all mode logic lives here
-export const MODES: Record<Mode, ModeConfig> = {
-    normal: {
-        id: 'normal',
-        name: t('mode.normal.name'),
-        description: t('mode.normal.description'),
-        calculateWeight: (lot: Lot) => lot.amount,
-        getResultText: (winner: Lot) => t('mode.normal.resultWinner', { name: winner.name }),
-    },
-    survival: {
-        id: 'survival',
-        name: t('mode.survival.name'),
-        description: t('mode.survival.description'),
-        calculateWeight: (lot: Lot) => 1 / lot.amount,
-        getResultText: (winner: Lot) => t('mode.survival.resultEliminated', { name: winner.name }),
-        onRollEnd: (winner: Lot, activeLots: Lot[], totalLots: number) => {
-            // In survival mode, the "winner" is actually eliminated
+/**
+ * Result of processing a roll through a game mode.
+ */
+export interface RollResult {
+    finished: boolean;
+    winner: Lot | null;
+    deactivate: string[];
+    message?: string;
+}
 
-            console.log("survival.onRollEnd start activeLots=" + JSON.stringify(activeLots) )
-            const result = {
-                eliminatedLotId: winner.id,
-                isComplete: false as boolean,
-                completionMessage: '' as string
-            };
-
-            
-            // Check if only one lot remains (survival complete)
-            if (activeLots.length === 1 && totalLots > 1) {
-                result.isComplete = true;
-                const survivor = activeLots[0];
-                if (survivor?.name && survivor.name.trim() !== '') {
-                    result.completionMessage = t('mode.survival.completionMessage', { name: survivor.name });
-                } else {
-                    // Fallback for edge cases
-                    result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
-                }
-            } else if (activeLots.length === 0) {
-                // All lots eliminated - this shouldn't happen in normal gameplay but handle gracefully
-                result.isComplete = true;
-                result.completionMessage = t('mode.survival.completionMessage', { name: 'Unknown' });
-            } else if (activeLots.length > 1) {
-                // Still multiple active lots, not complete yet
-                result.isComplete = false;
-            }
-
-            return result;
-        },
-    },
-};
-
-// Helper to get mode config by ID
-export function getModeConfig(modeId: Mode): ModeConfig {
-    return MODES[modeId];
+/**
+ * Game mode strategy. Encapsulates all mode-specific behavior without
+ * switch statements or branching in the core app/engine.
+ */
+export interface GameMode {
+    readonly id: Mode;
+    readonly name: string;
+    readonly description: string;
+    calculateWeight(lot: Lot, activeLots: Lot[]): number;
+    getRollText(rolledLot: Lot): string;
+    processRoll(rolledLot: Lot, state: GameState): RollResult;
 }
 
 // Application modes
@@ -204,7 +165,7 @@ export type ImportCallback = (parsedLots: ParsedLot[]) => void;
  */
 export interface IRenderer {
     /** Update segments based on lots and mode configuration */
-    updateSegments(lots: Lot[], modeConfig: ModeConfig): void;
+    updateSegments(lots: Lot[], mode: GameMode): void;
     
     /** Set current rotation value (for animation) */
     setRotation(value: number): void;
@@ -235,7 +196,7 @@ export interface VisualizationPackage {
     createRenderer: (canvas: HTMLCanvasElement) => IRenderer;
     computeFinalPosition: (
         lots: Lot[],
-        modeConfig: ModeConfig,
+        mode: GameMode,
         targetLotId: string,
         currentPosition: number,
         animationDurationMs: number,

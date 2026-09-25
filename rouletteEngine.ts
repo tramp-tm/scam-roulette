@@ -1,4 +1,4 @@
-import { Lot, ModeConfig, getModeConfig } from './types';
+import type { Lot, GameMode } from './types.js';
 import { getRandomPositionInRange } from './utils.js';
 
 /**
@@ -10,15 +10,15 @@ import { getRandomPositionInRange } from './utils.js';
 export class RouletteEngine {
     /**
      * Performs weighted random selection using cumulative distribution approach.
-     * Uses mode-specific weight calculation from ModeConfig.
+     * Uses mode-specific weight calculation from GameMode.
      */
-    static selectWeighted(lots: Lot[], modeConfig: ModeConfig): Lot | null {
+    static roll(lots: Lot[], mode: GameMode): Lot | null {
         if (lots.length === 0) return null;
         
         // Calculate weights for all lots using mode's calculateWeight function
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: modeConfig.calculateWeight(lot, lots)
+            weight: mode.calculateWeight(lot, lots)
         }));
 
         // Calculate total weight
@@ -47,12 +47,12 @@ export class RouletteEngine {
      */
     static getSegmentCenterAngle(
         lots: Lot[], 
-        modeConfig: ModeConfig, 
+        mode: GameMode, 
         targetLotId: string
     ): number {
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: modeConfig.calculateWeight(lot, lots)
+            weight: mode.calculateWeight(lot, lots)
         }));
 
         const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
@@ -80,10 +80,10 @@ export class RouletteEngine {
     /**
      * Calculates all segments for rendering.
      */
-    static calculateSegments(lots: Lot[], modeConfig: ModeConfig): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {
+    static calculateSegments(lots: Lot[], mode: GameMode): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {
         const weightedLots = lots.map(lot => ({
             lot,
-            weight: modeConfig.calculateWeight(lot, lots)
+            weight: mode.calculateWeight(lot, lots)
         }));
 
         const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
@@ -121,12 +121,12 @@ export class RouletteEngine {
      */
     static computeFinalRotation(
         lots: Lot[],
-        modeConfig: ModeConfig,
+        mode: GameMode,
         targetLotId: string,
         currentRotation: number,
         animationDurationMs: number
     ): number {
-        const segments = this.calculateSegments(lots, modeConfig);
+        const segments = this.calculateSegments(lots, mode);
         
         // Find winning segment
         const segment = segments.find(s => s.lot.id === targetLotId);
@@ -182,13 +182,13 @@ export class RouletteEngine {
      */
     static computeFinalScrollOffset(
         lots: Lot[],
-        modeConfig: ModeConfig,
+        mode: GameMode,
         targetLotId: string,
         currentOffset: number,
         animationDurationMs: number,
         canvasWidth: number
     ): number {
-        const segments = this.calculateSegments(lots, modeConfig);
+        const segments = this.calculateSegments(lots, mode);
         
         // Calculate total width of one complete cycle
         let totalCycleWidth = 0;

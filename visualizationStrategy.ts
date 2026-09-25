@@ -1,4 +1,4 @@
-import { Lot, ModeConfig, VisualizationType, VisualizationPackage } from './types.js';
+import { Lot, GameMode, VisualizationType, VisualizationPackage } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { WheelRenderer } from './wheelRenderer.js';
 import { StripRenderer } from './stripRenderer.js';
@@ -9,8 +9,8 @@ import { StripRenderer } from './stripRenderer.js';
 const WHEEL_PACKAGE: VisualizationPackage = {
     id: 'wheel',
     createRenderer: (canvas) => new WheelRenderer(canvas),
-    computeFinalPosition: (lots, modeConfig, targetLotId, currentPosition, duration) => 
-        RouletteEngine.computeFinalRotation(lots, modeConfig, targetLotId, currentPosition, duration)
+    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration) => 
+        RouletteEngine.computeFinalRotation(lots, mode, targetLotId, currentPosition, duration)
 };
 
 /**
@@ -19,8 +19,8 @@ const WHEEL_PACKAGE: VisualizationPackage = {
 const STRIP_PACKAGE: VisualizationPackage = {
     id: 'strip',
     createRenderer: (canvas) => new StripRenderer(canvas),
-    computeFinalPosition: (lots, modeConfig, targetLotId, currentPosition, duration, canvasWidth) => 
-        RouletteEngine.computeFinalScrollOffset(lots, modeConfig, targetLotId, currentPosition, duration, canvasWidth!)
+    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration, canvasWidth) => 
+        RouletteEngine.computeFinalScrollOffset(lots, mode, targetLotId, currentPosition, duration, canvasWidth!)
 };
 
 /**
