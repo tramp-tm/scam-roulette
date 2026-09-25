@@ -30,6 +30,8 @@
   "settings.theme": "Тема",
   "settings.themeDark": "Тёмная",
   "settings.themeLight": "Светлая",
+  "settings.themeEmerald": "Изумруд",
+  "settings.themeNordic": "Северная",
   "settings.easingFunction": "Функция сглаживания",
   "settings.easingRoulette": "Рулеточное замедление (по умолчанию)",
   "settings.easingCubic": "Кубическое замедление",
