@@ -55,56 +55,109 @@
 }
 
 :root[data-theme="light"] {
-    /* Backgrounds & surfaces */
-    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-    --panel-bg: rgba(255, 255, 255, 0.75);
-    --surface-bg: rgba(0, 0, 0, 0.04);
-    --surface-hover: rgba(0, 0, 0, 0.08);
-    --surface-active: rgba(0, 0, 0, 0.12);
-    --lot-bg: rgba(0, 0, 0, 0.04);
-    --lot-hover: rgba(0, 0, 0, 0.08);
-    --add-row-bg: rgba(46, 204, 113, 0.12);
-    --add-row-border: rgba(46, 204, 113, 0.6);
-    --status-bg: rgba(0, 0, 0, 0.04);
-    --switch-bg: rgba(0, 0, 0, 0.06);
-    --modal-bg: linear-gradient(135deg, #ffffff 0%, #f0f2f8 100%);
-    --overlay-bg: rgba(0, 0, 0, 0.5);
+    /* [FIXED LIGHT THEME - ИСПРАВЛЕН КОНТРАСТ] */
+    --bg-gradient: linear-gradient(135deg, #eef2f7 0%, #d9e2ec 100%); /* Сделан глубже, чтобы белые панели выделялись */
+    --panel-bg: rgba(250, 250, 250, 0.9); /* Увеличена плотность белого */
+    --surface-bg: rgba(0, 0, 0, 0.06); /* Сделан темнее для читаемости слоев */
+    --surface-hover: rgba(0, 0, 0, 0.10);
+    --surface-active: rgba(0, 0, 0, 0.15);
+    --lot-bg: rgba(255, 255, 255, 0.6); /* Светлая подложка лота для контраста */
+    --lot-hover: rgba(255, 255, 255, 0.85);
+    --add-row-bg: rgba(39, 174, 96, 0.08);
+    --add-row-border: rgba(39, 174, 96, 0.4);
+    --status-bg: rgba(0, 0, 0, 0.05);
+    --switch-bg: rgba(0, 0, 0, 0.08);
+    --modal-bg: linear-gradient(135deg, #ffffff 0%, #f4f6fa 100%);
+    --overlay-bg: rgba(15, 23, 42, 0.4); /* Мягкое благородное затемнение */
 
     /* Text */
-    --text-primary: #1a1a2e;
-    --switch-btn-color: rgba(26, 26, 46, 0.7);
+    --text-primary: #121824; /* Более глубокий контрастный цвет текста */
+    --switch-btn-color: rgba(18, 24, 36, 0.7);
 
     /* Borders */
-    --border-subtle: rgba(0, 0, 0, 0.12);
-    --modal-border: rgba(0, 0, 0, 0.1);
+    --border-subtle: rgba(0, 0, 0, 0.16); /* Границы стали четче */
+    --modal-border: rgba(0, 0, 0, 0.15);
 
     /* Inputs */
-    --input-bg: rgba(255, 255, 255, 0.95);
-    --input-color: #1a1a2e;
+    --input-bg: #ffffff;
+    --input-color: #121824;
 
-    /* Accents */
-    --accent: #e67e22;
-    --accent-2: #d35400;
-    --accent-danger: #e74c3c;
-    --accent-danger-dark: #c0392b;
-    --accent-success: #27ae60;
-    --accent-success-dark: #1e8449;
-    --accent-glow: rgba(230, 126, 34, 0.35);
-    --accent-glow-soft: rgba(230, 126, 34, 0.25);
-    --highlight-bg: rgba(243, 156, 18, 0.18);
-    --result-bg: rgba(243, 156, 18, 0.18);
+    /* Accents - Оптимизированы под светлый фон */
+    --accent: #d35400; /* Более темный оранжевый, не режет глаза */
+    --accent-2: #e67e22;
+    --accent-danger: #c0392b;
+    --accent-danger-dark: #962d22;
+    --accent-success: #1e8449;
+    --accent-success-dark: #145a32;
+    --accent-glow: rgba(211, 84, 0, 0.2);
+    --accent-glow-soft: rgba(211, 84, 0, 0.1);
+    --highlight-bg: rgba(211, 84, 0, 0.12);
+    --result-bg: rgba(211, 84, 0, 0.12);
 
     /* Buttons */
-    --btn-secondary-bg: rgba(0, 0, 0, 0.08);
-    --btn-secondary-hover: rgba(0, 0, 0, 0.15);
+    --btn-secondary-bg: rgba(0, 0, 0, 0.06);
+    --btn-secondary-hover: rgba(0, 0, 0, 0.12);
 
     /* Scrollbars */
-    --scrollbar-track: rgba(0, 0, 0, 0.06);
-    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
-    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+    --scrollbar-track: rgba(0, 0, 0, 0.04);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.25);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 
     /* Shadows */
-    --modal-shadow: rgba(0, 0, 0, 0.25);
+    --modal-shadow: rgba(12, 17, 29, 0.15);
+}
+
+:root[data-theme="emerald"] {
+    /* [NEW THEME: CYBERPUNK EMERALD] */
+    --bg-gradient: linear-gradient(135deg, #0a1f1d 0%, #071413 100%); /* Глубокий хвойно-черный */
+    --panel-bg: rgba(16, 44, 41, 0.4); /* Полупрозрачный изумрудный пластик */
+    --surface-bg: rgba(255, 255, 255, 0.05);
+    --surface-hover: rgba(46, 204, 113, 0.15); /* Мягкое неоновое подсвечивание при ховере */
+    --surface-active: rgba(46, 204, 113, 0.25);
+    --lot-bg: rgba(16, 44, 41, 0.3);
+    --lot-hover: rgba(46, 204, 113, 0.1);
+    --add-row-bg: rgba(0, 255, 136, 0.06);
+    --add-row-border: rgba(0, 255, 136, 0.4);
+    --status-bg: rgba(255, 255, 255, 0.03);
+    --switch-bg: rgba(46, 204, 113, 0.15);
+    --modal-bg: linear-gradient(135deg, #0f332f 0%, #0a1f1d 100%);
+    --overlay-bg: rgba(4, 11, 10, 0.8);
+
+    /* Text */
+    --text-primary: #e6f4f1; /* Слегка мятно-белый текст для снижения усталости глаз */
+    --switch-btn-color: rgba(230, 244, 241, 0.7);
+
+    /* Borders */
+    --border-subtle: rgba(46, 204, 113, 0.25); /* Тонкие мятные границы */
+    --modal-border: rgba(46, 204, 113, 0.3);
+
+    /* Inputs */
+    --input-bg: #102c29;
+    --input-color: #00ff88; /* Неоново-зеленый текст при вводе */
+
+    /* Accents - Смещены в сторону Киберпанк-Мяты и Изумруда */
+    --accent: #00ff88; /* Главный светящийся мятный акцент */
+    --accent-2: #2ecc71;
+    --accent-danger: #ff4757;
+    --accent-danger-dark: #ff6b81;
+    --accent-success: #00ff88;
+    --accent-success-dark: #2ecc71;
+    --accent-glow: rgba(0, 255, 136, 0.35);
+    --accent-glow-soft: rgba(0, 255, 136, 0.2);
+    --highlight-bg: rgba(0, 255, 136, 0.15);
+    --result-bg: rgba(0, 255, 136, 0.15);
+
+    /* Buttons */
+    --btn-secondary-bg: rgba(46, 204, 113, 0.15);
+    --btn-secondary-hover: rgba(46, 204, 113, 0.25);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(10, 31, 29, 0.5);
+    --scrollbar-thumb: rgba(46, 204, 113, 0.3);
+    --scrollbar-thumb-hover: rgba(0, 255, 136, 0.5);
+
+    /* Shadows */
+    --modal-shadow: rgba(0, 0, 0, 0.6);
 }
 
 /* ========================================
