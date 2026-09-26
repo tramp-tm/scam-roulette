@@ -65,8 +65,9 @@ export class App {
     
     /**
      * Current game mode, delegated to the active GameSession.
-     * Keeps the getter API used throughout App while making
-     * `App → GameSession → GameMode` the single read path (Stage 1).
+     * `GameSession` is the single source of truth for the current mode
+     * (§3 of the Stage 2 plan); `settings.modeId` is a UI/persistence
+     * record only and is never read back to drive the session.
      */
     get mode(): GameMode {
         return this.gameSession.mode;
@@ -118,9 +119,16 @@ export class App {
 
     constructor() {
         this.lotManager = new LotManager([]);
-        // Stage 1: the current game session is created alongside the lot manager.
-        // It snapshots the (empty) lot list and pins the initial mode.
-        this.gameSession = new GameSession(this.settings.modeId, this.lotManager.getAllLots());
+        // Stage 2: the GameSession owns the current mode and derives the game
+        // state (all/active lots) from the global lot list via an accessor.
+        // Because the accessor closes over `this.lotManager` and the session
+        // shares the same `Lot` objects by reference, no manual "sync" call is
+        // ever required after a LotManager mutation (add / delete / update /
+        // clear / import / reset / deactivate).
+        this.gameSession = new GameSession(
+            this.settings.modeId,
+            () => this.lotManager.getAllLots()
+        );
         const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
         this.renderer = createRenderer(this.settings.visualization, canvas);
         this.animationController = new AnimationController();
@@ -213,21 +221,6 @@ export class App {
     }
 
     /**
-     * Re-creates the current game session from the latest settings + lot list.
-     *
-     * Called after every change that affects the current game state:
-     *   - add / delete / clear / import (lot list changed)
-     *   - reset (active flags changed back to true)
-     *   - mode change (new rules must govern a fresh state)
-     *   - end of spin (deactivations applied via LotManager)
-     *
-     * Keeps the invariant: GameSession.state always mirrors the current lot list.
-     */
-    private syncGameSession(): void {
-        this.gameSession.recreate(this.settings.modeId, this.lotManager.getAllLots());
-    }
-
-    /**
      * Applies the given theme to the document and persists the preference.
      * The theme drives CSS custom properties defined on :root / :root[data-theme="light"].
      */
@@ -271,12 +264,18 @@ export class App {
         // Settings changes
         this.modeSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
-            this.settings.modeId = target.value as Mode;
-            // Re-create the session with the new mode and current lots, so the
-            // new rules govern a state built from the current lot list (no
-            // carry-over of the previous mode's state).
-            this.syncGameSession();
-            // Re-render wheel with new mode's weight calculation
+            const newModeId = target.value as Mode;
+
+            // Single point of mode change (§3). GameSession owns the current
+            // mode; `settings.modeId` is kept in sync only as a UI /
+            // persistence record and is never read back to drive the session.
+            this.gameSession.setMode(newModeId);
+            this.settings.modeId = newModeId;
+
+            // Re-render wheel with the new mode's weight calculation. The
+            // active lot list is unchanged: `lot.active` flags persist across
+            // a mode switch (the previous "no carry-over" comment was
+            // misleading — `Lot.active` has always been carried over).
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
             this.render();
             // Update result text to show new mode name if no winner highlighted
@@ -497,8 +496,8 @@ export class App {
         // Focus back on name input
         this.lotNameInput.focus();
         
-        // Lot list changed → rebuild the game session before rendering
-        this.syncGameSession();
+        // No manual session sync is needed: GameSession reads the global lot
+        // list through an accessor, so the new lot is visible immediately.
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
@@ -507,8 +506,8 @@ export class App {
     }
 
     private spin(): void {
-        // Stage 1: read the current game state via the session
-        // (source of truth for "which lots participate right now").
+        // Read the current active lots via the GameSession — the single
+        // source of truth for "which lots participate right now".
         const activeLots = this.gameSession.activeLots;
 
         if (!RouletteEngine.canSpin(activeLots)) {
@@ -578,17 +577,20 @@ export class App {
         }
 
         // Let the mode decide what this roll means, using the session's
-        // snapshot of the current game state.
+        // live game-state snapshot.
         const result: RollResult = this.gameSession.mode.processRoll(
             rolledLot,
             this.gameSession.state
         );
 
-        // Apply eliminations through LotManager (owner of the lots' active flags),
-        // then rebuild the session so its snapshot reflects the new actives.
+        // Apply eliminations through LotManager (owner of the lots' active
+        // flags). No manual session sync is required regardless of whether
+        // `result.deactivate` is empty or not: GameSession reads the active
+        // flags on demand, so the next `session.activeLots` read already
+        // reflects the change (§7 of the plan — the previous
+        // `if (deactivate.length > 0) sync()` shape is gone).
         if (result.deactivate.length > 0) {
             this.lotManager.deactivateMany(result.deactivate);
-            this.syncGameSession();
         }
 
         if (result.finished) {
@@ -623,8 +625,8 @@ export class App {
         this.highlightedLotId = null;
         this.isSettingsLocked = false;
         this.lotManager.resetAll();
-        // Active flags were flipped back to true → rebuild the session snapshot.
-        this.syncGameSession();
+        // `resetAll()` flips `lot.active` back to true on the shared `Lot`
+        // objects, which GameSession reads directly — no sync call needed.
         
         // Reset renderer
         this.renderer.reset();
@@ -641,14 +643,16 @@ export class App {
     }
 
     private updateUI(): void {
-        // Update lots list
+        // Update lots list (global lot data — served by LotManager,
+        // the owner of the global lot collection)
         this.renderLotsList();
         
-        // Update stats
+        // Update stats. Game-session counters are read from the GameSession
+        // (§8): `activeLots` and the current mode are game state.
         const totalEl = document.getElementById('total-lots');
         const activeEl = document.getElementById('active-lots');
         if (totalEl) totalEl.textContent = this.lotManager.getTotalCount().toString();
-        if (activeEl) activeEl.textContent = this.lotManager.getActiveCount().toString();
+        if (activeEl) activeEl.textContent = this.gameSession.activeCount.toString();
         
         // Update controls state
         this.updateControlsState();
@@ -807,8 +811,8 @@ export class App {
             onAmountChange: (id: string, newAmount: number) => {
                 if (!id) return; // Safety check for undefined id
                 this.lotManager.updateLot(id, { amount: newAmount });
-                // Amount changes do not affect which lots are active, so the
-                // session snapshot stays valid without a rebuild.
+                // Amount changes do not affect which lots are active; no
+                // session sync is required (and none is possible to forget).
                 this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
                 this.render();
             }
@@ -825,8 +829,9 @@ export class App {
             this.highlightedLotId = null;
         }
 
-        // Lot list changed → rebuild the game session before rendering
-        this.syncGameSession();
+        // No manual session sync is needed — GameSession reads the global
+        // lot list through an accessor, so the deletion is reflected on the
+        // next read of `session.activeLots`.
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
@@ -855,8 +860,8 @@ export class App {
         
         // Clear all lots
         this.lotManager.clearAll();
-        // Lot list emptied → rebuild the game session snapshot
-        this.syncGameSession();
+        // No session sync needed: the accessor now returns an empty list,
+        // so `session.activeLots` is empty on the next read.
         
         // Reset highlight and result display
         this.highlightedLotId = null;
@@ -909,8 +914,9 @@ export class App {
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
         // Delegate execution to the strategy object - no branching needed!
         const result = strategy.execute(parsedLots, this.lotManager);
-        // Lot list changed → rebuild the game session snapshot
-        this.syncGameSession();
+        // No manual session sync is needed: the strategy mutates the global
+        // lot list in place, and GameSession observes it through its
+        // accessor on the next read.
         
         // Update UI and renderer after import completes
         this.updateUI();
