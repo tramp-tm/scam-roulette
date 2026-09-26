@@ -266,6 +266,14 @@
     --modal-shadow: rgba(0, 0, 0, 0.75);
 }
 
+/* Автоматическая инверсия текста для акцентных элементов в Monochrome теме */
+:root[data-theme="monochrome"] .btn-primary,
+:root[data-theme="monochrome"] .switch-btn.active,
+:root[data-theme="monochrome"] .strategy-btn.merge
+{
+    color: #16161a !important; /* Угольно-черный текст на белом фоне */
+}
+
 /* ========================================
    RESET & BASE STYLES
    ======================================== */
