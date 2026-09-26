@@ -5,9 +5,9 @@ import { createRenderer } from './rendererFactory.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
+import { GameSession } from './gameSession.js';
 import { IRenderer, VisualizationType, Settings, Mode, Lot, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction, RollResult } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './importStrategies.js';
-import { getMode } from './modes.js';
 import { 
     generateRandomReadableColor, 
     sliderToDuration, 
@@ -50,6 +50,7 @@ export class App {
 
 
     private lotManager: LotManager;
+    private gameSession: GameSession;
     private renderer: IRenderer;
     private animationController: AnimationController;
     
@@ -62,9 +63,13 @@ export class App {
     // Easing function setting - source of truth for user preference
     private easingFunction: EasingFunction = DEFAULT_EASING;
     
-    // Get current mode (cached for performance)
+    /**
+     * Current game mode, delegated to the active GameSession.
+     * Keeps the getter API used throughout App while making
+     * `App → GameSession → GameMode` the single read path (Stage 1).
+     */
     get mode(): GameMode {
-        return getMode(this.settings.modeId);
+        return this.gameSession.mode;
     }
     
     private highlightedLotId: string | null = null;
@@ -113,6 +118,9 @@ export class App {
 
     constructor() {
         this.lotManager = new LotManager([]);
+        // Stage 1: the current game session is created alongside the lot manager.
+        // It snapshots the (empty) lot list and pins the initial mode.
+        this.gameSession = new GameSession(this.settings.modeId, this.lotManager.getAllLots());
         const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
         this.renderer = createRenderer(this.settings.visualization, canvas);
         this.animationController = new AnimationController();
@@ -205,6 +213,21 @@ export class App {
     }
 
     /**
+     * Re-creates the current game session from the latest settings + lot list.
+     *
+     * Called after every change that affects the current game state:
+     *   - add / delete / clear / import (lot list changed)
+     *   - reset (active flags changed back to true)
+     *   - mode change (new rules must govern a fresh state)
+     *   - end of spin (deactivations applied via LotManager)
+     *
+     * Keeps the invariant: GameSession.state always mirrors the current lot list.
+     */
+    private syncGameSession(): void {
+        this.gameSession.recreate(this.settings.modeId, this.lotManager.getAllLots());
+    }
+
+    /**
      * Applies the given theme to the document and persists the preference.
      * The theme drives CSS custom properties defined on :root / :root[data-theme="light"].
      */
@@ -249,8 +272,12 @@ export class App {
         this.modeSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
             this.settings.modeId = target.value as Mode;
+            // Re-create the session with the new mode and current lots, so the
+            // new rules govern a state built from the current lot list (no
+            // carry-over of the previous mode's state).
+            this.syncGameSession();
             // Re-render wheel with new mode's weight calculation
-            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+            this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
             this.render();
             // Update result text to show new mode name if no winner highlighted
             this.updateResultTextWithModeName();
@@ -265,7 +292,7 @@ export class App {
             this.renderer = createRenderer(this.settings.visualization, canvas);
             
             // Re-initialize segments and render
-            this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+            this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
             this.render();
         });
         
@@ -470,14 +497,19 @@ export class App {
         // Focus back on name input
         this.lotNameInput.focus();
         
+        // Lot list changed → rebuild the game session before rendering
+        this.syncGameSession();
+
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         this.render();
     }
 
     private spin(): void {
-        const activeLots = this.lotManager.getActiveLots();
+        // Stage 1: read the current game state via the session
+        // (source of truth for "which lots participate right now").
+        const activeLots = this.gameSession.activeLots;
 
         if (!RouletteEngine.canSpin(activeLots)) {
             alert(t('validation.noLotsToSpin'));
@@ -489,7 +521,7 @@ export class App {
         this.updateControlsState();
         
         // Select rolled lot using mode's weight calculation (BEFORE animation)
-        const rolledLot = RouletteEngine.roll(activeLots, this.mode);
+        const rolledLot = RouletteEngine.roll(activeLots, this.gameSession.mode);
         if (!rolledLot) return;
 
         // Calculate final position using visualization strategy pattern
@@ -504,7 +536,7 @@ export class App {
         const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
         const endRotation = vizPackage.computeFinalPosition(
             activeLots,
-            this.mode,
+            this.gameSession.mode,
             targetLotId,
             currentRotation,
             animationDuration,
@@ -542,16 +574,21 @@ export class App {
         // Immediate visual: show the rolled lot highlighted and its roll text
         this.highlightedLotId = rolledLot.id;
         if (this.resultText) {
-            this.resultText.textContent = this.mode.getRollText(rolledLot);
+            this.resultText.textContent = this.gameSession.mode.getRollText(rolledLot);
         }
 
-        // Let the mode decide what this roll means.
-        const state = this.lotManager.getState();
-        const result: RollResult = this.mode.processRoll(rolledLot, state);
+        // Let the mode decide what this roll means, using the session's
+        // snapshot of the current game state.
+        const result: RollResult = this.gameSession.mode.processRoll(
+            rolledLot,
+            this.gameSession.state
+        );
 
-        // Apply eliminations
+        // Apply eliminations through LotManager (owner of the lots' active flags),
+        // then rebuild the session so its snapshot reflects the new actives.
         if (result.deactivate.length > 0) {
             this.lotManager.deactivateMany(result.deactivate);
+            this.syncGameSession();
         }
 
         if (result.finished) {
@@ -573,7 +610,7 @@ export class App {
 
         // Refresh UI + renderer to reflect the new active-lot list
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         this.render();
         this.updateControlsState();
     }
@@ -586,10 +623,12 @@ export class App {
         this.highlightedLotId = null;
         this.isSettingsLocked = false;
         this.lotManager.resetAll();
+        // Active flags were flipped back to true → rebuild the session snapshot.
+        this.syncGameSession();
         
         // Reset renderer
         this.renderer.reset();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
@@ -768,8 +807,9 @@ export class App {
             onAmountChange: (id: string, newAmount: number) => {
                 if (!id) return; // Safety check for undefined id
                 this.lotManager.updateLot(id, { amount: newAmount });
-                // Re-render wheel to reflect weight changes
-                this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+                // Amount changes do not affect which lots are active, so the
+                // session snapshot stays valid without a rebuild.
+                this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
                 this.render();
             }
         });
@@ -785,9 +825,12 @@ export class App {
             this.highlightedLotId = null;
         }
 
+        // Lot list changed → rebuild the game session before rendering
+        this.syncGameSession();
+
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         this.render();
     }
 
@@ -812,6 +855,8 @@ export class App {
         
         // Clear all lots
         this.lotManager.clearAll();
+        // Lot list emptied → rebuild the game session snapshot
+        this.syncGameSession();
         
         // Reset highlight and result display
         this.highlightedLotId = null;
@@ -821,7 +866,7 @@ export class App {
         
         // Update UI and renderer
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         this.render();
     }
 
@@ -864,10 +909,12 @@ export class App {
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
         // Delegate execution to the strategy object - no branching needed!
         const result = strategy.execute(parsedLots, this.lotManager);
+        // Lot list changed → rebuild the game session snapshot
+        this.syncGameSession();
         
         // Update UI and renderer after import completes
         this.updateUI();
-        this.renderer.updateSegments(this.lotManager.getActiveLots(), this.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
         this.render();
         
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
