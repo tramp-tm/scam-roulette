@@ -213,6 +213,59 @@
     --modal-shadow: rgba(15, 20, 30, 0.5);
 }
 
+:root[data-theme="monochrome"] {
+    /* [NEW THEME: MONOCHROME TECH - СТИЛЬНЫЙ ГРАФИТ] */
+    --bg-gradient: linear-gradient(135deg, #16161a 0%, #0b0b0c 100%); /* Глубокий угольно-черный */
+    --panel-bg: rgba(34, 34, 40, 0.65); /* Плотный темный графит для подложек */
+    --surface-bg: rgba(255, 255, 255, 0.05); /* Легкий контрастный слой */
+    --surface-hover: rgba(255, 255, 255, 0.12); /* Четкий отклик при наведении */
+    --surface-active: rgba(255, 255, 255, 0.18);
+    --lot-bg: rgba(28, 28, 32, 0.8); /* Выделение карточек лотов */
+    --lot-hover: rgba(44, 44, 50, 0.9);
+    --add-row-bg: rgba(255, 255, 255, 0.04); /* Без зелени, чисто структурно */
+    --add-row-border: rgba(255, 255, 255, 0.4);
+    --status-bg: rgba(255, 255, 255, 0.06);
+    --switch-bg: rgba(255, 255, 255, 0.1);
+    --modal-bg: linear-gradient(135deg, #222227 0%, #16161a 100%);
+    --overlay-bg: rgba(0, 0, 0, 0.85); /* Глубокое премиальное затемнение */
+
+    /* Text */
+    --text-primary: #f2f2f7; /* Чистый, слегка мягкий белый текст */
+    --switch-btn-color: rgba(255, 255, 255, 0.7);
+
+    /* Borders */
+    --border-subtle: rgba(255, 255, 255, 0.15); /* Аккуратные, но заметные границы */
+    --modal-border: rgba(255, 255, 255, 0.25);
+
+    /* Inputs */
+    --input-bg: #1c1c21;
+    --input-color: #ffffff;
+
+    /* Accents - Весь фокус перенесен на белый и серебряный матовый */
+    --accent: #ffffff; /* Главный акцент — контрастный белый */
+    --accent-2: #cccccc; /* Серебряный металлик */
+    --accent-danger: #ff6b6b; /* Приглушенный пастельно-красный для алертов */
+    --accent-danger-dark: #e55353;
+    --accent-success: #57cc99; /* Приглушенный мятно-зеленый */
+    --accent-success-dark: #3db885;
+    --accent-glow: rgba(255, 255, 255, 0.25); /* Аккуратное белое свечение */
+    --accent-glow-soft: rgba(255, 255, 255, 0.12);
+    --highlight-bg: rgba(255, 255, 255, 0.1);
+    --result-bg: rgba(255, 255, 255, 0.1);
+
+    /* Buttons */
+    --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+    --btn-secondary-hover: rgba(255, 255, 255, 0.18);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(22, 22, 26, 0.5);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+
+    /* Shadows */
+    --modal-shadow: rgba(0, 0, 0, 0.75);
+}
+
 /* ========================================
    RESET & BASE STYLES
    ======================================== */
