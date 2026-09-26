@@ -57,7 +57,7 @@ const MIN_CIRCLE_RADIUS = 14;
 const MAX_CIRCLE_RADIUS = 250;
 
 /** Fraction of the (smaller) grid cell a circle may occupy at most. */
-const CELL_FILL_RATIO =0.25+ 0.85;
+const CELL_FILL_RATIO =0.95;
 
 /**
  * Crossfade window expressed as a fraction of the *current* segment.
