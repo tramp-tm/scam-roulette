@@ -3,6 +3,13 @@
 Structural description of the application's architecture and business logic.
 Client-only, single-page web application.
 
+> **STATUS: intermediate state.**
+> The project is in the middle of a staged architectural refactor.
+> **Stages 1 – 3 are complete**, so the current code and this document differ
+> from the historic "single-owner" model. Transitional artefacts (notably
+> `Lot.active` and the unused `LotManager` deactivation API) are marked where
+> they appear. Remaining refactor work is listed in §20.
+
 ---
 
 ## 1. Overview
@@ -13,9 +20,9 @@ visualization, and spins. The **amount** is the weight; its interpretation is
 mode-specific. The result is chosen **before** the animation starts — the
 animation is cosmetic and never affects the outcome.
 
-Supported configuration: two game modes (Normal, Survival), two
-visualizations (Wheel, Strip), two languages (EN/RU), four themes
-(dark, light, emerald, nordic).
+Supported configuration: two game modes (Normal, Survival), three
+visualizations (Wheel, Strip, Counting Rhyme), two languages (EN/RU),
+five themes (dark, light, emerald, nordic, monochrome).
 
 ---
 
@@ -35,7 +42,7 @@ visualizations (Wheel, Strip), two languages (EN/RU), four themes
 
 ## 3. Project structure
 
-```
+$$$
 /
 ├── index.html                  # static shell + inline theme bootstrap script
 ├── styles.css                  # all styling; 4 theme palettes via :root[data-theme="…"]
@@ -46,17 +53,19 @@ visualizations (Wheel, Strip), two languages (EN/RU), four themes
 │   └── ru.json
 └── *.ts                        # application sources (compiled to sibling *.js)
     ├── app.ts                      # entry point + orchestration + UI
+    ├── gameSession.ts              # current-game state
     ├── types.ts                    # all shared contracts
     ├── modes.ts                    # game-mode registry
     ├── NormalMode.ts               # GameMode implementation
     ├── SurvivalMode.ts             # GameMode implementation
     ├── rouletteEngine.ts           # weighted random + geometry
-    ├── lotManager.ts               # lot state
+    ├── lotManager.ts               # global lot storage
     ├── rendererFactory.ts          # renderer construction
     ├── visualizationStrategy.ts    # visualization-package registry
     ├── baseRenderer.ts             # shared IRenderer base class
     ├── wheelRenderer.ts            # IRenderer implementation (wheel)
     ├── stripRenderer.ts            # IRenderer implementation (strip)
+    ├── countingRhymeRenderer.ts    # IRenderer implementation (counting rhyme)
     ├── animation.ts                # easing functions + AnimationController
     ├── i18n.ts                     # i18next bootstrap + DOM translation
     ├── utils.ts                    # colours, duration mapping, random helpers
@@ -69,13 +78,13 @@ visualizations (Wheel, Strip), two languages (EN/RU), four themes
     ├── errorDialog.ts              # generic error/info dialog
     ├── modalDialog.ts              # abstract modal base class
     └── modalManager.ts             # singleton modal stack manager
-```
+$$$
 
 ---
 
 ## 4. Architectural layers
 
-```
+$$$
         ┌──────────────────────────────────────────────┐
  L6 UI   │ app.ts           (orchestration, DOM, loop)  │
         └───────┬──────────────┬───────────────┬───────┘
@@ -102,11 +111,20 @@ visualizations (Wheel, Strip), two languages (EN/RU), four themes
                 │ animation.ts,          │
                 │ csvParser.ts           │
                 └────────────────────────┘
-```
+$$$
 
 **Core rule:** dependencies point downward only. `App` knows *that* a game mode
 exists, never *how* it plays. `RouletteEngine` and `LotManager` are entirely
 mode-agnostic — they only receive a `GameMode` and call its `calculateWeight`.
+
+**Refactor note (Stages 1 – 3).** `GameSession` (`gameSession.ts`) sits
+between `App` and the state layers. It owns the current `GameMode` **and**
+the participation set (`activeLotIds: Set<string>`), and exposes
+`allLots` / `activeLots` / `activeCount` / `state` / `isActive()` as live
+projections over `LotManager`'s global list. `LotManager` remains the owner
+of the **global** lot collection only; `Lot.active` is now inert (see §5,
+§8). There is no `syncGameSession()` anywhere — participation mutations are
+explicit calls on `GameSession` (§5.1, §11, §12).
 
 ---
 
@@ -116,19 +134,51 @@ mode-agnostic — they only receive a `GameMode` and call its `calculateWeight`.
 |------|--------------|
 | `Lot` | `{ id, name, amount, color, active }` — the atomic unit |
 | `Mode` | `'normal' \| 'survival'` |
-| `VisualizationType` | `'wheel' \| 'strip'` |
+| `VisualizationType` | `'wheel' \| 'strip' \| 'counting-rhyme'` |
 | `Settings` | `{ modeId, visualization, animationDuration }`; theme and language are intentionally not part of `Settings` |
 | `Segment` | `{ lot, startAngle, endAngle, weight }` — `weight` is normalized (0–1) |
 | `GameState` | `{ allLots: Lot[], activeLots: Lot[] }` |
 | `RollResult` | `{ finished, winner: Lot\|null, deactivate: string[], message? }` |
 | `GameMode` | `{ id, name, description, calculateWeight, getRollText, processRoll }` |
 | `IRenderer` | `updateSegments`, `setRotation`, `getCurrentRotation`, `setHighlightedLot`, `render`, `reset` |
-| `VisualizationPackage` | `{ id, createRenderer, computeFinalPosition }` |
+| `VisualizationPackage` | `{ id, createRenderer, computeFinalPosition }` (optional `canvasWidth?` in `computeFinalPosition`) |
 | `ParsedLot` / `ParseResult` | `{ name, amount }` / `{ validLots, errorCount }` |
 | `ImportResult` | `{ lotsAdded, lotsTruncated }` |
-| `ImportStrategy` | `{ id, label, description, execute }` |
+| `ImportStrategy` | `{ id, execute(parsedLots, lotManager): ImportResult }` — labels/descriptions live only in locale files (`data-i18n="importStrategy.<id>.…"`), not on the strategy object |
 | `SortField` / `SortDirection` | `'name' \| 'amount'` / `'asc' \| 'desc'` |
 | `EasingFunction` | `(t: number) => number` |
+
+**`Lot.active` is transitional / inert (Stage 3, §1 of the plan).** Since
+Stage 3 the field is neither read nor written by game logic. Participation
+is owned by `GameSession.activeLotIds` and exposed via
+`GameSession.activeLots` / `activeCount` / `isActive()`. `LotManager.addLot`
+still initialises it to `true`, but nothing consumes it. New code must
+consult `GameSession`.
+
+### 5.1 `GameSession` — current-game state
+
+Owns the state of the *current game*, distinct from the *global* lot list
+owned by `LotManager`.
+
+| Member | Role |
+|--------|------|
+| `constructor(modeId, getLots)` | Binds the mode; stores an accessor for the global list (typically `() => lotManager.getAllLots()`); seeds `activeLotIds` from the current list. |
+| `mode` (getter) | The `GameMode` governing the session. |
+| `allLots` (getter) | Live view of the global list. |
+| `activeLots` (getter) | Global list filtered by `activeLotIds`, recomputed on every read. |
+| `activeCount` (getter) | `activeLots.length`. |
+| `state` (getter) | `{ allLots, activeLots }` snapshot for `GameMode.processRoll`. |
+| `isActive(id)` | Participation query used by the UI list. |
+| `addLot(lot)` / `removeLot(id)` | Explicit participation mutation (paired with `LotManager.addLot` / `deleteLot`). |
+| `deactivateMany(ids)` | Removes several participants (spin eliminations). |
+| `clearLots()` | Empties participation (paired with `LotManager.clearAll`). |
+| `reset()` | Re-seeds `activeLotIds` from the current global list. |
+| `reconcileAfterBulkChange(previousIds)` | Post-import diff: kept ids preserve prior participation, new ids become active, stale ids dropped. |
+| `setMode(modeId)` | Single authoritative mode change. Participation is preserved across a switch. |
+
+**Invariant.** Every lot returned by `activeLots` / `state` exists in
+`LotManager` — holds by construction, because both are materialised from
+the live accessor. This is the Stage 3 §7 invariant.
 
 ---
 
@@ -139,13 +189,13 @@ All mode-specific rules live inside a `GameMode` implementation. There is no
 
 ### Registry (`modes.ts`)
 
-```
+$$$
     export const MODES: Record<Mode, GameMode> = {
         normal: new NormalMode(),
         survival: new SurvivalMode()
     };
     export function getMode(modeId: Mode): GameMode { return MODES[modeId]; }
-```
+$$$
 
 Mode instances are stateless and shared. Adding a new mode requires one new
 class and one line in `MODES`; nothing else changes.
@@ -170,7 +220,7 @@ A single spin selects the winner; the game ends immediately.
 
 `processRoll` logic:
 
-```
+$$$
     remaining = state.activeLots.filter(l => l.id !== rolledLot.id)
 
     if remaining.length === 1:
@@ -178,7 +228,7 @@ A single spin selects the winner; the game ends immediately.
             message: completionMessage(remaining[0]) }
     otherwise:
         → { finished: false, winner: null, deactivate: [rolledLot.id] }
-```
+$$$
 
 **Key design point:** the winner is computed from the list *after* removing the
 rolled lot. This prevents the historical bug where the last lot standing was
@@ -205,6 +255,7 @@ winner, or completion.
 | `getSegmentCenterAngle(lots, mode, targetLotId)` | Angle at the centre of a lot's segment. |
 | `computeFinalRotation(lots, mode, targetLotId, currentRotation, durationMs)` | Wheel: rotation that places the target segment centre under the fixed top pointer, plus extra full turns scaled by duration. |
 | `computeFinalScrollOffset(lots, mode, targetLotId, currentOffset, durationMs, canvasWidth)` | Strip: horizontal offset that places the target segment centre under the viewport centre, plus extra cycles. |
+| `computeFinalCountingPosition(lots, mode, targetLotId, currentPosition, durationMs)` | Counting Rhyme: returns the cycle-space end position with residue equal to the target circle's midpoint (`endValue ≡ targetMid (mod 1)`), plus extra cycles scaled by duration. Five parameters — no `canvasWidth` (layout math is renderer-side). |
 | `canSpin(activeLots)` | Returns `activeLots.length >= 1`. |
 
 Segment width (strip) is derived via `getSegmentWidth(normalizedWeight)` from
@@ -216,7 +267,14 @@ apart. The formula is `Math.max(60, normalizedWeight * 400)`.
 
 ## 8. LotManager (`lotManager.ts`)
 
-Owns the `Lot[]`. Knows nothing about game modes, winners, or rules.
+Owns the *global* `Lot[]` — the universe of lots. Knows nothing about game
+modes, winners, rules, or which lots participate in the current game.
+
+**Transitional (Stage 3).** The following members still exist on the API but
+are **not used by the game path** and will be removed in a later stage:
+`Lot.active` (field), `toggleActive`, `deactivateLot`, `deactivateMany`,
+`resetAll`, `getActiveLots`, `getActiveCount`, `getState`. Participation is
+owned by `GameSession` (§5.1).
 
 | Method | Purpose |
 |--------|---------|
@@ -237,7 +295,9 @@ Owns the `Lot[]`. Knows nothing about game modes, winners, or rules.
 
 All renderers implement `IRenderer`. They receive a `GameMode` in
 `updateSegments` and delegate weight math to `RouletteEngine.calculateSegments`.
-Neither computes weights itself.
+None computes weights itself. `BaseRenderer` supplies the shared state and
+high-DPI setup; each concrete renderer owns only its drawing and (optionally)
+a cached layout.
 
 ### `BaseRenderer` (`baseRenderer.ts`)
 
@@ -312,6 +372,38 @@ high-DPI setup, constant extraction, `totalCycleWidth` caching) were applied to
 the shared base and to `wheelRenderer.ts` as well, so both sibling renderers
 stay aligned.
 
+### `CountingRhymeRenderer` (`countingRhymeRenderer.ts`)
+
+Extends `BaseRenderer`. Each active lot is drawn as a filled circle in a
+grid. Speed and visual layout are decoupled from the "current circle"
+mechanic: the per-frame highlight is derived **inside `render()` from
+`currentRotation` and the cached prefix sums of `Segment.weight`** — **not**
+from `highlightedLotId` (which is never driven for this renderer).
+
+- **Cycle domain.** `currentRotation` is measured in *cycles*: `1.0` = one
+  full traversal of the circle ring. Circle `i` owns `[P_i, P_{i+1})` of
+  `[0, 1)` where `P` is the prefix sum of normalized weights, so dwell per
+  traversal is exactly `w_i · T_cycle`.
+- **Radius** is proportional to the lot's weight *relative to the heaviest
+  active weight* (`w_i / max(w)`), not to the raw normalized weight — the
+  heaviest lot fills its grid cell (`MIN_CIRCLE_RADIUS = 14`,
+  `MAX_CIRCLE_RADIUS = 250`, `CELL_FILL_RATIO = 0.95`).
+- **Grid mapping is permuted** deterministically (FNV-1a seed over the lot
+  ids drives an LCG Fisher–Yates shuffle of cell indices). Cosmetic only:
+  the highlight order remains `segments[0..n-1]`, only the *position* of each
+  circle changes. Same lot set → same arrangement, so Survival does not
+  reshuffle between eliminations.
+- **Layout is computed once** in `updateSegments()` and cached; `render()`
+  never regenerates it. Uses logical `getBoundingClientRect()` sizes, not the
+  DPR-scaled backing store.
+- **Highlight uses a crossfade** over a `TRANSITION_FRACTION = 0.2` window
+  expressed as a fraction of the *current* segment, so dwell proportionality
+  is preserved.
+- **Last-frame guarantee.** `computeFinalCountingPosition()` returns
+  `endValue ≡ targetMid (mod 1)`; `AnimationController` fires
+  `onUpdate(endValue, 1)` before `onComplete()`, so the final animated frame
+  resolves to the rolled lot.
+
 ---
 
 ## 10. Visualization strategy (`visualizationStrategy.ts`)
@@ -319,12 +411,17 @@ stay aligned.
 Each visualization is a `VisualizationPackage` bundling a renderer factory and a
 final-position function:
 
-```
-    WHEEL_PACKAGE = { id: 'wheel', createRenderer, computeFinalPosition → computeFinalRotation }
-    STRIP_PACKAGE = { id: 'strip', createRenderer, computeFinalPosition → computeFinalScrollOffset }
-    export const VISUALIZATION_PACKAGES = { wheel, strip } as const;
+$$$
+    WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
+    STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
+    COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
+    export const VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' } as const;
     export function getVisualizationPackage(type): VisualizationPackage;
-```
+$$$
+
+`computeFinalPosition` exposes an optional `canvasWidth?: number`. The wheel
+and strip packages forward it; the Counting Rhyme package deliberately does
+not — its position math lives entirely in cycle space (§9).
 
 `App` selects a visualization by registry lookup — no `switch` statement.
 
@@ -338,11 +435,31 @@ final-position function:
 sorting, import execution, animation driving, result display, control
 enable/disable, theme application.
 
-**Key state:** `lotManager`, `renderer`, `animationController`, `settings`,
-`easingFunction`, `highlightedLotId`, `isSettingsLocked`, `sortField`,
-`sortDirection`, DOM handles.
+**Key state:** `lotManager`, `gameSession`, `renderer`,
+`animationController`, `settings`, `easingFunction`, `highlightedLotId`,
+`isSettingsLocked`, `sortField`, `sortDirection`, DOM handles.
 
-**Derived:** `get mode(): GameMode { return getMode(this.settings.modeId); }`.
+**Derived:** `get mode(): GameMode { return this.gameSession.mode; }` — the
+mode is owned by the session. `settings.modeId` is written **only** as a UI /
+persistence mirror; it is never read back to drive the session.
+
+**Session orchestration (Stages 1 – 3).** Every global-lot mutation is paired
+with the matching `GameSession` call at the mutation site; there is **no**
+`syncGameSession()` step to remember:
+
+| `LotManager` operation        | paired `GameSession` operation                       |
+|-------------------------------|------------------------------------------------------|
+| `addLot(name, amount, color)` | `gameSession.addLot(result.lot)`                     |
+| `deleteLot(id)`               | `gameSession.removeLot(id)`                          |
+| `clearAll()`                  | `gameSession.clearLots()`                            |
+| `resetAll()`                  | `gameSession.reset()`                                |
+| (bulk) import strategy        | `gameSession.reconcileAfterBulkChange(idsBefore)`    |
+| `updateLot(id, { amount })`   | — (participation unaffected)                         |
+
+Mode change is a single entry point: `gameSession.setMode(id)` plus a
+mirror to `settings.modeId`, followed by `renderer.updateSegments(...)` and
+`render()`. Participation is deliberately preserved across a mode switch
+(§13).
 
 ### Initialization order
 1. Create `LotManager`, `renderer` (via `rendererFactory`), `AnimationController`.
@@ -360,16 +477,16 @@ paint, so the theme never flashes on reload.
 
 ## 12. Spin lifecycle — the critical business flow
 
-```
+$$$
     spin()
-      ├─ activeLots = lotManager.getActiveLots()
+      ├─ activeLots = gameSession.activeLots                       // session-owned
       ├─ if (!RouletteEngine.canSpin(activeLots)) → alert(noLotsToSpin); return
-      ├─ isSettingsLocked = true; updateControlsState()          // lock UI
-      ├─ rolledLot = RouletteEngine.roll(activeLots, this.mode)  // DECISION MADE HERE
+      ├─ isSettingsLocked = true; updateControlsState()           // lock UI
+      ├─ rolledLot = RouletteEngine.roll(activeLots, gameSession.mode)   // DECISION MADE HERE
       ├─ if (!rolledLot) return
       ├─ vizPackage = getVisualizationPackage(settings.visualization)
       ├─ endRotation = vizPackage.computeFinalPosition(
-      │        activeLots, mode, rolledLot.id,
+      │        activeLots, gameSession.mode, rolledLot.id,
       │        renderer.getCurrentRotation(), animationDuration, canvasWidth)
       ├─ animationController.configure({ startValue, endValue,
       │        duration, easing, onUpdate: setRotation+render,
@@ -379,28 +496,33 @@ paint, so the theme never flashes on reload.
     finishSpin(rolledLot)
       ├─ if (!rolledLot) → updateControlsState(); return
       ├─ highlightedLotId = rolledLot.id
-      ├─ resultText = mode.getRollText(rolledLot)
-      ├─ state  = lotManager.getState()
-      ├─ result = mode.processRoll(rolledLot, state)             // RULES APPLIED HERE
-      ├─ lotManager.deactivateMany(result.deactivate)
+      ├─ resultText = gameSession.mode.getRollText(rolledLot)
+      ├─ result = gameSession.mode.processRoll(rolledLot, gameSession.state)  // RULES APPLIED HERE
+      ├─ if result.deactivate.length > 0 → gameSession.deactivateMany(result.deactivate)
       ├─ if result.finished:
       │     highlightedLotId = result.winner?.id ?? highlightedLotId
       │     if result.message → alert(result.message) after 500 ms
       │     isSettingsLocked = true                              // lock until Reset
       │   else:
       │     isSettingsLocked = false                             // next spin allowed
-      └─ updateUI(); renderer.updateSegments(activeLots, mode); render(); updateControlsState()
-```
+      └─ updateUI(); renderer.updateSegments(gameSession.activeLots, gameSession.mode); render(); updateControlsState()
+$$$
 
-The winner is captured in the animation closure; the animation only moves the
-wheel/strip to a pre-computed position.
+The winner is captured in the animation closure; the animation only moves
+the wheel / strip / circle grid to a pre-computed position.
+
+**Refactor note (Stage 3 §4 / §7).** `finishSpin` never touches `Lot.active`.
+Eliminations act on `GameSession` (the owner of participation). The next
+read of `session.activeLots` already reflects the change without a sync step;
+the `if (result.deactivate.length > 0)` guard is kept only to skip a useless
+loop when there is nothing to deactivate.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
-```
+$$$
     spin #1 → B rolled → deactivate B → active = {A, C} → finished=false → next spin allowed
     spin #2 → C rolled → deactivate C → remaining = {A}  → winner A, finished=true → UI locks
-```
+$$$
 
 No third spin occurs. For Normal mode, a single spin yields `finished=true` with
 the rolled lot as winner.
@@ -418,11 +540,21 @@ Three cooperating layers:
 2. **Coordinator** (`importDialog.ts`) hosts both tabs, tracks the active tab,
    aggregates its `getParsedResult()`, shows a shared valid/error status line
    and a preview, and hands `ParsedLot[]` to the callback on Import.
-3. **Strategies** (`importStrategies.ts`):
+3. **Strategies** (`importStrategies.ts`) — pure executors `{ id, execute }`,
+   with no UI strings:
    - `REPLACE_STRATEGY` — `clearAll()`, then adds new lots up to `MAX_LOTS`.
    - `MERGE_STRATEGY` — matches by lowercase name (updates amount on a match,
      otherwise adds), up to `MAX_LOTS`.
    - Both return `{ lotsAdded, lotsTruncated }`.
+   - The conflict-dialog buttons drive their text via
+     `data-i18n="importStrategy.<id>.label|description"` keys, so labels
+     retranslate on language change.
+
+   **Session reconciliation after import.** Before running a strategy, `App`
+   snapshots the global lot ids (`idsBefore`). After the strategy returns it
+   calls `gameSession.reconcileAfterBulkChange(idsBefore)`: kept ids preserve
+   prior participation, newly created ids become active, stale ids are
+   dropped. This is what keeps the §5.1 invariant.
 
 If lots already exist, `ImportConflictDialog` asks the user to Replace / Merge /
 Cancel. Truncation is reported via `ErrorDialog` with a summary message.
@@ -460,13 +592,18 @@ Cancel. Truncation is reported via `ErrorDialog` with a summary message.
   `[data-i18n-title]` and replaces text/attributes.
 - `initI18n()` is awaited once at startup (`startApp()`).
 - The language `select` calls `i18n.changeLanguage` then `translateDOM()`.
+- `syncDocumentLang()` writes the resolved i18n language to
+  `<html lang="...">` so screen readers and font shaping target the correct
+  locale. It runs once inside `initI18n()` and again from `App`'s language
+  handler after every `i18n.changeLanguage(...)`.
 
 ---
 
 ## 16. Theming (`styles.css`, `index.html`, `app.ts`)
 
-- Palettes are CSS custom properties on `:root` (dark) and
-  `:root[data-theme="light"|"emerald"|"nordic"]`.
+- Palettes are CSS custom properties on `:root` (default / dark) and
+  `:root[data-theme="light"|"emerald"|"nordic"|"monochrome"]`. Five themes
+  total.
 - All stylesheet rules reference these variables; no hardcoded palette colours
   exist outside the theme blocks.
 - `index.html` sets `data-theme` from `localStorage` in an inline head script
@@ -519,6 +656,11 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
    again.
 5. **Locked until Reset.** Once a game finishes (`finished === true`), spin is
    locked until the user presses Reset.
+6. **GameSession owns participation.** The game path never reads or writes
+   `Lot.active`. The participant set lives in `GameSession.activeLotIds`;
+   global lot existence lives in `LotManager`. The `GameState` passed to
+   `processRoll` is materialised from the session, so a stale id can never
+   leak into a mode.
 
 ---
 
@@ -526,11 +668,20 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
 
 | # | Issue | Impact |
 |---|-------|--------|
-| 1 | `App.updateControlsState()` selects `#lot-form input`, which does not exist in `index.html` | The inline add-lot inputs are not disabled while the game is locked |
-| 2 | `importStrategies.ts` evaluates `i18n.t(...)` at module-load time (before `initI18n()`); `MERGE_STRATEGY.description` is hardcoded English | Strategy labels may show raw keys; they do not retranslate on language change |
-| 3 | `App.mode` is a getter re-resolved in `finishSpin`; a mode change during animation can desync the applied rules from the animation | Rare, but a correctness hazard — capture the mode once per spin |
-| 4 | `rendererFactory.ts` duplicates the registry lookup already exposed by `VisualizationPackage.createRenderer` | Redundant indirection, harmless |
-| 5 | `App.spin` early-returns on `!rolledLot` after setting `isSettingsLocked = true` | Lockout trap if upstream validation changes |
-| 6 | Dead imports in `app.ts` (`parseCSV`, `ModalManager`, `IMPORT_STRATEGIES`, `ParseResult`, `SeparatorType`) | Obscures ownership of CSV parsing |
-| 7 | `<html lang>` is never updated on language switch | Accessibility / font-shaping |
-| 8 | `RouletteEngine.getSegmentCenterAngle` is defined but unused | Dead code |
+| 1 | `App.mode` / `finishSpin` re-resolve `gameSession.mode` inline; a mode change during animation would desync rules from animation | Rare — capture the mode once at `spin()` entry if the hazard is worth closing |
+| 2 | `rendererFactory.ts` duplicates the registry lookup already exposed by `VisualizationPackage.createRenderer` | Redundant indirection, harmless |
+| 3 | `App.spin` early-returns on `!rolledLot` after setting `isSettingsLocked = true` | Lockout trap if upstream validation changes |
+| 4 | Dead imports in `app.ts` (`parseCSV`, `ModalManager`, `IMPORT_STRATEGIES`, `ParseResult`, `SeparatorType`) | Obscures ownership of CSV parsing |
+| 5 | `RouletteEngine.getSegmentCenterAngle` is defined but unused | Dead code |
+| 6 | **Transitional (Stage 3).** `Lot.active` and `LotManager` members `toggleActive` / `deactivateLot` / `deactivateMany` / `resetAll` / `getActiveLots` / `getActiveCount` / `getState` are no longer used by the game path | Dead code — removal is a follow-up refactor stage |
+| 7 | **Transitional (Stage 3).** `App.reset()` still calls `lotManager.resetAll()` **and** `gameSession.reset()` — the first is kept only to keep the inert `Lot.active` flag consistent | Two-step reset; collapses to `gameSession.reset()` once `Lot.active` is removed |
+| 8 | `importStrategies.ts` receives `LotManager` typed as `any` in the `ImportStrategy` interface rather than a session | Intentional while `LotManager` owns the global list; the `any` obscures the contract |
+
+Resolved during the refactor (kept for traceability): the former
+`#lot-form input` selector in `updateControlsState()` (now targets the
+actual add-row / per-lot controls); the module-load-time `i18n.t()` calls
+and hardcoded English `MERGE_STRATEGY.description` in `importStrategies.ts`
+(labels live in locales, driven by `data-i18n`); the failing `<html lang>`
+update on language switch (`syncDocumentLang()` now runs from `initI18n` and
+from the language handler); the `rouletteEaseOut === easeOutQuint` duplicate
+(now a distinct cubic/quintic blend).
