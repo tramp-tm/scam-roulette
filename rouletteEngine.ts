@@ -1,5 +1,5 @@
 import type { Lot, GameMode } from './types.js';
-import { getRandomPositionInRange } from './utils.js';
+import { getRandomPositionInRange, getSegmentWidth } from './utils.js';
 
 /**
  * Core roulette engine that handles weighted random selection.
@@ -193,8 +193,7 @@ export class RouletteEngine {
         // Calculate total width of one complete cycle
         let totalCycleWidth = 0;
         for (const segment of segments) {
-            const segWidth = Math.max(60, segment.weight * 400);
-            totalCycleWidth += segWidth;
+            totalCycleWidth += getSegmentWidth(segment.weight);
         }
 
         if (totalCycleWidth === 0) return currentOffset;
@@ -203,7 +202,7 @@ export class RouletteEngine {
         let cumulativeWidth = 0;
         
         for (const segment of segments) {
-            const segmentWidth = Math.max(60, segment.weight * 400);
+            const segmentWidth = getSegmentWidth(segment.weight);
             
             if (segment.lot.id === targetLotId) {
                 // Pick random point within this lot's width (with margin from edges)

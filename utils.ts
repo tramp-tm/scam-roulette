@@ -34,6 +34,25 @@ export function brightenColor(color: string, percent: number): string {
 }
 
 // ========================================
+// STRIP GEOMETRY
+// ========================================
+
+/** Minimum width (px) of a strip segment, regardless of weight */
+export const MIN_SEGMENT_WIDTH = 60;
+
+/** Multiplier applied to a segment's normalized weight to get its width */
+export const SEGMENT_WIDTH_SCALE = 400;
+
+/**
+ * Computes the rendered width of a strip segment from its normalized weight.
+ * This is the single source of truth shared by StripRenderer (drawing) and
+ * RouletteEngine.computeFinalScrollOffset (scroll math) — they must never drift.
+ */
+export function getSegmentWidth(weight: number): number {
+    return Math.max(MIN_SEGMENT_WIDTH, weight * SEGMENT_WIDTH_SCALE);
+}
+
+// ========================================
 // DURATION SLIDER MAPPING
 // ========================================
 
@@ -128,4 +147,3 @@ export function getRandomPositionInRange(
     const maxOffset = span - margin;
     return Math.random() * (maxOffset - minOffset) + minOffset;
 }
-
