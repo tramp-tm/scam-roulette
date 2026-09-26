@@ -119,12 +119,11 @@ export class App {
 
     constructor() {
         this.lotManager = new LotManager([]);
-        // Stage 2: the GameSession owns the current mode and derives the game
-        // state (all/active lots) from the global lot list via an accessor.
-        // Because the accessor closes over `this.lotManager` and the session
-        // shares the same `Lot` objects by reference, no manual "sync" call is
-        // ever required after a LotManager mutation (add / delete / update /
-        // clear / import / reset / deactivate).
+        // Stage 3: `LotManager` owns the *global* lot list; `GameSession`
+        // owns the *current game* (mode + participation state). The session
+        // reads the global list through this accessor so it never caches a
+        // stale snapshot, while its participation set (`activeLotIds`) is
+        // its own — see gameSession.ts and refac3.md §2–§7.
         this.gameSession = new GameSession(
             this.settings.modeId,
             () => this.lotManager.getAllLots()
@@ -273,9 +272,9 @@ export class App {
             this.settings.modeId = newModeId;
 
             // Re-render wheel with the new mode's weight calculation. The
-            // active lot list is unchanged: `lot.active` flags persist across
-            // a mode switch (the previous "no carry-over" comment was
-            // misleading — `Lot.active` has always been carried over).
+            // session's participation set is deliberately preserved across a
+            // mode switch (matches the behaviour shipped in Stage 1/2 — the
+            // Stage 3 plan §13 keeps this behaviour).
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
             this.render();
             // Update result text to show new mode name if no winner highlighted
@@ -488,6 +487,12 @@ export class App {
             return;
         }
 
+        // Global-lot mutation succeeded. Register the new lot as a participant
+        // of the current game session (Stage 3 §6): the two operations are
+        // distinct — LotManager persists the lot globally, GameSession tracks
+        // whether it takes part in the current game.
+        this.gameSession.addLot(result.lot);
+
         // Success - proceed as before
         this.lotNameInput.value = '';
         this.lotAmountInput.value = '1';
@@ -496,9 +501,6 @@ export class App {
         // Focus back on name input
         this.lotNameInput.focus();
         
-        // No manual session sync is needed: GameSession reads the global lot
-        // list through an accessor, so the new lot is visible immediately.
-
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
@@ -583,14 +585,12 @@ export class App {
             this.gameSession.state
         );
 
-        // Apply eliminations through LotManager (owner of the lots' active
-        // flags). No manual session sync is required regardless of whether
-        // `result.deactivate` is empty or not: GameSession reads the active
-        // flags on demand, so the next `session.activeLots` read already
-        // reflects the change (§7 of the plan — the previous
-        // `if (deactivate.length > 0) sync()` shape is gone).
+        // Apply eliminations through the GameSession (owner of participation
+        // since Stage 3 §4) rather than through the shared `Lot.active`
+        // field. The next read of `session.activeLots` already reflects the
+        // change — no sync step exists to forget.
         if (result.deactivate.length > 0) {
-            this.lotManager.deactivateMany(result.deactivate);
+            this.gameSession.deactivateMany(result.deactivate);
         }
 
         if (result.finished) {
@@ -624,9 +624,14 @@ export class App {
         // Reset state
         this.highlightedLotId = null;
         this.isSettingsLocked = false;
+
+        // Stage 3 §14: two independent resets, orchestrated by App.
+        //   • LotManager.resetAll()  — transitional: restores the inert
+        //     `Lot.active` flag on the global lots.
+        //   • GameSession.reset()    — real reset of the current game: every
+        //     lot currently in the global list becomes an active participant.
         this.lotManager.resetAll();
-        // `resetAll()` flips `lot.active` back to true on the shared `Lot`
-        // objects, which GameSession reads directly — no sync call needed.
+        this.gameSession.reset();
         
         // Reset renderer
         this.renderer.reset();
@@ -644,7 +649,8 @@ export class App {
 
     private updateUI(): void {
         // Update lots list (global lot data — served by LotManager,
-        // the owner of the global lot collection)
+        // the owner of the global lot collection; the participation flag
+        // is projected from the session inside renderLotsList).
         this.renderLotsList();
         
         // Update stats. Game-session counters are read from the GameSession
@@ -788,10 +794,11 @@ export class App {
     }
 
     private renderLotsList(): void {
-        let lots = this.lotManager.getAllLots();
+        // Global lots come from LotManager (owner of the global collection).
+        const allLots = this.lotManager.getAllLots();
         
         // Apply sorting based on current sort state
-        lots = [...lots].sort((a, b) => {
+        const sorted = [...allLots].sort((a, b) => {
             if (this.sortField === 'name') {
                 return this.sortDirection === 'asc' 
                     ? a.name.localeCompare(b.name)
@@ -802,17 +809,26 @@ export class App {
                     : b.amount - a.amount;
             }
         });
+
+        // Project the session's participation state onto each renderable lot
+        // (Stage 3 §12). `Lot.active` is no longer authoritative; the UI asks
+        // the session which lots participate in the current game.
+        const renderables: RenderableLot[] = sorted.map(lot => ({
+            ...lot,
+            active: this.gameSession.isActive(lot.id)
+        }));
         
         // Use the reusable rendering method with default options for main lots list
-        this.renderLotsListToContainer(this.lotsList, lots, {
+        this.renderLotsListToContainer(this.lotsList, renderables, {
             showActions: true,
             highlightId: this.highlightedLotId,
             editableAmount: true,
             onAmountChange: (id: string, newAmount: number) => {
                 if (!id) return; // Safety check for undefined id
                 this.lotManager.updateLot(id, { amount: newAmount });
-                // Amount changes do not affect which lots are active; no
-                // session sync is required (and none is possible to forget).
+                // Amount changes do not affect participation; no session
+                // mutation is required. The next read of `session.activeLots`
+                // already reflects the updated amount.
                 this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
                 this.render();
             }
@@ -822,16 +838,18 @@ export class App {
     private deleteLot(id: string): void {
         if (!confirm(t('confirmation.deleteLot'))) return;
 
+        // Two independent operations (Stage 3 §6 / §7):
+        //   • LotManager.deleteLot(id) — removes the lot globally;
+        //   • GameSession.removeLot(id) — drops it from the session's
+        //     participation set, preserving the invariant that the session
+        //     never references a globally absent lot.
         this.lotManager.deleteLot(id);
+        this.gameSession.removeLot(id);
         
         // Clear highlight if deleted lot was highlighted
         if (this.highlightedLotId === id) {
             this.highlightedLotId = null;
         }
-
-        // No manual session sync is needed — GameSession reads the global
-        // lot list through an accessor, so the deletion is reflected on the
-        // next read of `session.activeLots`.
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
@@ -858,10 +876,11 @@ export class App {
             return;
         }
         
-        // Clear all lots
+        // Two independent operations (Stage 3 §6 / §7):
+        //   • LotManager.clearAll() — empties the global list;
+        //   • GameSession.clearLots() — empties the participation set.
         this.lotManager.clearAll();
-        // No session sync needed: the accessor now returns an empty list,
-        // so `session.activeLots` is empty on the next read.
+        this.gameSession.clearLots();
         
         // Reset highlight and result display
         this.highlightedLotId = null;
@@ -912,11 +931,21 @@ export class App {
 
     /** Executes the import using the selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
+        // Snapshot the global id set *before* the strategy runs so the
+        // session can tell "kept / updated" lots (preserve participation)
+        // apart from "created" lots (become active). See GameSession
+        // .reconcileAfterBulkChange() for the exact rules — they preserve
+        // the shipped behaviour of both strategies without either strategy
+        // needing to know about the session.
+        const idsBefore = new Set(this.lotManager.getAllLots().map(l => l.id));
+
         // Delegate execution to the strategy object - no branching needed!
         const result = strategy.execute(parsedLots, this.lotManager);
-        // No manual session sync is needed: the strategy mutates the global
-        // lot list in place, and GameSession observes it through its
-        // accessor on the next read.
+
+        // Reconcile the session's participation set with the new global list
+        // (Stage 3 §6). This is the explicit bulk-change entry point; no
+        // syncGameSession() is involved.
+        this.gameSession.reconcileAfterBulkChange(idsBefore);
         
         // Update UI and renderer after import completes
         this.updateUI();

@@ -4,6 +4,19 @@ export interface Lot {
     name: string;
     amount: number;
     color: string;
+    /**
+     * Transitional / inert field.
+     *
+     * Historically this flag was the mechanism `LotManager` used to track
+     * which lots participated in the current game session. Since Stage 3
+     * that responsibility has moved to `GameSession`, which owns the
+     * authoritative participation set (`activeLotIds`) and exposes it via
+     * `activeLots` / `activeCount` / `isActive()`.
+     *
+     * Game logic no longer reads or writes this field. It is retained on
+     * the interface for compatibility during migration (see refac3.md §1
+     * and §4). New code must consult `GameSession` instead.
+     */
     active: boolean;
 }
 
