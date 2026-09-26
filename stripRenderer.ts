@@ -144,6 +144,9 @@ export class StripRenderer implements IRenderer {
         
         // Draw center marker at viewport center (independent of scroll)
         this.drawCenterMarker(canvasWidth / 2, centerY, canvasHeight);
+
+        // Draw outer decorative frame around the band
+        this.drawFrame(canvasWidth, centerY);
     }
 
     /**
@@ -234,6 +237,26 @@ export class StripRenderer implements IRenderer {
         this.ctx.fillStyle = 'gold';
         this.ctx.fill();
 
+        this.ctx.restore();
+    }
+
+    /**
+     * Draws the outer decorative frame around the strip band.
+     * Mirrors the wheel's drawOuterRing in style: same 10px padding
+     * around the visible band and the same stroke colour/width.
+     */
+    private drawFrame(canvasWidth: number, centerY: number): void {
+        const bandHalfHeight = 80;   // matches the 160px-tall segments drawn in renderOneCycle
+        const padding = 10;          // matches the wheel ring's +10 offset
+        const top = centerY - bandHalfHeight - padding;
+        const height = (bandHalfHeight + padding) * 2;
+
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(0, top, canvasWidth, height);
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 4;
+        this.ctx.stroke();
         this.ctx.restore();
     }
 

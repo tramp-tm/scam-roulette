@@ -172,7 +172,7 @@ export class WheelRenderer implements IRenderer {
         this.ctx.lineTo(centerX, centerY - radius);
         this.ctx.closePath();
         
-        this.ctx.fillStyle = '#fff';
+        this.ctx.fillStyle = 'gold';
         this.ctx.fill();
         
         // Add glow effect
