@@ -1,5 +1,4 @@
 import { SeparatorType, ParsedLot, ParseResult } from './types.js';
-import { t } from './i18n.js';
 
 declare const Papa: {
     parse(
@@ -13,6 +12,54 @@ declare const Papa: {
         data: unknown[][];
     };
 };
+
+/**
+ * Normalises a user-supplied amount string into a form `parseFloat` can read.
+ *
+ * Handles both decimal conventions:
+ *   - en / US : "1,234.56"  (comma = thousands, dot = decimal)
+ *   - eu / RU : "1.234,56"  (dot = thousands, comma = decimal)
+ *
+ * Rule: the decimal separator is the separator that appears last AND is
+ * followed by one or two digits. Any other separator is treated as a grouping
+ * (thousands) separator and stripped. If no separator qualifies as a decimal
+ * point, every separator is stripped (e.g. "1,234" -> "1234").
+ */
+function normalizeAmount(raw: string): string {
+    const s = raw.trim().replace(/\s/g, '');
+    if (!s) return s;
+
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+
+    if (lastComma === -1 && lastDot === -1) {
+        return s;
+    }
+
+    const commaIsDecimal =
+        lastComma !== -1 && /^\d{1,2}$/.test(s.slice(lastComma + 1));
+    const dotIsDecimal =
+        lastDot !== -1 && /^\d{1,2}$/.test(s.slice(lastDot + 1));
+
+    let decimalIndex = -1;
+    if (commaIsDecimal && dotIsDecimal) {
+        // Both separators are candidates - the rightmost one is the decimal point.
+        decimalIndex = lastComma > lastDot ? lastComma : lastDot;
+    } else if (commaIsDecimal) {
+        decimalIndex = lastComma;
+    } else if (dotIsDecimal) {
+        decimalIndex = lastDot;
+    }
+
+    if (decimalIndex === -1) {
+        // No decimal separator detected - treat every separator as grouping.
+        return s.replace(/[,\.]/g, '');
+    }
+
+    const intPart = s.slice(0, decimalIndex).replace(/[,\.]/g, '');
+    const fracPart = s.slice(decimalIndex + 1).replace(/[,\.]/g, '');
+    return `${intPart}.${fracPart}`;
+}
 
 /**
  * Parses CSV text into lots.
@@ -58,37 +105,18 @@ export function parseCSV(csvText: string, separator: SeparatorType): ParseResult
             continue;
         }
 
-        // Parse amount as number (handle European decimal separator)
-        let cleanAmountStr = amountStr;
-        
-        // Handle comma as decimal separator - replace the first comma with dot
-        if (cleanAmountStr.includes(',')) {
-            const lastCommaIndex = cleanAmountStr.lastIndexOf(',');
-            if (lastCommaIndex !== -1) {
-                // Replace only the last comma with a dot to handle European format like "241,5"
-                cleanAmountStr = 
-                    cleanAmountStr.substring(0, lastCommaIndex) + 
-                    '.' + 
-                    cleanAmountStr.substring(lastCommaIndex + 1);
-            }
-        }
-        
-        let amount = parseFloat(cleanAmountStr);
+        const amount = parseFloat(normalizeAmount(amountStr));
 
         // Validate: valid numeric amount required (must be positive and finite)
         if (isNaN(amount) || !isFinite(amount) || amount <= 0) {
-            // Check for header row auto-detection on first data row only
-            if (rowIndex === 0) {
-                // If second column is not a valid number, treat as header and skip this row
+            // Header auto-detection: only the very first row may be a header,
+            // and only when there is at least one further row of actual data.
+            // Requiring a second row prevents a single malformed line from
+            // being silently discarded - it is reported as an error instead.
+            if (rowIndex === 0 && parsed.data.length > 1) {
                 continue;
             }
-            
-            result.errorCount++;
-            continue;
-        }
 
-        // Additional check to ensure we're getting actual numeric values
-        if (amount === 0 && cleanAmountStr !== '0' && cleanAmountStr !== '0.0') {
             result.errorCount++;
             continue;
         }

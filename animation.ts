@@ -35,13 +35,20 @@ export const EasingFunctions = {
         t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
     
     /**
-     * Custom roulette easing - smooth deceleration starting from halfway through
-     * Provides a natural wheel slowdown effect with extended tail
+     * Custom roulette easing - deliberately distinct from easeOutQuint.
+     *
+     * A blend of cubic and quintic ease-out: it starts closer to the gentler
+     * cubic curve (so the wheel sheds speed more gradually over the first
+     * half) and finishes closer to quintic (for a long, dramatic tail).
+     *
+     * The curve is strictly monotonic on [0, 1] and differs from both the
+     * cubic and quintic curves above, so selecting it produces a visibly
+     * different animation (previously it was byte-identical to easeOutQuint).
      */
     rouletteEaseOut: (t: number): number => {
-        // Use quintic ease out for dramatic, gradual slowdown
-        // This starts slowing down earlier and more smoothly than cubic
-        return 1 - Math.pow(1 - t, 5);
+        const cubic = 1 - Math.pow(1 - t, 3);
+        const quintic = 1 - Math.pow(1 - t, 5);
+        return cubic * (1 - t) + quintic * t;
     }
 };
 
@@ -60,11 +67,7 @@ export class AnimationController {
     private endValue: number = 0;
     private duration: number = 1000;
     private easing: EasingFunction = DEFAULT_EASING;
-    
-    // Fields for tracking speed calculation
-    private lastValue: number = 0;
-    private lastTime: number | null = null;
-    
+
     private onUpdate?: (value: number, progress: number) => void;
     private onComplete?: () => void;
 
@@ -96,8 +99,6 @@ export class AnimationController {
         this.stop(); // Ensure any previous animation is stopped
         
         this.startTime = performance.now();
-        this.lastValue = this.startValue;
-        this.lastTime = this.startTime;
         this.animate(this.startTime);
     }
 
@@ -116,10 +117,6 @@ export class AnimationController {
         // Calculate current value using linear interpolation
         const currentValue = this.startValue + 
             (this.endValue - this.startValue) * easedProgress;
-
-        // Update tracking values for next frame
-        this.lastValue = currentValue;
-        this.lastTime = currentTime;
 
         // Call update callback
         if (this.onUpdate) {
@@ -154,9 +151,6 @@ export class AnimationController {
             this.animationFrameId = null;
         }
         this.startTime = null;
-        // Reset speed tracking
-        this.lastValue = 0;
-        this.lastTime = null;
     }
 
     /**
