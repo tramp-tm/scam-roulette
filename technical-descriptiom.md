@@ -43,7 +43,7 @@ five themes (dark, light, emerald, nordic, monochrome).
 
 ## 3. Project structure
 
-$$$
+```
 /
 ├── index.html                  # static shell + inline theme bootstrap script
 ├── styles.css                  # all styling; 4 theme palettes via :root[data-theme="…"]
@@ -79,13 +79,13 @@ $$$
     ├── errorDialog.ts              # generic error/info dialog
     ├── modalDialog.ts              # abstract modal base class
     └── modalManager.ts             # singleton modal stack manager
-$$$
+```
 
 ---
 
 ## 4. Architectural layers
 
-<$$$>
+```
         ┌──────────────────────────────────────────────┐
  L6 UI   │ app.ts           (orchestration, DOM, loop)  │
         └───────┬──────────────┬───────────────┬───────┘
@@ -112,9 +112,9 @@ $$$
                 │ animation.ts,          │
                 │ csvParser.ts           │
                 └────────────────────────┘
-</$$$>
+```
 
-*(The two `$$$`-adjacent angle-bracket fences above are only a rendering
+*(The two `````-adjacent angle-bracket fences above are only a rendering
 convenience; the diagram itself carries no runtime meaning.)*
 
 **Core rule:** dependencies point downward only. `App` knows *that* a game mode
@@ -202,13 +202,13 @@ All mode-specific rules live inside a `GameMode` implementation. There is no
 
 ### Registry (`modes.ts`)
 
-$$$
+```
 export const MODES: Record<Mode, GameMode> = {
     normal: new NormalMode(),
     survival: new SurvivalMode()
 };
 export function getMode(modeId: Mode): GameMode { return MODES[modeId]; }
-$$$
+```
 
 Mode instances are stateless and shared. Adding a new mode requires one new
 class and one line in `MODES`; nothing else changes.
@@ -233,7 +233,7 @@ A single spin selects the winner; the game ends immediately.
 
 `processRoll` logic:
 
-$$$
+```
 remaining = state.activeLots.filter(l => l.id !== rolledLot.id)
 
 if remaining.length === 1:
@@ -241,7 +241,7 @@ if remaining.length === 1:
         message: completionMessage(remaining[0]) }
 otherwise:
     → { finished: false, winner: null, deactivate: [rolledLot.id] }
-$$$
+```
 
 **Key design point:** the winner is computed from the list *after* removing the
 rolled lot. This prevents the historical bug where the last lot standing was
@@ -424,13 +424,13 @@ from `highlightedLotId` (which is never driven for this renderer).
 Each visualization is a `VisualizationPackage` bundling a renderer factory and a
 final-position function:
 
-$$$
+```
 WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
 STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
 COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
 export const VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' } as const;
 export function getVisualizationPackage(type): VisualizationPackage;
-$$$
+```
 
 `computeFinalPosition` exposes an optional `canvasWidth?: number`. The wheel
 and strip packages forward it; the Counting Rhyme package deliberately does
@@ -498,7 +498,7 @@ paint, so the theme never flashes on reload.
 Since Stage 4 the turn lifecycle is split cleanly between `App` (animation +
 UI) and `GameSession` (validation, rolling, state transitions).
 
-$$$
+```
 spin() [App]
   ├─ rolledLot = gameSession.prepareSpin()                  // session: validate + roll + remember
   │     └─ if null → alert(noLotsToSpin); return
@@ -541,7 +541,7 @@ GameSession.finishSpin()  (internal)
   ├─ result = currentMode.processRoll(rolledLot, state)      // RULES APPLIED HERE
   ├─ if result.deactivate.length > 0 → deactivateMany(result.deactivate)
   └─ return { rolledLot, result }
-$$$
+```
 
 The winner is decided inside `GameSession.prepareSpin()`, i.e. **before**
 `App` configures or starts any animation; the animation only moves the
@@ -560,12 +560,12 @@ wheel / strip / circle grid to a pre-computed position.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
-$$$
+```
 spin #1 → prepareSpin rolls B → finishSpin: deactivate B → active = {A, C}
         → finished=false → next spin allowed
 spin #2 → prepareSpin rolls C → finishSpin: remaining = {A} → winner A,
         finished=true → UI locks
-$$$
+```
 
 No third spin occurs. For Normal mode, a single spin yields `finished=true` with
 the rolled lot as winner.
