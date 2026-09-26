@@ -36,10 +36,10 @@ const BASE_STROKE_COLOR = 'rgba(255, 255, 255, 0.45)';
 const BASE_STROKE_WIDTH = 2;
 
 const MIN_CIRCLE_RADIUS = 14;
-const MAX_CIRCLE_RADIUS = 90;
+const MAX_CIRCLE_RADIUS = 250;
 
 /** Fraction of the (smaller) grid cell a circle may occupy at most. */
-const CELL_FILL_RATIO = 0.85;
+const CELL_FILL_RATIO =0.25+ 0.85;
 
 /**
  * Crossfade window expressed as a fraction of the *current* segment.
@@ -173,7 +173,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const cellWidth = width / cols;
         const cellHeight = height / rows;
         const cellHalf = Math.min(cellWidth, cellHeight) / 2;
-
         // Single shared cap → monotonic radius mapping is preserved even
         // when the grid is tight (§7).
         const effectiveMaxRadius = Math.min(
@@ -196,6 +195,9 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const radius =
                 MIN_CIRCLE_RADIUS +
                 weight * Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
+
+            console.log("MIN_CIRCLE_RADIUS =" + MIN_CIRCLE_RADIUS +" MAX_CIRCLE_RADIUS =" +MAX_CIRCLE_RADIUS+ " effectiveMaxRadius=" + effectiveMaxRadius + " radius="+radius +" weight=" +weight) ;
+
 
             this.layout.push({
                 lotId: this.segments[i].lot.id,
