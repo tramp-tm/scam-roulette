@@ -4,14 +4,18 @@ import { BaseRenderer } from './baseRenderer.js';
 /**
  * CountingRhymeRenderer
  * ---------------------
- * New visualization: each active lot is drawn as a circle whose radius is
- * proportional to its normalized Segment.weight. During animation the
- * "counting-rhyme" highlight hops from circle to circle.
+ * New visualization: each active lot is drawn as a circle whose radius
+ * reflects its weight *relative to the heaviest active lot*. During animation
+ * the "counting-rhyme" highlight hops from circle to circle.
  *
  * Contract (§ of the task spec):
  *  - §6:  weights come from the shared Segment[] produced by
  *         RouletteEngine.calculateSegments() via BaseRenderer.updateSegments().
  *         This renderer never calls GameMode.calculateWeight() itself.
+ *  - §7:  radius is proportional to the lot's weight *relative to the largest
+ *         active weight* (w_i / max(w)), not to the raw normalized weight.
+ *         The mapping is still monotone in weight; only the baseline (the
+ *         heaviest lot fills the cell) differs.
  *  - §10: the per-frame highlighted circle is derived inside render() from
  *         `currentRotation` + `segments`. `highlightedLotId` (the field set by
  *         App via IRenderer.setHighlightedLot) is NOT the driver here.
@@ -25,6 +29,12 @@ import { BaseRenderer } from './baseRenderer.js';
  *  - §32: layout is computed once per updateSegments() and cached;
  *         render() never regenerates positions; the grid uses logical
  *         getBoundingClientRect() dimensions, not canvas.width / canvas.height.
+ *
+ * NOTE: radius and dwell are deliberately derived from *two different*
+ * normalizations of the same weight — timing from raw `w` (probability),
+ * radius from `w / max(w)` (relative magnitude). Do not "unify" them:
+ * dividing the dwell partition by max(w) would break the Σw = 1 invariant
+ * that computeIntensities() relies on.
  */
 
 /** Gold that matches the wheel / strip pointers. */
@@ -180,6 +190,19 @@ export class CountingRhymeRenderer extends BaseRenderer {
             cellHalf * CELL_FILL_RATIO
         );
 
+        // Radius maps weight RELATIVE to the heaviest lot, not the raw
+        // normalized weight. Since calculateSegments() normalizes weights so
+        // that Σwᵢ = 1, using wᵢ directly would cap every circle at
+        // MIN + (1/n)·range — the largest possible radius would shrink as
+        // lots are added. Dividing by maxWeight lifts the heaviest lot to
+        // exactly effectiveMaxRadius and keeps monotonicity in weight (§7).
+        let maxWeight = 0;
+        for (const s of this.segments) {
+            if (s.weight > maxWeight) maxWeight = s.weight;
+        }
+        const safeMaxWeight = maxWeight > 0 ? maxWeight : 1;
+        const radiusRange = Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
+
         for (let i = 0; i < n; i++) {
             const col = i % cols;
             const row = Math.floor(i / cols);
@@ -191,13 +214,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const cx = (col + rowOffset + 0.5) * cellWidth;
             const cy = (row + 0.5) * cellHeight;
 
-            const weight = this.segments[i].weight;
-            const radius =
-                MIN_CIRCLE_RADIUS +
-                weight * Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
-
-            console.log("MIN_CIRCLE_RADIUS =" + MIN_CIRCLE_RADIUS +" MAX_CIRCLE_RADIUS =" +MAX_CIRCLE_RADIUS+ " effectiveMaxRadius=" + effectiveMaxRadius + " radius="+radius +" weight=" +weight) ;
-
+            const weightRatio = this.segments[i].weight / safeMaxWeight;
+            const radius = MIN_CIRCLE_RADIUS + weightRatio * radiusRange;
 
             this.layout.push({
                 lotId: this.segments[i].lot.id,
@@ -221,6 +239,10 @@ export class CountingRhymeRenderer extends BaseRenderer {
      * position. Exactly one circle is "current" at any given moment; the
      * transition into it is smoothed over the first TRANSITION_FRACTION of
      * its own segment, so the visual crossfade spans w_i · T_cycle · f.
+     *
+     * Uses the raw normalized Segment.weight (NOT the per-max ratio used for
+     * radius): the cycle must be partitioned by actual probabilities so that
+     * dwell time stays proportional to weight (§11 / §15).
      */
     private computeIntensities(frac: number): number[] {
         const n = this.segments.length;
