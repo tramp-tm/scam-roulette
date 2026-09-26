@@ -112,11 +112,16 @@ export interface ImportResult {
 /**
  * Strategy object for handling import operations.
  * Encapsulates the logic for a specific import strategy.
+ *
+ * Note: the former `label` / `description` fields were removed. They were
+ * dead code — the only UI consumer (importConflictDialog.ts) drives its
+ * text through `data-i18n="importStrategy.<id>.label|description"` keys so
+ * the strings are translated by translateDOM() and re-render on language
+ * change. Any in-strategy strings would have been frozen at module-load
+ * time (before initI18n resolved) and never reflected the active locale.
  */
 export interface ImportStrategy {
     id: 'replace' | 'merge';
-    label: string;
-    description: string;
     /** Execute function - LotManager type is referenced but not imported to avoid circular dependency */
     execute: (parsedLots: ParsedLot[], lotManager: any) => ImportResult;
 }

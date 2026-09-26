@@ -1,13 +1,10 @@
 import { Lot, ImportStrategy, ImportResult } from './types.js';
 import { LotManager } from './lotManager.js';
 import { generateRandomReadableColor } from './utils.js';
-import i18n from './i18n.js';
 
 /** Replace strategy - clears existing lots and imports new ones */
 export const REPLACE_STRATEGY: ImportStrategy = {
     id: 'replace',
-    label: i18n.t('importStrategy.replace.label'),
-    description: i18n.t('importStrategy.replace.description'),
     execute: (parsedLots, lotManager): ImportResult => {
         lotManager.clearAll();
         
@@ -36,8 +33,6 @@ export const REPLACE_STRATEGY: ImportStrategy = {
 /** Merge strategy - combines existing and new lots */
 export const MERGE_STRATEGY: ImportStrategy = {
     id: 'merge',
-    label: i18n.t('importStrategy.merge.label'),
-    description: 'Keep existing lots and add new ones',
     execute: (parsedLots, lotManager): ImportResult => {
         let lotsAdded = 0;
         let lotsTruncated = 0;

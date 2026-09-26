@@ -39,6 +39,9 @@ export async function initI18n(): Promise<void> {
 
     // Делаем первичный перевод DOM сразу после готовности
     translateDOM();
+
+    // Keep <html lang> aligned with the resolved language from the very start
+    syncDocumentLang();
 }
 
 export function translateDOM(): void {
@@ -54,6 +57,21 @@ export function translateDOM(): void {
                 const key = el.getAttribute('data-i18n-title');
                 if (key) el.setAttribute('title', i18n.t(key));
             });
+}
+
+/**
+ * Synchronises the <html lang> attribute with the currently active i18n
+ * language, so screen readers and font shaping use the correct locale.
+ *
+ * Call after initI18n() and after every i18n.changeLanguage(...) — the
+ * language switch in app.ts previously only ran translateDOM(), leaving
+ * the document declared as lang="en" regardless of the selected language.
+ */
+export function syncDocumentLang(): void {
+    const lang = i18n.language || DEFAULT_LANG || FALLBACK_LANG;
+    if (lang) {
+        document.documentElement.setAttribute('lang', lang);
+    }
 }
 
 export function retranslateAllModals(): void {

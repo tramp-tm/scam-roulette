@@ -1,4 +1,4 @@
-import i18n, { t, translateDOM, initI18n } from './i18n.js';
+import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { createRenderer } from './rendererFactory.js';
@@ -352,6 +352,8 @@ export class App {
                 // Re-translate all DOM elements after language change
                 translateDOM();
 
+                // Keep <html lang> in sync so screen readers / font shaping use the right locale
+                syncDocumentLang();
 
                 // Update result text to show mode name in new language (if no winner)
                 this.updateResultTextWithModeName();
@@ -615,18 +617,33 @@ export class App {
 
     private updateControlsState(): void {
         const isAnimating = this.animationController.isAnimating();
-        
-        if (this.spinBtn) this.spinBtn.disabled = this.isSettingsLocked || isAnimating;
+        const locked = this.isSettingsLocked;
+        const disableEditControls = locked || isAnimating;
+
+        if (this.spinBtn) this.spinBtn.disabled = disableEditControls;
         if (this.resetBtn) this.resetBtn.disabled = isAnimating;
         if (this.importBtnControls) this.importBtnControls.disabled = isAnimating;
         if (this.clearBtnControls) this.clearBtnControls.disabled = isAnimating;
-        
-        // Disable form inputs when locked
-        const formInputs = document.querySelectorAll('#lot-form input');
-        formInputs.forEach(input => {
-            if ('disabled' in input && input instanceof HTMLInputElement) {
-                input.disabled = this.isSettingsLocked;
-            }
+
+        // Disable every lot-editing control while the game is locked or animating.
+        //
+        // The previous `#lot-form input` selector matched nothing because no
+        // <form id="lot-form"> exists in index.html, so the add-lot row and the
+        // per-lot amount / delete controls stayed interactive mid-spin — which
+        // desyncs the "decision-before-animation" contract and lets the user
+        // edit the pool after a finished game was supposed to be frozen.
+        //
+        // Target the actual elements instead:
+        //   • add-lot row:    #new-lot-name, #new-lot-amount, #add-lot-btn
+        //   • per-lot list:   #lots-list .lot-amount-input, #lots-list .btn-delete
+        const lockableControls = document.querySelectorAll<
+            HTMLInputElement | HTMLButtonElement
+        >(
+            '#new-lot-name, #new-lot-amount, #add-lot-btn, ' +
+            '#lots-list .lot-amount-input, #lots-list .btn-delete'
+        );
+        lockableControls.forEach(el => {
+            el.disabled = disableEditControls;
         });
     }
 
