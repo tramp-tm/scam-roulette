@@ -5,10 +5,11 @@ Client-only, single-page web application.
 
 > **STATUS: intermediate state.**
 > The project is in the middle of a staged architectural refactor.
-> **Stages 1 – 3 are complete**, so the current code and this document differ
+> **Stages 1 – 4 are complete**, so the current code and this document differ
 > from the historic "single-owner" model. Transitional artefacts (notably
-> `Lot.active` and the unused `LotManager` deactivation API) are marked where
-> they appear. Remaining refactor work is listed in §20.
+> `Lot.active`, the unused `LotManager` deactivation API, and the leftover
+> dead imports in `app.ts`) are marked where they appear. Remaining refactor
+> work (Stage 5+) is listed in §20.
 
 ---
 
@@ -42,7 +43,7 @@ five themes (dark, light, emerald, nordic, monochrome).
 
 ## 3. Project structure
 
-```
+$$$
 /
 ├── index.html                  # static shell + inline theme bootstrap script
 ├── styles.css                  # all styling; 4 theme palettes via :root[data-theme="…"]
@@ -53,7 +54,7 @@ five themes (dark, light, emerald, nordic, monochrome).
 │   └── ru.json
 └── *.ts                        # application sources (compiled to sibling *.js)
     ├── app.ts                      # entry point + orchestration + UI
-    ├── gameSession.ts              # current-game state
+    ├── gameSession.ts              # current-game state + spin lifecycle
     ├── types.ts                    # all shared contracts
     ├── modes.ts                    # game-mode registry
     ├── NormalMode.ts               # GameMode implementation
@@ -78,13 +79,13 @@ five themes (dark, light, emerald, nordic, monochrome).
     ├── errorDialog.ts              # generic error/info dialog
     ├── modalDialog.ts              # abstract modal base class
     └── modalManager.ts             # singleton modal stack manager
-```
+$$$
 
 ---
 
 ## 4. Architectural layers
 
-```
+<$$$>
         ┌──────────────────────────────────────────────┐
  L6 UI   │ app.ts           (orchestration, DOM, loop)  │
         └───────┬──────────────┬───────────────┬───────┘
@@ -111,15 +112,19 @@ five themes (dark, light, emerald, nordic, monochrome).
                 │ animation.ts,          │
                 │ csvParser.ts           │
                 └────────────────────────┘
-```
+</$$$>
+
+*(The two `$$$`-adjacent angle-bracket fences above are only a rendering
+convenience; the diagram itself carries no runtime meaning.)*
 
 **Core rule:** dependencies point downward only. `App` knows *that* a game mode
 exists, never *how* it plays. `RouletteEngine` and `LotManager` are entirely
 mode-agnostic — they only receive a `GameMode` and call its `calculateWeight`.
 
-**Refactor note (Stages 1 – 3).** `GameSession` (`gameSession.ts`) sits
-between `App` and the state layers. It owns the current `GameMode` **and**
-the participation set (`activeLotIds: Set<string>`), and exposes
+**Refactor note (Stages 1 – 4).** `GameSession` (`gameSession.ts`) sits
+between `App` and the state layers. It owns the current `GameMode`, the
+participation set (`activeLotIds: Set<string>`), and — since Stage 4 — the
+turn lifecycle (`prepareSpin()` / `finishSpin()`). It exposes
 `allLots` / `activeLots` / `activeCount` / `state` / `isActive()` as live
 projections over `LotManager`'s global list. `LotManager` remains the owner
 of the **global** lot collection only; `Lot.active` is now inert (see §5,
@@ -155,10 +160,10 @@ is owned by `GameSession.activeLotIds` and exposed via
 still initialises it to `true`, but nothing consumes it. New code must
 consult `GameSession`.
 
-### 5.1 `GameSession` — current-game state
+### 5.1 `GameSession` — current-game state and turn lifecycle
 
-Owns the state of the *current game*, distinct from the *global* lot list
-owned by `LotManager`.
+Owns the state of the *current game* (both participation and the turn
+lifecycle), distinct from the *global* lot list owned by `LotManager`.
 
 | Member | Role |
 |--------|------|
@@ -172,13 +177,21 @@ owned by `LotManager`.
 | `addLot(lot)` / `removeLot(id)` | Explicit participation mutation (paired with `LotManager.addLot` / `deleteLot`). |
 | `deactivateMany(ids)` | Removes several participants (spin eliminations). |
 | `clearLots()` | Empties participation (paired with `LotManager.clearAll`). |
-| `reset()` | Re-seeds `activeLotIds` from the current global list. |
+| `reset()` | Clears any pending spin context, then re-seeds `activeLotIds` from the current global list. |
 | `reconcileAfterBulkChange(previousIds)` | Post-import diff: kept ids preserve prior participation, new ids become active, stale ids dropped. |
+| **`prepareSpin()`** | **Stage 4.** Validates via `RouletteEngine.canSpin()`, rolls via `RouletteEngine.roll()`, stores the pending rolled lot, and returns it — or `null` if the spin cannot proceed. The winner is decided *before* any animation starts. |
+| **`finishSpin()`** | **Stage 4.** Reads the pending rolled lot, processes it through the current mode (`GameMode.processRoll`), applies any eliminations internally (`deactivateMany`), clears the pending context, and returns `{ rolledLot, result }` — or `null` if there is no pending spin. |
 | `setMode(modeId)` | Single authoritative mode change. Participation is preserved across a switch. |
 
 **Invariant.** Every lot returned by `activeLots` / `state` exists in
 `LotManager` — holds by construction, because both are materialised from
 the live accessor. This is the Stage 3 §7 invariant.
+
+**Spin-context invariant (Stage 4).** A pending rolled lot exists only
+between a successful `prepareSpin()` and the matching `finishSpin()`.
+`finishSpin()` nulls the context *before* invoking `processRoll`, and
+`reset()` nulls it as well, so re-entrant or late completions cannot
+replay a stale roll (refac4.md §12 / §17).
 
 ---
 
@@ -189,13 +202,13 @@ All mode-specific rules live inside a `GameMode` implementation. There is no
 
 ### Registry (`modes.ts`)
 
-```
-    export const MODES: Record<Mode, GameMode> = {
-        normal: new NormalMode(),
-        survival: new SurvivalMode()
-    };
-    export function getMode(modeId: Mode): GameMode { return MODES[modeId]; }
-```
+$$$
+export const MODES: Record<Mode, GameMode> = {
+    normal: new NormalMode(),
+    survival: new SurvivalMode()
+};
+export function getMode(modeId: Mode): GameMode { return MODES[modeId]; }
+$$$
 
 Mode instances are stateless and shared. Adding a new mode requires one new
 class and one line in `MODES`; nothing else changes.
@@ -220,15 +233,15 @@ A single spin selects the winner; the game ends immediately.
 
 `processRoll` logic:
 
-```
-    remaining = state.activeLots.filter(l => l.id !== rolledLot.id)
+$$$
+remaining = state.activeLots.filter(l => l.id !== rolledLot.id)
 
-    if remaining.length === 1:
-        → { finished: true, winner: remaining[0], deactivate: [rolledLot.id],
-            message: completionMessage(remaining[0]) }
-    otherwise:
-        → { finished: false, winner: null, deactivate: [rolledLot.id] }
-```
+if remaining.length === 1:
+    → { finished: true, winner: remaining[0], deactivate: [rolledLot.id],
+        message: completionMessage(remaining[0]) }
+otherwise:
+    → { finished: false, winner: null, deactivate: [rolledLot.id] }
+$$$
 
 **Key design point:** the winner is computed from the list *after* removing the
 rolled lot. This prevents the historical bug where the last lot standing was
@@ -281,12 +294,12 @@ owned by `GameSession` (§5.1).
 | `addLot(name, amount, color)` | Adds a lot; returns `{ success, message }` (validation lives here) |
 | `updateLot(id, patch)` | Updates a lot's fields (e.g. `{ amount }`) |
 | `deleteLot(id)` | Removes a lot |
-| `deactivateLot(id)` / `deactivateMany(ids)` | Marks lots inactive (used by spin lifecycle) |
-| `resetAll()` | Reactivates all lots |
+| `deactivateLot(id)` / `deactivateMany(ids)` | Marks lots inactive (transitional — not used by the game path) |
+| `resetAll()` | Reactivates all lots (transitional — only keeps the inert flag consistent) |
 | `clearAll()` | Removes all lots |
 | `getAllLots()` / `getActiveLots()` | Read access |
 | `getTotalCount()` / `getActiveCount()` | Counts |
-| `getState(): GameState` | Snapshot `{ allLots, activeLots }` for a mode's `processRoll` |
+| `getState(): GameState` | Snapshot `{ allLots, activeLots }` (transitional — the session provides its own `state`) |
 | `LotManager.MAX_LOTS` | Static limit = `3000` |
 
 ---
@@ -411,13 +424,13 @@ from `highlightedLotId` (which is never driven for this renderer).
 Each visualization is a `VisualizationPackage` bundling a renderer factory and a
 final-position function:
 
-```
-    WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
-    STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
-    COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
-    export const VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' } as const;
-    export function getVisualizationPackage(type): VisualizationPackage;
-```
+$$$
+WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
+STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
+COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
+export const VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' } as const;
+export function getVisualizationPackage(type): VisualizationPackage;
+$$$
 
 `computeFinalPosition` exposes an optional `canvasWidth?: number`. The wheel
 and strip packages forward it; the Counting Rhyme package deliberately does
@@ -429,7 +442,8 @@ not — its position math lives entirely in cycle space (§9).
 
 ## 11. App orchestration (`app.ts`)
 
-`App` owns the UI and drives the game. It contains **no mode-specific logic**.
+`App` owns the UI and drives the game. It contains **no mode-specific logic**
+and, since Stage 4, **no game-state mutation** either.
 
 **Responsibilities:** DOM wiring, settings panels, lot-list rendering and
 sorting, import execution, animation driving, result display, control
@@ -443,7 +457,7 @@ enable/disable, theme application.
 mode is owned by the session. `settings.modeId` is written **only** as a UI /
 persistence mirror; it is never read back to drive the session.
 
-**Session orchestration (Stages 1 – 3).** Every global-lot mutation is paired
+**Session orchestration (Stages 1 – 4).** Every global-lot mutation is paired
 with the matching `GameSession` call at the mutation site; there is **no**
 `syncGameSession()` step to remember:
 
@@ -455,11 +469,15 @@ with the matching `GameSession` call at the mutation site; there is **no**
 | `resetAll()`                  | `gameSession.reset()`                                |
 | (bulk) import strategy        | `gameSession.reconcileAfterBulkChange(idsBefore)`    |
 | `updateLot(id, { amount })`   | — (participation unaffected)                         |
+| *(turn lifecycle)*            | `gameSession.prepareSpin()` / `gameSession.finishSpin()` (Stage 4) |
 
 Mode change is a single entry point: `gameSession.setMode(id)` plus a
 mirror to `settings.modeId`, followed by `renderer.updateSegments(...)` and
 `render()`. Participation is deliberately preserved across a mode switch
 (§13).
+
+`App` never calls `processRoll()`, `RouletteEngine.roll()`, or
+`deactivateMany()` — those live inside `GameSession` (Stage 4).
 
 ### Initialization order
 1. Create `LotManager`, `renderer` (via `rendererFactory`), `AnimationController`.
@@ -477,52 +495,77 @@ paint, so the theme never flashes on reload.
 
 ## 12. Spin lifecycle — the critical business flow
 
-```
-    spin()
-      ├─ activeLots = gameSession.activeLots                       // session-owned
-      ├─ if (!RouletteEngine.canSpin(activeLots)) → alert(noLotsToSpin); return
-      ├─ isSettingsLocked = true; updateControlsState()           // lock UI
-      ├─ rolledLot = RouletteEngine.roll(activeLots, gameSession.mode)   // DECISION MADE HERE
-      ├─ if (!rolledLot) return
-      ├─ vizPackage = getVisualizationPackage(settings.visualization)
-      ├─ endRotation = vizPackage.computeFinalPosition(
-      │        activeLots, gameSession.mode, rolledLot.id,
-      │        renderer.getCurrentRotation(), animationDuration, canvasWidth)
-      ├─ animationController.configure({ startValue, endValue,
-      │        duration, easing, onUpdate: setRotation+render,
-      │        onComplete: () => finishSpin(rolledLot) })
-      └─ animationController.start()
+Since Stage 4 the turn lifecycle is split cleanly between `App` (animation +
+UI) and `GameSession` (validation, rolling, state transitions).
 
-    finishSpin(rolledLot)
-      ├─ if (!rolledLot) → updateControlsState(); return
-      ├─ highlightedLotId = rolledLot.id
-      ├─ resultText = gameSession.mode.getRollText(rolledLot)
-      ├─ result = gameSession.mode.processRoll(rolledLot, gameSession.state)  // RULES APPLIED HERE
-      ├─ if result.deactivate.length > 0 → gameSession.deactivateMany(result.deactivate)
-      ├─ if result.finished:
-      │     highlightedLotId = result.winner?.id ?? highlightedLotId
-      │     if result.message → alert(result.message) after 500 ms
-      │     isSettingsLocked = true                              // lock until Reset
-      │   else:
-      │     isSettingsLocked = false                             // next spin allowed
-      └─ updateUI(); renderer.updateSegments(gameSession.activeLots, gameSession.mode); render(); updateControlsState()
-```
+$$$
+spin() [App]
+  ├─ rolledLot = gameSession.prepareSpin()                  // session: validate + roll + remember
+  │     └─ if null → alert(noLotsToSpin); return
+  ├─ isSettingsLocked = true; updateControlsState()          // lock UI (after roll succeeds)
+  ├─ vizPackage = getVisualizationPackage(settings.visualization)
+  ├─ endRotation = vizPackage.computeFinalPosition(
+  │        gameSession.activeLots, gameSession.mode, rolledLot.id,
+  │        renderer.getCurrentRotation(), animationDuration, canvasWidth)
+  ├─ animationController.configure({ startValue, endValue,
+  │        duration, easing, onUpdate: setRotation+render,
+  │        onComplete: () => finishSpin() })
+  └─ animationController.start()
 
-The winner is captured in the animation closure; the animation only moves
-the wheel / strip / circle grid to a pre-computed position.
+GameSession.prepareSpin()  (internal)
+  ├─ active = activeLots
+  ├─ if (!RouletteEngine.canSpin(active)) → return null
+  ├─ rolledLot = RouletteEngine.roll(active, currentMode)    // DECISION MADE HERE
+  ├─ if (!rolledLot) → return null
+  ├─ pendingRolledLot = rolledLot
+  └─ return rolledLot
 
-**Refactor note (Stage 3 §4 / §7).** `finishSpin` never touches `Lot.active`.
-Eliminations act on `GameSession` (the owner of participation). The next
-read of `session.activeLots` already reflects the change without a sync step;
-the `if (result.deactivate.length > 0)` guard is kept only to skip a useless
-loop when there is nothing to deactivate.
+finishSpin() [App]
+  ├─ outcome = gameSession.finishSpin()
+  │     └─ if null → updateControlsState(); return
+  ├─ { rolledLot, result } = outcome
+  ├─ highlightedLotId = rolledLot.id
+  ├─ resultText = gameSession.mode.getRollText(rolledLot)
+  ├─ if result.finished:
+  │     highlightedLotId = result.winner?.id ?? highlightedLotId
+  │     if result.message → alert(result.message) after 500 ms
+  │     isSettingsLocked = true                              // lock until Reset
+  │   else:
+  │     isSettingsLocked = false                             // next spin allowed
+  └─ updateUI(); renderer.updateSegments(gameSession.activeLots, gameSession.mode);
+      render(); updateControlsState()
+
+GameSession.finishSpin()  (internal)
+  ├─ rolledLot = pendingRolledLot; if null → return null
+  ├─ pendingRolledLot = null                                 // clear BEFORE processing
+  ├─ result = currentMode.processRoll(rolledLot, state)      // RULES APPLIED HERE
+  ├─ if result.deactivate.length > 0 → deactivateMany(result.deactivate)
+  └─ return { rolledLot, result }
+$$$
+
+The winner is decided inside `GameSession.prepareSpin()`, i.e. **before**
+`App` configures or starts any animation; the animation only moves the
+wheel / strip / circle grid to a pre-computed position.
+
+**Refactor note (Stage 4, refac4.md §3–§12).**
+- `App` never touches `GameSession.activeLotIds`, never calls
+  `processRoll` and never calls `deactivateMany` — all of that is inside
+  `GameSession.finishSpin()`.
+- `isSettingsLocked = true` is now set **after** `prepareSpin()` succeeds,
+  so a failed validation no longer leaves the UI permanently locked.
+- `reset()` on the session nulls the pending rolled lot, so a late
+  `onComplete` (e.g. after `AnimationController.stop()` followed by a fresh
+  start) cannot replay a stale roll — `finishSpin()` returns `null` in that
+  case and `App` is a no-op apart from re-evaluating control state.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
-```
-    spin #1 → B rolled → deactivate B → active = {A, C} → finished=false → next spin allowed
-    spin #2 → C rolled → deactivate C → remaining = {A}  → winner A, finished=true → UI locks
-```
+$$$
+spin #1 → prepareSpin rolls B → finishSpin: deactivate B → active = {A, C}
+        → finished=false → next spin allowed
+spin #2 → prepareSpin rolls C → finishSpin: remaining = {A} → winner A,
+        finished=true → UI locks
+$$$
 
 No third spin occurs. For Normal mode, a single spin yields `finished=true` with
 the rolled lot as winner.
@@ -644,8 +687,10 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
 
 ## 19. Business-logic invariants
 
-1. **Result before animation.** The winner/eliminated lot is chosen in `spin()`
-   before the animation starts; the animation cannot change the outcome.
+1. **Result before animation.** The winner/eliminated lot is chosen inside
+   `GameSession.prepareSpin()` — before the animation starts. The animation
+   only moves the visualization to a pre-computed position and cannot change
+   the outcome.
 2. **Modes own their rules.** All game rules live in `NormalMode` /
    `SurvivalMode`. Adding a mode requires editing only `modes.ts` and one new
    class.
@@ -661,27 +706,48 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
    global lot existence lives in `LotManager`. The `GameState` passed to
    `processRoll` is materialised from the session, so a stale id can never
    leak into a mode.
+7. **GameSession owns the turn lifecycle.** Since Stage 4, rules are applied
+   inside `GameSession.finishSpin()`. `App` reads the returned
+   `{ rolledLot, result }` for UI only and never mutates game state itself.
+8. **Pending-spin context is single-use.** A pending rolled lot exists only
+   between `prepareSpin()` and `finishSpin()`; `finishSpin()` clears it
+   before invoking `processRoll`, and `reset()` clears it too — a stale roll
+   can never be replayed.
 
 ---
 
 ## 20. Known issues / technical debt
 
+**Remaining (Stage 5+).**
+
 | # | Issue | Impact |
 |---|-------|--------|
-| 1 | `App.mode` / `finishSpin` re-resolve `gameSession.mode` inline; a mode change during animation would desync rules from animation | Rare — capture the mode once at `spin()` entry if the hazard is worth closing |
+| 1 | `App` still re-resolves `gameSession.mode` inline in `spin()` / `finishSpin()`; a mode change during animation would desync the current mode from the animation-time mode | Rare — capture the mode once at `spin()` entry if the hazard is worth closing |
 | 2 | `rendererFactory.ts` duplicates the registry lookup already exposed by `VisualizationPackage.createRenderer` | Redundant indirection, harmless |
-| 3 | `App.spin` early-returns on `!rolledLot` after setting `isSettingsLocked = true` | Lockout trap if upstream validation changes |
-| 4 | Dead imports in `app.ts` (`parseCSV`, `ModalManager`, `IMPORT_STRATEGIES`, `ParseResult`, `SeparatorType`) | Obscures ownership of CSV parsing |
-| 5 | `RouletteEngine.getSegmentCenterAngle` is defined but unused | Dead code |
-| 6 | **Transitional (Stage 3).** `Lot.active` and `LotManager` members `toggleActive` / `deactivateLot` / `deactivateMany` / `resetAll` / `getActiveLots` / `getActiveCount` / `getState` are no longer used by the game path | Dead code — removal is a follow-up refactor stage |
-| 7 | **Transitional (Stage 3).** `App.reset()` still calls `lotManager.resetAll()` **and** `gameSession.reset()` — the first is kept only to keep the inert `Lot.active` flag consistent | Two-step reset; collapses to `gameSession.reset()` once `Lot.active` is removed |
-| 8 | `importStrategies.ts` receives `LotManager` typed as `any` in the `ImportStrategy` interface rather than a session | Intentional while `LotManager` owns the global list; the `any` obscures the contract |
+| 3 | Dead imports in `app.ts` (`parseCSV`, `ModalManager`, `IMPORT_STRATEGIES`, `ParseResult`, `SeparatorType`) | Obscures ownership of CSV parsing; TS `noUnusedLocals` would flag them |
+| 4 | `RouletteEngine.getSegmentCenterAngle` is defined but unused | Dead code |
+| 5 | **Transitional (Stage 3).** `Lot.active` and `LotManager` members `toggleActive` / `deactivateLot` / `deactivateMany` / `resetAll` / `getActiveLots` / `getActiveCount` / `getState` are no longer used by the game path | Dead code — removal is a follow-up refactor stage |
+| 6 | **Transitional (Stage 3).** `App.reset()` still calls `lotManager.resetAll()` **and** `gameSession.reset()` — the first is kept only to keep the inert `Lot.active` flag consistent | Two-step reset; collapses to `gameSession.reset()` once `Lot.active` is removed |
+| 7 | `importStrategies.ts` receives `LotManager` typed as `any` in the `ImportStrategy` interface rather than a concrete type | Intentional while `LotManager` owns the global list; the `any` obscures the contract |
 
-Resolved during the refactor (kept for traceability): the former
-`#lot-form input` selector in `updateControlsState()` (now targets the
-actual add-row / per-lot controls); the module-load-time `i18n.t()` calls
-and hardcoded English `MERGE_STRATEGY.description` in `importStrategies.ts`
-(labels live in locales, driven by `data-i18n`); the failing `<html lang>`
-update on language switch (`syncDocumentLang()` now runs from `initI18n` and
-from the language handler); the `rouletteEaseOut === easeOutQuint` duplicate
-(now a distinct cubic/quintic blend).
+**Resolved during the refactor (kept for traceability).**
+
+- The former `#lot-form input` selector in `updateControlsState()` (now targets
+  the actual add-row / per-lot controls).
+- The module-load-time `i18n.t()` calls and hardcoded English
+  `MERGE_STRATEGY.description` in `importStrategies.ts` (labels live in
+  locales, driven by `data-i18n`).
+- The failing `<html lang>` update on language switch (`syncDocumentLang()`
+  now runs from `initI18n` and from the language handler).
+- The `rouletteEaseOut === easeOutQuint` duplicate (now a distinct
+  cubic/quintic blend).
+- **Stage 3:** participation state moved from `Lot.active` to
+  `GameSession.activeLotIds`; `syncGameSession()` eliminated in favour of
+  explicit participation mutations; post-import reconciliation via
+  `GameSession.reconcileAfterBulkChange(previousIds)`.
+- **Stage 4:** the turn lifecycle (`RouletteEngine.roll` → `GameMode.processRoll`
+  → `deactivateMany`) moved from `App.finishSpin` into
+  `GameSession.prepareSpin()` / `GameSession.finishSpin()`. `App.spin` no
+  longer sets `isSettingsLocked = true` before validation runs, so a failed
+  spin cannot leave the UI locked. The former `App.spin` early-return-after-lock
+  hazard (previously listed here) is now closed.
