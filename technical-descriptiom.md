@@ -54,6 +54,7 @@ visualizations (Wheel, Strip), two languages (EN/RU), four themes
     ├── lotManager.ts               # lot state
     ├── rendererFactory.ts          # renderer construction
     ├── visualizationStrategy.ts    # visualization-package registry
+    ├── baseRenderer.ts             # shared IRenderer base class
     ├── wheelRenderer.ts            # IRenderer implementation (wheel)
     ├── stripRenderer.ts            # IRenderer implementation (strip)
     ├── animation.ts                # easing functions + AnimationController
@@ -206,8 +207,10 @@ winner, or completion.
 | `computeFinalScrollOffset(lots, mode, targetLotId, currentOffset, durationMs, canvasWidth)` | Strip: horizontal offset that places the target segment centre under the viewport centre, plus extra cycles. |
 | `canSpin(activeLots)` | Returns `activeLots.length >= 1`. |
 
-Segment width (strip) is derived as `Math.max(60, normalizedWeight * 400)` —
-the renderer and the offset math use the same formula.
+Segment width (strip) is derived via `getSegmentWidth(normalizedWeight)` from
+`utils.ts` — a **single source of truth** shared by the strip renderer's drawing
+pass and `computeFinalScrollOffset`'s scroll math, so the two cannot drift
+apart. The formula is `Math.max(60, normalizedWeight * 400)`.
 
 ---
 
@@ -230,37 +233,84 @@ Owns the `Lot[]`. Knows nothing about game modes, winners, or rules.
 
 ---
 
-## 9. Renderers (`wheelRenderer.ts`, `stripRenderer.ts`)
+## 9. Renderers (`baseRenderer.ts`, `wheelRenderer.ts`, `stripRenderer.ts`)
 
-Both implement `IRenderer`. They receive a `GameMode` in `updateSegments` and
-delegate weight math to `RouletteEngine.calculateSegments`. Neither computes
-weights itself.
+All renderers implement `IRenderer`. They receive a `GameMode` in
+`updateSegments` and delegate weight math to `RouletteEngine.calculateSegments`.
+Neither computes weights itself.
 
-Both:
-- set up high-DPI canvas scaling with a 600×500 fallback when the canvas has no
-  measured size yet;
-- `reset()` clears rotation, highlight, and segments.
+### `BaseRenderer` (`baseRenderer.ts`)
 
-### WheelRenderer
-- Radius: `min(centerX, centerY) - 30`.
-- Segments drawn as arcs; white 2px stroke; labels at `0.7 * radius`, rotated
-  by mid-angle.
-- Highlight → `brightenColor(color, 30)`.
-- Cursor: a gold (`'gold'`) downward triangle at the top, with a gold glow.
-- Frame: outer decorative ring at `radius + 10` (`rgba(255,255,255,0.3)`, 4px),
-  plus a subtle inner ring at `radius - 5` (`rgba(255,255,255,0.1)`, 2px).
+Abstract base class shared by every concrete renderer. Owns the state and
+lifecycle that used to be duplicated between the two renderers:
 
-### StripRenderer
-- Infinite scroll via modulo of the accumulated offset over one cycle's width,
-  with cyclic buffer copies for seamlessness.
-- Segment width `Math.max(60, weight * 400)`; band height 160; vertical labels
-  (rotated `-π/2`).
-- Highlight → `brightenColor(color, 40)` plus a gold glow.
-- Cursor: a gold dashed vertical centre line with gold down/up arrows at the top
-  and bottom edges.
-- Frame: rectangular decorative frame `(0, centerY-90, canvasWidth, 180)`
-  (`rgba(255,255,255,0.3)`, 4px) — the strip's counterpart to the wheel's outer
-  ring.
+- **State:** `canvas` and `ctx` (both `protected readonly`), `segments`,
+  `currentRotation`, `highlightedLotId`.
+- **Constructor:** grabs the 2D context and calls `setupHighDPI()`.
+- **`setupHighDPI()`** — reads `devicePixelRatio`, measures the canvas via
+  `getBoundingClientRect()`, and falls back to `600 × 500` **only when the
+  measured size is zero** (canvas not yet laid out). Sizes the backing store
+  and applies `ctx.scale(dpr, dpr)`. No fake `DOMRect`, no type cast.
+- **`updateSegments(lots, mode)`** — calls `RouletteEngine.calculateSegments`
+  and stores the result. Subclasses override it to add caching (see
+  `StripRenderer` below).
+- **`setRotation` / `getCurrentRotation` / `setHighlightedLot` / `reset`** —
+  trivial state accessors plus a shared reset of `currentRotation`,
+  `highlightedLotId`, and `segments`.
+- **`render(canvasWidth, canvasHeight)`** is abstract.
+
+### `WheelRenderer` (`wheelRenderer.ts`)
+
+Extends `BaseRenderer`. Segment/ring/pointer/label geometry is defined by
+module-level constants (`WHEEL_MARGIN`, `SEGMENT_STROKE_WIDTH`,
+`HIGHLIGHT_BRIGHTNESS`, `LABEL_*`, `POINTER_*`, `OUTER_RING_*`,
+`INNER_RING_*`). Rendering:
+
+- Radius: `min(centerX, centerY) - WHEEL_MARGIN` (= 30).
+- Segments drawn as arcs; white 2 px stroke; labels at `0.7 * radius`, rotated
+  by mid-angle, drawn only when the arc span exceeds `LABEL_MIN_ARC`.
+- Highlight → `brightenColor(color, HIGHLIGHT_BRIGHTNESS)` (= 30).
+- Cursor: a gold (`POINTER_COLOR`) downward triangle at the top, with a glow
+  (`POINTER_SHADOW_BLUR`).
+- Frame: outer decorative ring at `radius + OUTER_RING_OFFSET` (= 10)
+  (`rgba(255,255,255,0.3)`, 4 px), plus a subtle inner ring at
+  `radius - INNER_RING_OFFSET` (= 5) (`rgba(255,255,255,0.1)`, 2 px).
+
+### `StripRenderer` (`stripRenderer.ts`)
+
+Extends `BaseRenderer`. Overrides:
+
+- **`updateSegments(lots, mode)`** — after `super.updateSegments`, sums
+  `getSegmentWidth(s.weight)` over all segments and caches the result in
+  `totalCycleWidth`. This is recomputed only when the lots/mode change, never
+  inside the animation frame loop.
+- **`reset()`** — calls `super.reset()` and clears `totalCycleWidth`.
+- **`render(canvasWidth, canvasHeight)`** — infinite scroll via modulo of the
+  accumulated offset over one cycle's width (`getVisualOffset`), with cyclic
+  buffer copies (`getCyclesNeeded` → `renderOneCycle`) for seamlessness. The
+  helper methods keep the render body focused on the drawing sequence.
+
+Geometry is defined by module-level constants (`BAND_HEIGHT = 160`,
+`BAND_HALF_HEIGHT`, `FRAME_PADDING`, `LABEL_*`, `HIGHLIGHT_*`). Behaviour:
+
+- Segment width comes exclusively from `getSegmentWidth(weight)` (same
+  function used by `RouletteEngine.computeFinalScrollOffset`).
+- Band height 160; vertical labels (rotated `-π/2`), truncated per constants.
+- Highlight → `brightenColor(color, HIGHLIGHT_BRIGHTNESS)` (= 40) plus a gold
+  glow (`HIGHLIGHT_SHADOW_*`).
+- Cursor: a gold dashed vertical centre line with gold down/up arrows at the
+  top and bottom edges.
+- Frame: rectangular decorative frame
+  `(0, centerY - BAND_HALF_HEIGHT - FRAME_PADDING, canvasWidth,
+  (BAND_HALF_HEIGHT + FRAME_PADDING) * 2)`
+  (`rgba(255,255,255,0.3)`, 4 px) — the strip's counterpart to the wheel's
+  outer ring.
+
+The `BaseRenderer` extraction was performed as part of a review of
+`stripRenderer.ts`; the fixes (deduplicated segment-width formula, simplified
+high-DPI setup, constant extraction, `totalCycleWidth` caching) were applied to
+the shared base and to `wheelRenderer.ts` as well, so both sibling renderers
+stay aligned.
 
 ---
 
@@ -446,10 +496,12 @@ Cancel. Truncation is reported via `ErrorDialog` with a summary message.
 |----------|---------|
 | `generateRandomReadableColor()` | HSL colour with controlled lightness for label contrast |
 | `brightenColor(color, percent)` | Hex → lightened hex, used for highlights |
+| `getSegmentWidth(weight)` | Strip segment width from a normalized weight; single source of truth shared by the strip renderer and RouletteEngine's scroll math |
 | `sliderToDuration(v)` / `durationToSlider(s)` | Bidirectional mapping; 1–60 s linear, above that a non-linear map |
 | `getRandomPositionInRange(...)` | Random landing position within a segment, with edge margins |
 
-Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`.
+Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
+`MIN_SEGMENT_WIDTH` (= 60), `SEGMENT_WIDTH_SCALE` (= 400).
 
 ---
 
