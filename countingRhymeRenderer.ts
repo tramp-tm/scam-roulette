@@ -38,7 +38,7 @@ import { BaseRenderer } from './baseRenderer.js';
  */
 
 /** Gold that matches the wheel / strip pointers. */
-const HIGHLIGHT_COLOR = '#ffd700';
+const HIGHLIGHT_COLOR = 'gold';
 const HIGHLIGHT_GLOW_BLUR = 24;
 const HIGHLIGHT_STROKE_WIDTH = 4;
 
