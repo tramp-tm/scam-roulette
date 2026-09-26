@@ -35,6 +35,14 @@ import { BaseRenderer } from './baseRenderer.js';
  * radius from `w / max(w)` (relative magnitude). Do not "unify" them:
  * dividing the dwell partition by max(w) would break the Σw = 1 invariant
  * that computeIntensities() relies on.
+ *
+ * NOTE ON COSMETIC SHUFFLE: the mapping segment i → grid cell is permuted so
+ * the highlight order (still segments[0..n-1], the sole owner of dwell timing
+ * §11) is decoupled from the visual position. The permutation is seeded
+ * deterministically from the lot ids, so the same lot set yields the same
+ * arrangement (no reshuffling between Survival eliminations) while still
+ * breaking any perceived correlation between list order and screen position.
+ * Math.random() is never called from render() — §27 is respected.
  */
 
 /** Gold that matches the wheel / strip pointers. */
@@ -76,6 +84,9 @@ export class CountingRhymeRenderer extends BaseRenderer {
     /** prefixSums[i] = sum of Segment.weight for segments[0..i-1]. */
     private prefixSums: number[] = [];
 
+    /** cellOfSegment[i] = grid cell index where segments[i] is drawn. */
+    private cellOfSegment: number[] = [];
+
     /** Currently resolved circle index (internal; not driven by highlightLotId). */
     private currentHighlighted: number = -1;
 
@@ -95,6 +106,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         // starts from a clean slate.
         this.layout = [];
         this.prefixSums = [];
+        this.cellOfSegment = [];
         this.currentHighlighted = -1;
     }
 
@@ -163,7 +175,12 @@ export class CountingRhymeRenderer extends BaseRenderer {
 
     /**
      * Deterministic grid layout, computed once per updateSegments() and
-     * cached for the whole spin. No randomness, no per-frame repositioning.
+     * cached for the whole spin. No per-frame repositioning.
+     *
+     * The segment → cell mapping is a deterministic permutation of the cells
+     * (see buildCellPermutation). computeIntensities() and render() both
+     * iterate by segment index i, so permuting cells only affects *where*
+     * segments[i] is drawn, never *when* it is highlighted.
      */
     private rebuildLayout(): void {
         this.layout = [];
@@ -203,9 +220,19 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const safeMaxWeight = maxWeight > 0 ? maxWeight : 1;
         const radiusRange = Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
 
+        // Shuffle which cell each segment occupies. This is cosmetic only:
+        // the highlight order is still segments[0..n-1], but the highlighted
+        // circle now appears to "hop" unpredictably across the grid. Seeded
+        // from the lot ids, so identical lot sets yield identical layouts.
+        this.cellOfSegment = this.buildCellPermutation(
+            n,
+            this.segments.map(s => s.lot.id)
+        );
+
         for (let i = 0; i < n; i++) {
-            const col = i % cols;
-            const row = Math.floor(i / cols);
+            const cell = this.cellOfSegment[i];
+            const col = cell % cols;
+            const row = Math.floor(cell / cols);
 
             // Center a possibly-partial final row horizontally.
             const itemsInRow = row === rows - 1 ? n - row * cols : cols;
@@ -226,6 +253,39 @@ export class CountingRhymeRenderer extends BaseRenderer {
         }
     }
 
+    /**
+     * Deterministic Fisher–Yates shuffle of [0, n), seeded from the given
+     * lot ids. Because the seed depends only on the set of ids, the same lot
+     * set always yields the same arrangement — the grid does NOT reshuffle
+     * between Survival eliminations. Called once per updateSegments(), never
+     * from render(), so the random source stays off the animation hot path
+     * (§27). The deterministic part of the game (winner selection) lives in
+     * RouletteEngine.roll().
+     */
+    private buildCellPermutation(n: number, seedFrom: string[]): number[] {
+        // FNV-1a seed over the lot ids.
+        let seed = 2166136261;
+        for (const s of seedFrom) {
+            for (let i = 0; i < s.length; i++) {
+                seed = (seed ^ s.charCodeAt(i)) * 16777619 >>> 0;
+            }
+        }
+
+        // LCG returning values in [0, 1).
+        const rand = () => {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 0xFFFFFFFF;
+        };
+
+        const perm = new Array<number>(n);
+        for (let i = 0; i < n; i++) perm[i] = i;
+        for (let i = n - 1; i > 0; i--) {
+            const j = Math.floor(rand() * (i + 1));
+            [perm[i], perm[j]] = [perm[j], perm[i]];
+        }
+        return perm;
+    }
+
     // ------------------------------------------------------------------
     // Position → highlight (counting-rhyme mechanics, §11 / §20)
     // ------------------------------------------------------------------
@@ -243,6 +303,10 @@ export class CountingRhymeRenderer extends BaseRenderer {
      * Uses the raw normalized Segment.weight (NOT the per-max ratio used for
      * radius): the cycle must be partitioned by actual probabilities so that
      * dwell time stays proportional to weight (§11 / §15).
+     *
+     * NOTE: this method is untouched by the cosmetic cell shuffle — the
+     * highlight index is by segment index, not by grid cell, so the dwell
+     * partition and the last-frame guarantee (§21) are unaffected.
      */
     private computeIntensities(frac: number): number[] {
         const n = this.segments.length;
