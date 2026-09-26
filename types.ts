@@ -46,7 +46,7 @@ export interface GameMode {
 export type Mode = 'normal' | 'survival';
 
 // Visualization types
-export type VisualizationType = 'wheel' | 'strip';
+export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
 // Settings interface
 export interface Settings {

@@ -2,6 +2,7 @@ import { Lot, GameMode, VisualizationType, VisualizationPackage } from './types.
 import { RouletteEngine } from './rouletteEngine.js';
 import { WheelRenderer } from './wheelRenderer.js';
 import { StripRenderer } from './stripRenderer.js';
+import { CountingRhymeRenderer } from './countingRhymeRenderer.js';
 
 /**
  * Bundled visualization package for wheel type.
@@ -24,11 +25,27 @@ const STRIP_PACKAGE: VisualizationPackage = {
 };
 
 /**
+ * Bundled visualization package for counting-rhyme type.
+ *
+ * Note: computeFinalCountingPosition intentionally takes 5 arguments (no
+ * canvasWidth) — its position math lives entirely in cycle space and does
+ * not depend on pixel dimensions. The optional 6th parameter is simply not
+ * forwarded (§13 / §17).
+ */
+const COUNTING_RHYME_PACKAGE: VisualizationPackage = {
+    id: 'counting-rhyme',
+    createRenderer: (canvas) => new CountingRhymeRenderer(canvas),
+    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration) =>
+        RouletteEngine.computeFinalCountingPosition(lots, mode, targetLotId, currentPosition, duration)
+};
+
+/**
  * Registry of all visualization packages - single source of truth.
  */
 export const VISUALIZATION_PACKAGES = {
     wheel: WHEEL_PACKAGE,
-    strip: STRIP_PACKAGE
+    strip: STRIP_PACKAGE,
+    'counting-rhyme': COUNTING_RHYME_PACKAGE
 } as const;
 
 /**
