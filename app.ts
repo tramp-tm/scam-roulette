@@ -2,11 +2,10 @@ import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { createRenderer } from './rendererFactory.js';
-import { RouletteEngine } from './rouletteEngine.js';
 import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { GameSession } from './gameSession.js';
-import { IRenderer, VisualizationType, Settings, Mode, Lot, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction, RollResult } from './types.js';
+import { IRenderer, VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction } from './types.js';
 import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './importStrategies.js';
 import { 
     generateRandomReadableColor, 
@@ -508,35 +507,32 @@ export class App {
     }
 
     private spin(): void {
-        // Read the current active lots via the GameSession — the single
-        // source of truth for "which lots participate right now".
-        const activeLots = this.gameSession.activeLots;
-
-        if (!RouletteEngine.canSpin(activeLots)) {
+        // Preparation belongs to the session (Stage 4 §3–§4): validation,
+        // rolling, and remembering the pending spin. The result is decided
+        // here, before any animation starts.
+        const rolledLot = this.gameSession.prepareSpin();
+        if (!rolledLot) {
             alert(t('validation.noLotsToSpin'));
             return;
         }
-        
+
         // Lock settings
         this.isSettingsLocked = true;
         this.updateControlsState();
-        
-        // Select rolled lot using mode's weight calculation (BEFORE animation)
-        const rolledLot = RouletteEngine.roll(activeLots, this.gameSession.mode);
-        if (!rolledLot) return;
 
         // Calculate final position using visualization strategy pattern
         const currentRotation = this.renderer.getCurrentRotation();
         const targetLotId = rolledLot.id;
         const animationDuration = this.settings.animationDuration;
-        
+
         // Get canvas dimensions
         const rect = this.canvas.getBoundingClientRect();
-        
-        // Use bundled visualization package - single lookup returns everything needed
+
+        // Use bundled visualization package - single lookup returns
+        // everything needed
         const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
         const endRotation = vizPackage.computeFinalPosition(
-            activeLots,
+            this.gameSession.activeLots,
             this.gameSession.mode,
             targetLotId,
             currentRotation,
@@ -555,7 +551,7 @@ export class App {
                 this.render();
             },
             onComplete: () => {
-                this.finishSpin(rolledLot);
+                this.finishSpin();
             }
         });
 
@@ -565,36 +561,34 @@ export class App {
 
     /**
      * Finishes the spin and applies results.
+     *
+     * The session owns the game-state transition (Stage 4 §6 / §11):
+     * `gameSession.finishSpin()` processes the stored roll through the
+     * current mode and applies eliminations internally. `App` only reads
+     * the returned outcome for UI display.
      */
-    private finishSpin(rolledLot: Lot | null): void {
-        if (!rolledLot) {
+    private finishSpin(): void {
+        const outcome = this.gameSession.finishSpin();
+
+        if (!outcome) {
+            // No pending spin (e.g. the animation was stopped/aborted).
             this.updateControlsState();
             return;
         }
 
-        // Immediate visual: show the rolled lot highlighted and its roll text
+        const { rolledLot, result } = outcome;
+
+        // Immediate visual: show the rolled lot highlighted and its roll
+        // text. These are UI concerns only — `getRollText` is a
+        // mode-provided display string, not a game-state mutation.
         this.highlightedLotId = rolledLot.id;
         if (this.resultText) {
             this.resultText.textContent = this.gameSession.mode.getRollText(rolledLot);
         }
 
-        // Let the mode decide what this roll means, using the session's
-        // live game-state snapshot.
-        const result: RollResult = this.gameSession.mode.processRoll(
-            rolledLot,
-            this.gameSession.state
-        );
-
-        // Apply eliminations through the GameSession (owner of participation
-        // since Stage 3 §4) rather than through the shared `Lot.active`
-        // field. The next read of `session.activeLots` already reflects the
-        // change — no sync step exists to forget.
-        if (result.deactivate.length > 0) {
-            this.gameSession.deactivateMany(result.deactivate);
-        }
-
         if (result.finished) {
-            // A surviving winner (e.g. SurvivalMode) may differ from the rolled lot
+            // A surviving winner (e.g. SurvivalMode) may differ from the
+            // rolled lot.
             if (result.winner) {
                 this.highlightedLotId = result.winner.id;
             }
@@ -630,6 +624,7 @@ export class App {
         //     `Lot.active` flag on the global lots.
         //   • GameSession.reset()    — real reset of the current game: every
         //     lot currently in the global list becomes an active participant.
+        //     Also clears any in-flight spin context (Stage 4 §17).
         this.lotManager.resetAll();
         this.gameSession.reset();
         

@@ -1,5 +1,6 @@
-import type { GameMode, GameState, Lot, Mode } from './types.js';
+import type { GameMode, GameState, Lot, Mode, RollResult } from './types.js';
 import { getMode } from './modes.js';
+import { RouletteEngine } from './rouletteEngine.js';
 
 /**
  * Represents the current game session: the active game mode paired with the
@@ -15,6 +16,8 @@ import { getMode } from './modes.js';
  *   - own the current GameMode (the rules that govern this session);
  *   - own the participation state of the current game (which lots take part
  *     in the current session);
+ *   - own the spin lifecycle (Stage 4): prepare the roll, decide the result
+ *     before animation, apply the mode's state transitions on completion;
  *   - expose a single authoritative point of mode change via `setMode()`;
  *   - expose explicit mutation operations (`addLot`, `removeLot`,
  *     `deactivateMany`, `clearLots`, `reset`, `reconcileAfterBulkChange`) so
@@ -54,6 +57,23 @@ import { getMode } from './modes.js';
  *   orchestrates the two independent operations (global lot mutation via
  *   `LotManager`, participation mutation via `GameSession`) at each call
  *   site, and the session never caches a snapshot of the global list.
+ *
+ * Spin lifecycle (Stage 4, refac4.md):
+ *
+ *   Stage 3 left the turn lifecycle in `App`: `App` called
+ *   `RouletteEngine.roll(...)`, then `GameMode.processRoll(...)`, then
+ *   interpreted the `RollResult` and applied `GameSession.deactivateMany(...)`.
+ *   That meant `App` still knew the shape of the rules.
+ *
+ *   Stage 4 moves the lifecycle here:
+ *
+ *     - `prepareSpin()` validates, rolls (via `RouletteEngine.roll`) and
+ *       stores the pending rolled lot — the winner is decided *before* the
+ *       animation (§3–§5 of the plan);
+ *     - `finishSpin()` re-reads that stored lot, asks the current mode to
+ *       `processRoll`, applies the resulting eliminations internally and
+ *       returns the outcome for UI. `App` never mutates game state itself
+ *       (§6, §11). `GameMode` stays the sole owner of the rules (§7).
  */
 export class GameSession {
     private currentMode: GameMode;
@@ -64,6 +84,14 @@ export class GameSession {
      * part in this session. Owned solely by this class (Stage 3 §2 / §4).
      */
     private activeLotIds: Set<string>;
+
+    /**
+     * Context of the in-progress spin (Stage 4 §5): the lot already decided
+     * by `prepareSpin()` and awaited by `finishSpin()`. Cleared by
+     * `finishSpin()` and by `reset()` so a stale pending roll can never be
+     * replayed (Stage 4 §12 / §17).
+     */
+    private pendingRolledLot: Lot | null = null;
 
     /**
      * @param modeId  The initial mode governing this session.
@@ -190,6 +218,9 @@ export class GameSession {
      * pressed; the two operations are not merged into a single method here.
      */
     reset(): void {
+        // Clear any in-flight spin context so an aborted animation cannot
+        // leave a stale pending roll behind (Stage 4 §17).
+        this.pendingRolledLot = null;
         this.activeLotIds = new Set(this.getLots().map(lot => lot.id));
     }
 
@@ -227,6 +258,68 @@ export class GameSession {
                 this.activeLotIds.add(id);
             }
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Spin lifecycle (Stage 4)
+    // ---------------------------------------------------------------
+
+    /**
+     * Prepares a spin (Stage 4 §3–§4): validates, rolls the winning lot with
+     * the current mode, stores it as the pending spin context, and returns
+     * it so `App` can drive the animation.
+     *
+     * Returning `null` means the spin cannot proceed (no active lots, or a
+     * degenerate zero-weight pool) — the caller must not start the
+     * animation.
+     *
+     * The winner is decided here, *before* any animation starts; the
+     * animation only represents the already-decided result (§4).
+     */
+    prepareSpin(): Lot | null {
+        const active = this.activeLots;
+        if (!RouletteEngine.canSpin(active)) {
+            return null;
+        }
+
+        const rolledLot = RouletteEngine.roll(active, this.currentMode);
+        if (!rolledLot) {
+            return null;
+        }
+
+        this.pendingRolledLot = rolledLot;
+        return rolledLot;
+    }
+
+    /**
+     * Finishes the in-progress spin (Stage 4 §6 / §11): processes the stored
+     * rolled lot through the current mode, applies the resulting state
+     * transitions (eliminations) to this session, and returns the outcome
+     * plus the rolled lot so `App` can update the UI.
+     *
+     * Guarantees that `activeLots` / `activeCount` / `state` are fully
+     * up-to-date upon return — no follow-up sync call from `App` is needed
+     * (§11).
+     *
+     * Returns `null` if there is no pending spin (e.g. a late `onComplete`
+     * after `reset()`); the caller treats that as a no-op for UI (§12).
+     */
+    finishSpin(): { rolledLot: Lot; result: RollResult } | null {
+        const rolledLot = this.pendingRolledLot;
+        if (!rolledLot) {
+            return null;
+        }
+
+        // Clear the pending context *before* applying the transition so a
+        // re-entrant call cannot process the same roll twice (§12).
+        this.pendingRolledLot = null;
+
+        const result = this.currentMode.processRoll(rolledLot, this.state);
+        if (result.deactivate.length > 0) {
+            this.deactivateMany(result.deactivate);
+        }
+
+        return { rolledLot, result };
     }
 
     // ---------------------------------------------------------------
