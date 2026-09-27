@@ -10,7 +10,6 @@ import {
     generateRandomReadableColor, 
     sliderToDuration, 
     durationToSlider, 
-    MAX_DURATION_SLIDER_VALUE,
     MIN_DURATION_SEC,
     MAX_DURATION_SEC
 } from './utils.js';
@@ -754,7 +753,6 @@ export class App {
             } else if (onAmountChange && lot.id) {
                 // Handle amount change with callback
                 const lotId: string = lot.id; // Capture in closure, guaranteed defined here
-                let debounceTimer: number | null = null;
                 amountInput.addEventListener('change', () => {
                     const newAmount = parseFloat(amountInput.value);
                     if (!isNaN(newAmount) && newAmount > 0) {
