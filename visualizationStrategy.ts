@@ -1,8 +1,17 @@
-import { Lot, GameMode, VisualizationType, VisualizationPackage } from './types.js';
+import { VisualizationType, VisualizationPackage } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { WheelRenderer } from './wheelRenderer.js';
 import { StripRenderer } from './stripRenderer.js';
 import { CountingRhymeRenderer } from './countingRhymeRenderer.js';
+
+/**
+ * Sole registry of visualization packages.
+ *
+ * `VISUALIZATION_PACKAGES` (+ `getVisualizationPackage`) is the single
+ * authoritative source of truth for "which renderer / which final-position
+ * logic corresponds to which visualization". The former `rendererFactory.ts`
+ * was removed in Stage 5 as redundant — nothing else constructs a renderer.
+ */
 
 /**
  * Bundled visualization package for wheel type.

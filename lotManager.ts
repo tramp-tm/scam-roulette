@@ -1,4 +1,4 @@
-import type { Lot, GameState } from './types.js';
+import type { Lot } from './types.js';
 import { t } from './i18n.js';
 
 /**
@@ -20,6 +20,11 @@ export interface AddLotResult {
 
 /**
  * Manages the collection of lots in the roulette application.
+ *
+ * Owns the *global* lot collection only. It knows nothing about game modes,
+ * winners, rules, or which lots participate in the current game — that is
+ * the responsibility of `GameSession` (see gameSession.ts and §8 of the
+ * technical description).
  */
 export class LotManager {
     public static readonly MAX_LOTS = 3000;
@@ -71,8 +76,7 @@ export class LotManager {
             id: LotManager.generateId(),
             name: trimmedName,
             amount: Math.max(0.01, parseFloat(amount.toString())),
-            color,
-            active: true
+            color
         };
 
         this.lots.push(lot);
@@ -112,67 +116,10 @@ export class LotManager {
     }
 
     /**
-     * Toggles the active state of a lot.
-     */
-    toggleActive(id: string): boolean {
-        const lot = this.lots.find(l => l.id === id);
-        if (!lot) return false;
-
-        lot.active = !lot.active;
-        return true;
-    }
-
-    /**
-     * Deactivates a specific lot (used in survival mode).
-     */
-    deactivateLot(id: string): boolean {
-        const lot = this.lots.find(l => l.id === id);
-        if (!lot) return false;
-
-        lot.active = false;
-        return true;
-    }
-
-    /**
-     * Deactivates multiple lots. IDs that don't exist are silently ignored.
-     */
-    deactivateMany(ids: readonly string[]): void {
-        for (const id of ids) {
-            this.deactivateLot(id);
-        }
-    }
-
-    /**
-     * Snapshot of the current lot state, for the game-mode strategy.
-     */
-    getState(): GameState {
-        return {
-            allLots: this.getAllLots(),
-            activeLots: this.getActiveLots()
-        };
-    }
-
-    /**
-     * Gets all active lots.
-     */
-    getActiveLots(): Lot[] {
-        return this.lots.filter(lot => lot.active);
-    }
-
-    /**
      * Gets a lot by ID.
      */
     getLotById(id: string): Lot | undefined {
         return this.lots.find(lot => lot.id === id);
-    }
-
-    /**
-     * Resets all lots to their initial state (all active).
-     */
-    resetAll(): void {
-        this.lots.forEach(lot => {
-            lot.active = true;
-        });
     }
 
     /**
@@ -190,14 +137,7 @@ export class LotManager {
     }
 
     /**
-     * Gets the count of active lots.
-     */
-    getActiveCount(): number {
-        return this.getActiveLots().length;
-    }
-
-    /**
-     * Gets all lots (including inactive ones).
+     * Gets all lots.
      */
     getAllLots(): Lot[] {
         return [...this.lots];

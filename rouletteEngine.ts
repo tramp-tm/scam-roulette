@@ -42,42 +42,6 @@ export class RouletteEngine {
     }
 
     /**
-     * Calculates the angle/position for a specific lot in the visualization.
-     * Returns the center angle of the segment for proper alignment.
-     */
-    static getSegmentCenterAngle(
-        lots: Lot[], 
-        mode: GameMode, 
-        targetLotId: string
-    ): number {
-        const weightedLots = lots.map(lot => ({
-            lot,
-            weight: mode.calculateWeight(lot, lots)
-        }));
-
-        const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
-        
-        if (totalWeight <= 0) return 0;
-
-        let cumulativeWeight = 0;
-        
-        for (const { lot, weight } of weightedLots) {
-            const normalizedWeight = weight / totalWeight;
-            const segmentStart = cumulativeWeight * Math.PI * 2;
-            const segmentEnd = (cumulativeWeight + normalizedWeight) * Math.PI * 2;
-            
-            if (lot.id === targetLotId) {
-                // Return center of the segment
-                return (segmentStart + segmentEnd) / 2;
-            }
-            
-            cumulativeWeight += normalizedWeight;
-        }
-
-        return 0;
-    }
-
-    /**
      * Calculates all segments for rendering.
      */
     static calculateSegments(lots: Lot[], mode: GameMode): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {

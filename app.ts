@@ -1,12 +1,11 @@
 import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
-import { createRenderer } from './rendererFactory.js';
 import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
 import { GameSession } from './gameSession.js';
-import { IRenderer, VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ParseResult, SeparatorType, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction } from './types.js';
-import { IMPORT_STRATEGIES, MERGE_STRATEGY } from './importStrategies.js';
+import { IRenderer, VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction } from './types.js';
+import { MERGE_STRATEGY } from './importStrategies.js';
 import { 
     generateRandomReadableColor, 
     sliderToDuration, 
@@ -15,10 +14,8 @@ import {
     MIN_DURATION_SEC,
     MAX_DURATION_SEC
 } from './utils.js';
-import { parseCSV } from './csvParser.js';
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
-import { ModalManager } from './modalManager.js';
 import { ErrorDialog } from './errorDialog.js';
 
 
@@ -128,7 +125,10 @@ export class App {
             () => this.lotManager.getAllLots()
         );
         const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
-        this.renderer = createRenderer(this.settings.visualization, canvas);
+        // Stage 5: `visualizationStrategy.ts` is the sole renderer registry
+        // (`rendererFactory.ts` was collapsed into it). One lookup returns
+        // the package whose `createRenderer` builds the concrete renderer.
+        this.renderer = getVisualizationPackage(this.settings.visualization).createRenderer(canvas);
         this.animationController = new AnimationController();
         
         // Initialize DOM elements
@@ -284,9 +284,10 @@ export class App {
             const target = e.target as HTMLSelectElement;
             this.settings.visualization = target.value as VisualizationType;
             
-            // Recreate renderer with new visualization type
+            // Recreate renderer with new visualization type via the package
+            // registry (Stage 5: `rendererFactory.ts` was removed).
             const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
-            this.renderer = createRenderer(this.settings.visualization, canvas);
+            this.renderer = getVisualizationPackage(this.settings.visualization).createRenderer(canvas);
             
             // Re-initialize segments and render
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
@@ -520,6 +521,10 @@ export class App {
         this.isSettingsLocked = true;
         this.updateControlsState();
 
+        // Capture the current mode once so the visualization final-position
+        // calculation uses the same mode that decided the roll (Stage 5 §20-1).
+        const mode = this.gameSession.mode;
+
         // Calculate final position using visualization strategy pattern
         const currentRotation = this.renderer.getCurrentRotation();
         const targetLotId = rolledLot.id;
@@ -533,7 +538,7 @@ export class App {
         const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
         const endRotation = vizPackage.computeFinalPosition(
             this.gameSession.activeLots,
-            this.gameSession.mode,
+            mode,
             targetLotId,
             currentRotation,
             animationDuration,
@@ -568,6 +573,10 @@ export class App {
      * the returned outcome for UI display.
      */
     private finishSpin(): void {
+        // Capture the current mode once so the roll text and the renderer
+        // segment update use the same mode that decided the roll (Stage 5 §20-1).
+        const mode = this.gameSession.mode;
+
         const outcome = this.gameSession.finishSpin();
 
         if (!outcome) {
@@ -583,7 +592,7 @@ export class App {
         // mode-provided display string, not a game-state mutation.
         this.highlightedLotId = rolledLot.id;
         if (this.resultText) {
-            this.resultText.textContent = this.gameSession.mode.getRollText(rolledLot);
+            this.resultText.textContent = mode.getRollText(rolledLot);
         }
 
         if (result.finished) {
@@ -606,7 +615,7 @@ export class App {
 
         // Refresh UI + renderer to reflect the new active-lot list
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
+        this.renderer.updateSegments(this.gameSession.activeLots, mode);
         this.render();
         this.updateControlsState();
     }
@@ -619,13 +628,10 @@ export class App {
         this.highlightedLotId = null;
         this.isSettingsLocked = false;
 
-        // Stage 3 §14: two independent resets, orchestrated by App.
-        //   • LotManager.resetAll()  — transitional: restores the inert
-        //     `Lot.active` flag on the global lots.
-        //   • GameSession.reset()    — real reset of the current game: every
-        //     lot currently in the global list becomes an active participant.
-        //     Also clears any in-flight spin context (Stage 4 §17).
-        this.lotManager.resetAll();
+        // Reset the current game session (Stage 3 §14 / Stage 4 §17):
+        // every lot currently in the global list becomes an active
+        // participant again, and any in-flight spin context is cleared so a
+        // stale pending turn cannot be replayed after the reset.
         this.gameSession.reset();
         
         // Reset renderer
@@ -806,8 +812,8 @@ export class App {
         });
 
         // Project the session's participation state onto each renderable lot
-        // (Stage 3 §12). `Lot.active` is no longer authoritative; the UI asks
-        // the session which lots participate in the current game.
+        // (Stage 3 §12). Participation is projected from the session — the
+        // UI asks GameSession which lots take part in the current game.
         const renderables: RenderableLot[] = sorted.map(lot => ({
             ...lot,
             active: this.gameSession.isActive(lot.id)
