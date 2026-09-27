@@ -3,8 +3,9 @@ import { LotManager } from './lotManager.js';
 
 import { EasingFunctions, DEFAULT_EASING } from './animation.js';
 import { VisualizationDriver } from './visualizationDriver.js';
+import { LotListView } from './lotListView.js';
 import { GameSession } from './gameSession.js';
-import { VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ImportStrategy, SortField, SortDirection, EasingFunction, PrepareSpinFailureReason, Lot, RollResult } from './types.js';
+import { VisualizationType, Settings, Mode, GameMode, RenderableLot, ParsedLot, ImportStrategy, EasingFunction, PrepareSpinFailureReason, Lot, RollResult } from './types.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
 import { 
     generateRandomReadableColor, 
@@ -47,6 +48,7 @@ export class App {
     private lotManager: LotManager;
     private gameSession: GameSession;
     private visualizationDriver: VisualizationDriver;
+    private lotListView: LotListView;
     
     private settings: Settings = {
         modeId: 'normal',
@@ -69,10 +71,6 @@ export class App {
     
     private highlightedLotId: string | null = null;
     private importDialog: ImportDialog | null = null;
-    
-    // Sort state
-    private sortField: SortField = 'name';
-    private sortDirection: SortDirection = 'asc';
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -104,10 +102,6 @@ export class App {
     private modeHelp: HTMLElement | null = null;
     private easingHelp: HTMLElement | null = null;
 
-    
-    // Sort control elements
-    private sortByNameBtn: HTMLButtonElement | null = null;
-    private sortByAmountBtn: HTMLButtonElement | null = null;
     
     // Settings toggle element
     private settingsToggleBtn: HTMLButtonElement | null = null;
@@ -166,10 +160,12 @@ export class App {
         this.modeHelp = document.getElementById('mode-help');
         this.easingHelp = document.getElementById('easing-help');
 
-        
-        // Sort control elements
-        this.sortByNameBtn = document.getElementById('sort-by-name') as HTMLButtonElement;
-        this.sortByAmountBtn = document.getElementById('sort-by-amount') as HTMLButtonElement;
+        // LotListView owns the list DOM and the sorting controls
+        // (lot-m-refac.md §§2–6). `#sort-controls` sits outside `#lots-list`,
+        // so it is passed in explicitly rather than discovered from the list
+        // container.
+        const sortControls = document.getElementById('sort-controls');
+        this.lotListView = new LotListView(this.lotsList, sortControls);
         
         // Settings toggle button
         this.settingsToggleBtn = document.getElementById('toggle-settings-subblock') as HTMLButtonElement;
@@ -240,6 +236,22 @@ export class App {
             case 'noActiveLots':   return 'validation.noLotsToSpin';
             case 'noValidWeights': return 'validation.noValidWeights';
         }
+    }
+
+    /**
+     * Handle an amount edit emitted by the LotListView. The view knows
+     * nothing about the application — this is the application's job.
+     */
+    private handleAmountChange(id: string, newAmount: number): void {
+        if (!id) return;
+        // State-level guard (planA.md §13): rejected while the session is
+        // locked, mirroring the GameSession-boundary rejection.
+        if (this.gameSession.isSessionLocked) return;
+        this.lotManager.updateLot(id, { amount: newAmount });
+        // Amount changes do not affect participation; no session mutation
+        // is required. The next read of session.activeLots already reflects
+        // the updated amount.
+        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
     }
 
     /**
@@ -454,23 +466,6 @@ export class App {
             this.visualizationDriver.render();
         });
 
-        
-        // Sort switch buttons - unified handler for both buttons
-        const sortButtons = document.querySelectorAll('#sort-controls .switch-btn');
-        sortButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const targetField = (button as HTMLElement).dataset.sortField;
-                if (!targetField) return;
-                
-                // Update active state visually
-                sortButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                
-                // Set sort field and toggle direction if same field
-                this.setSortField(targetField as SortField);
-            });
-        });
-        
         // Settings sub-block toggle button
         if (this.settingsToggleBtn) {
             this.settingsToggleBtn.addEventListener('click', () => {
@@ -485,56 +480,6 @@ export class App {
         }
     }
 
-
-    /** Sets the sort field and toggles direction if same field */
-    private setSortField(field: SortField): void {
-        // If clicking same field, toggle direction; otherwise default to ascending
-        if (this.sortField === field) {
-            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.sortField = field;
-            this.sortDirection = 'asc';
-        }
-        
-        // Update button visual states
-        this.updateSortButtons();
-        
-        // Re-render lots list with new sort order.
-        //
-        // Sorting is strictly a presentation operation (planA.md §11): it
-        // never touches `GameSession.activeLotIds`. It does, however,
-        // rebuild the `#lots-list` DOM from scratch, so any lock state on
-        // the freshly created amount inputs / delete buttons must be
-        // re-applied — `renderLotsList()` now does that itself (A1 — single
-        // authoritative derivation point).
-        this.renderLotsList();
-    }
-    
-    /** Updates visual state of sort buttons */
-    private updateSortButtons(): void {
-        if (!this.sortByNameBtn || !this.sortByAmountBtn) return;
-        
-        // Get translated labels
-        const nameLabel = t('sort.byName');
-        const amountLabel = t('sort.byAmount');
-        
-        // Reset both buttons to inactive state
-        this.sortByNameBtn.classList.remove('active');
-        this.sortByAmountBtn.classList.remove('active');
-        this.sortByNameBtn.textContent = nameLabel;
-        this.sortByAmountBtn.textContent = amountLabel;
-        
-        // Set active button with direction indicator
-        if (this.sortField === 'name') {
-            this.sortByNameBtn.classList.add('active');
-            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            this.sortByNameBtn.textContent = `${nameLabel} ${arrow}`;
-        } else {
-            this.sortByAmountBtn.classList.add('active');
-            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            this.sortByAmountBtn.textContent = `${amountLabel} ${arrow}`;
-        }
-    }
 
     private addLot(): void {
         // State-level guard at the entry point as well (planA.md §13): this
@@ -685,7 +630,7 @@ export class App {
         // Refresh UI + renderer to reflect the new active-lot list.
         //
         // A1 (single derivation point): the lock state is re-applied
-        // automatically by `renderLotsList()` inside `updateUI()`, so no
+        // automatically by the render path inside `updateUI()`, so no
         // trailing `updateControlsState()` is needed on this normal path.
         this.updateUI();
         this.visualizationDriver.refresh(this.gameSession.activeLots, mode);
@@ -720,21 +665,35 @@ export class App {
     }
 
     private updateUI(): void {
-        // Update lots list (global lot data — served by LotManager,
-        // the owner of the global lot collection; the participation flag
-        // is projected from the session inside renderLotsList).
-        //
-        // A1 (single derivation point): `renderLotsList()` itself re-applies
-        // the current lock state to the freshly-rendered controls, so no
-        // explicit `updateControlsState()` call is needed here.
-        this.renderLotsList();
-        
+        // Global lot data comes from `LotManager`; participation is
+        // projected from the session. Sorting is delegated to the view
+        // (lot-m-refac.md §§4, 10).
+        const allLots = this.lotManager.getAllLots();
+        const renderables: RenderableLot[] = allLots.map(lot => ({
+            ...lot,
+            active: this.gameSession.isActive(lot.id)
+        }));
+
+        this.lotListView.render(renderables, {
+            showActions: true,
+            highlightId: this.highlightedLotId,
+            editableAmount: true,
+            onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
+            onDelete: (id) => this.deleteLot(id)
+        });
+
         // Update stats. Game-session counters are read from the GameSession
         // (§8): `activeLots` and the current mode are game state.
         const totalEl = document.getElementById('total-lots');
         const activeEl = document.getElementById('active-lots');
         if (totalEl) totalEl.textContent = this.lotManager.getTotalCount().toString();
         if (activeEl) activeEl.textContent = this.gameSession.activeCount.toString();
+
+        // A1 (single derivation point): re-apply the lifecycle lock state
+        // to every control the UI just rebuilt — the list controls via
+        // LotListView.setLocked(), plus the application-level controls
+        // handled directly here.
+        this.updateControlsState();
     }
 
     /**
@@ -778,14 +737,15 @@ export class App {
         if (this.importBtnControls) this.importBtnControls.disabled = sessionLevelLocked;
         if (this.clearBtnControls) this.clearBtnControls.disabled = sessionLevelLocked;
 
-        // Lot editing
-        const lockableControls = document.querySelectorAll<
+        // Add-row controls stay managed directly by App.
+        const addRowControls = document.querySelectorAll<
             HTMLInputElement | HTMLButtonElement
-        >(
-            '#new-lot-name, #new-lot-amount, #add-lot-btn, ' +
-            '#lots-list .lot-amount-input, #lots-list .btn-delete'
-        );
-        lockableControls.forEach(el => { el.disabled = sessionLevelLocked; });
+        >('#new-lot-name, #new-lot-amount, #add-lot-btn');
+        addRowControls.forEach(el => { el.disabled = sessionLevelLocked; });
+
+        // List controls are delegated to the view (lot-m-refac.md §7 / §12):
+        // App passes only the boolean; the view knows which elements to lock.
+        this.lotListView.setLocked(sessionLevelLocked);
 
         // Spin-time configuration (duration, visualization, easing) — available
         // between spins of an unfinished game (planA.md §5); disabled while
@@ -799,160 +759,6 @@ export class App {
         // never disabled in any lifecycle state. The sort buttons always
         // accept clicks; `renderLotsList()` re-applies the current lock state
         // to the freshly-rendered list controls afterwards.
-    }
-
-    /**
-     * Renders a list of lots into the specified container element.
-     * Reusable for both main lots list and import preview.
-     * 
-     * @param container - The UL element to render into
-     * @param lots - Array of lot data objects (Lot or ParsedLot)
-     * @param options - Rendering options
-     */
-    private renderLotsListToContainer(
-        container: HTMLUListElement,
-        lots: RenderableLot[],
-        options: LotsListRenderOptions = {}
-    ): void {
-        const {
-            showActions = false,
-            highlightId = null,
-            editableAmount = true,
-            onAmountChange
-        } = options;
-
-        container.innerHTML = '';
-
-        for (const lot of lots) {
-            const li = document.createElement('li');
-            
-            // Build class name with conditional classes
-            const classNameParts: string[] = ['lot-item'];
-            if (!lot.active) classNameParts.push('inactive');
-            if (lot.id === highlightId) classNameParts.push('highlighted');
-            li.className = classNameParts.join(' ');
-
-            // Color indicator (use default color if not provided)
-            const colorIndicator = document.createElement('div');
-            colorIndicator.className = 'lot-color-indicator';
-            colorIndicator.style.backgroundColor = lot.color || '#888';
-
-            // Lot name (non-editable)
-            const lotName = document.createElement('span');
-            lotName.className = 'lot-name';
-            lotName.textContent = lot.name;
-            lotName.style.flex = '1';
-            lotName.style.overflow = 'hidden';
-            lotName.style.textOverflow = 'ellipsis';
-
-            // Amount input (editable or read-only based on options)
-            const amountInput = document.createElement('input');
-            amountInput.type = 'number';
-            amountInput.className = 'lot-amount-input';
-            amountInput.value = lot.amount.toFixed(2);
-            amountInput.min = '0.01';
-            amountInput.step = '0.01';
-
-            if (!editableAmount) {
-                amountInput.disabled = true;
-            } else if (onAmountChange && lot.id) {
-                // Handle amount change with callback
-                const lotId: string = lot.id; // Capture in closure, guaranteed defined here
-                amountInput.addEventListener('change', () => {
-                    const newAmount = parseFloat(amountInput.value);
-                    if (!isNaN(newAmount) && newAmount > 0) {
-                        onAmountChange(lotId, newAmount);
-                    } else {
-                        amountInput.value = lot.amount.toFixed(2);
-                    }
-                });
-            }
-
-            // Append in order: color → name → amount → delete button
-            li.appendChild(colorIndicator);
-            li.appendChild(lotName);
-            li.appendChild(amountInput);
-
-            // Actions (delete button only if showActions is true and not highlighted)
-            if (showActions && lot.id !== highlightId) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'lot-actions';
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn-delete';
-                deleteBtn.textContent = '×';
-                deleteBtn.style.padding = '6px 10px';
-                
-                // Store lot id for deletion callback
-                if (lot.id) {
-                    const lotId: string = lot.id; // Capture in closure, guaranteed defined here
-                    deleteBtn.onclick = () => this.deleteLot(lotId);
-                }
-
-                actionsDiv.appendChild(deleteBtn);
-                li.appendChild(actionsDiv);
-            }
-
-            container.appendChild(li);
-        }
-    }
-
-    private renderLotsList(): void {
-        // Global lots come from LotManager (owner of the global collection).
-        const allLots = this.lotManager.getAllLots();
-        
-        // Apply sorting based on current sort state.
-        //
-        // NOTE (planA.md §11): sorting is purely a presentation operation.
-        // The following `sorted` array is a *copy* (`[...allLots]`) used to
-        // order the rendered list; it never mutates `LotManager` and never
-        // touches `GameSession.activeLotIds`. Participation is projected
-        // below from the session, so an eliminated lot stays eliminated
-        // regardless of the sort order.
-        const sorted = [...allLots].sort((a, b) => {
-            if (this.sortField === 'name') {
-                return this.sortDirection === 'asc' 
-                    ? a.name.localeCompare(b.name)
-                    : b.name.localeCompare(a.name);
-            } else { // amount
-                return this.sortDirection === 'asc'
-                    ? a.amount - b.amount
-                    : b.amount - a.amount;
-            }
-        });
-
-        // Project the session's participation state onto each renderable lot
-        // (Stage 3 §12). Participation is projected from the session — the
-        // UI asks GameSession which lots take part in the current game.
-        const renderables: RenderableLot[] = sorted.map(lot => ({
-            ...lot,
-            active: this.gameSession.isActive(lot.id)
-        }));
-        
-        // Use the reusable rendering method with default options for main lots list
-        this.renderLotsListToContainer(this.lotsList, renderables, {
-            showActions: true,
-            highlightId: this.highlightedLotId,
-            editableAmount: true,
-            onAmountChange: (id: string, newAmount: number) => {
-                if (!id) return; // Safety check for undefined id
-                // State-level guard (planA.md §13): rejected while the
-                // session is locked, mirroring the GameSession-boundary
-                // rejection.
-                if (this.gameSession.isSessionLocked) return;
-                this.lotManager.updateLot(id, { amount: newAmount });
-                // Amount changes do not affect participation; no session
-                // mutation is required. The next read of `session.activeLots`
-                // already reflects the updated amount.
-                this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
-            }
-        });
-
-        // Any lockable controls created by this render must be brought into
-        // line with the current lifecycle state. This makes the lock refresh
-        // self-contained rather than dependent on the caller's call order
-        // (A1 — single authoritative derivation point).
-        this.updateControlsState();
     }
 
     private deleteLot(id: string): void {

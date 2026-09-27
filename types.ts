@@ -174,13 +174,14 @@ export interface RenderableLot {
 }
 
 /**
- * Options for rendering a lots list.
+ * Options for rendering a lots list via `LotListView`.
  */
-export interface LotsListRenderOptions {
-    showActions?: boolean;  // Show delete/edit buttons
-    highlightId?: string | null;  // ID of lot to highlight
-    editableAmount?: boolean;  // Whether amount input is editable
-    onAmountChange?: (id: string, newAmount: number) => void;  // Callback for amount changes
+export interface LotListViewOptions {
+    showActions?: boolean;
+    highlightId?: string | null;
+    editableAmount?: boolean;
+    onAmountChange?: (id: string, newAmount: number) => void;
+    onDelete?: (id: string) => void;
 }
 
 // ========================================
