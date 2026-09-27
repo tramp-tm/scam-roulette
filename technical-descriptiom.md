@@ -5,9 +5,9 @@ Client-only, single-page web application.
 
 > **STATUS: intermediate state.**
 > The staged refactor has completed through **Stage 5** plus **Sub-stage A**
-> (the session / spin lifecycle-lock work). The current code no longer
-> matches the historic "single-owner, single-lock" model. Remaining work is
-> listed in §20.
+> (the session / spin lifecycle-lock work) and **Sub-stage B** (spin-time
+> configuration widening). The current code no longer matches the historic
+> "single-owner, single-lock" model. Remaining work is listed in §20.
 
 ---
 
@@ -187,12 +187,12 @@ owned by `LotManager`.
 
 - `sessionLocked` — set on the first successful `prepareSpin()`; cleared only
   by `reset()`. Freezes every session-level mutation (participation, mode,
-  bulk reconciliation, visualization/easing via the UI). Never cleared by
-  `finishSpin()`.
+  bulk reconciliation). Never cleared by `finishSpin()`.
 - `spinInProgress` — set and cleared by the same pair
   (`prepareSpin()` / `finishSpin()`). Freezes only the things that cannot
-  change mid-animation (duration slider/number input, Spin itself). Between
-  the spins of an unfinished Survival game it is released.
+  change mid-animation (duration slider/number input, visualization select,
+  easing select, Spin itself). Between the spins of an unfinished Survival
+  game it is released.
 - `gameFinished` — set when a `RollResult` with `finished === true` is
   applied; cleared only by `reset()`. Keeps Spin disabled after the game
   ends, independent of the session lock.
@@ -457,13 +457,13 @@ The three `GameSession` lock flags are translated into `disabled` attributes.
 - **Spin** — disabled while `isSpinInProgress` or `isGameFinished`.
 - **Reset** — always enabled (the user must be able to abandon a session,
   including mid-spin).
-- **Session-level configuration** (mode select, visualization select,
-  import button, clear button, easing select) — disabled while
-  `isSessionLocked || isSpinInProgress`.
+- **Session-level configuration** (mode select, import button, clear button)
+  — disabled while `isSessionLocked || isSpinInProgress`.
 - **Lot-editing controls** (`.add-row` inputs, per-lot amount inputs, delete
   buttons) — disabled while `isSessionLocked || isSpinInProgress`.
-- **Duration** (slider and number input) — disabled only while
-  `isSpinInProgress`, so it remains editable between the spins of an
+- **Spin-time configuration** (duration slider and number input,
+  visualization select, easing select) — disabled only while
+  `isSpinInProgress`, so they remain editable between the spins of an
   unfinished Survival game (planA §5).
 - **Sorting** — never disabled: sorting is a pure presentation operation
   (planA §11). Sorting freely does not touch participation.
@@ -489,8 +489,9 @@ the mutation site; there is **no** `syncGameSession()` step to remember:
 
 Mode change goes through `gameSession.setMode(id)` plus a mirror to
 `settings.modeId`. Participation is deliberately preserved across a mode
-switch. Visualization change is analogous: rejection while locked, followed
-by a fresh renderer created via the registry lookup.
+switch. Visualization change is a renderer/UI concern only: rejected while
+a spin is in flight, and otherwise applied by creating a fresh renderer via
+the registry lookup. It never touches participation.
 
 `App` never calls `processRoll()`, `RouletteEngine.roll()`, or
 `deactivateMany()` — those live inside `GameSession`.
@@ -767,7 +768,7 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
 | 3 | `GameSession.finishSpin()` clears `pendingRolledLot` and `spinInProgress` **before** calling `processRoll` | If a future mode throws inside `processRoll`, the session stays `sessionLocked` with no pending roll and no way out except Reset — no `try/finally` exists |
 | 4 | `GameSession.deactivateMany()` is deliberately unguarded | It is currently only called from `finishSpin()`; any future external caller must be reviewed against planA §3 |
 | 5 | `App.updateControlsState()` is invoked imperatively from `updateUI()`, `spin()`, `finishSpin()`, and `setSortField()` | A future render path that forgets the follow-up call will render interactive controls on a locked session |
-| 6 | The mode-change and visualization-change handlers restore on rejection from two different sources (`gameSession.mode.id` vs `settings.visualization`) | Two patterns for the same §14/§15 protection; worth unifying |
+| 6 | The mode-change handler restores from `gameSession.mode.id`, the visualization-change handler from `settings.visualization`; the latter path is now effectively unreachable (the select is disabled exactly when the guard can fire) | Two patterns for the same §14/§15 protection; worth unifying |
 | 7 | After a finished game, duration controls remain enabled (tied only to `spinning`) while Spin is disabled | Harmless today but inconsistent with "finished freezes everything except Reset" |
 | 8 | The ORed `isSpinInProgress` clauses in `App`'s guards are currently equivalent to `isSessionLocked` (because of the §5.1 invariant) | Kept intentionally so the two locks stay separate concept-wise; verify the invariant if either flag is ever raised independently |
 
@@ -803,3 +804,11 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
   cannot leave the UI locked. The CSS disabled-control rule was extended to
   `input`, `select`, and `textarea`, closing the previous "buttons look
   disabled, other controls don't" gap.
+- **Sub-stage B:** `visualizationSelect` and `easingSelect` were moved from
+  the session-lock class to the spin-time-lock class, joining the duration
+  controls. They are now editable between spins of an unfinished Survival
+  game. `App.updateControlsState()` splits its "session-level" and
+  "spin-time" blocks accordingly; the visualization-change handler narrows
+  its rejection guard from `isSessionLocked || isSpinInProgress` to
+  `isSpinInProgress` alone. The session lock still governs participation,
+  mode, import, and clear.

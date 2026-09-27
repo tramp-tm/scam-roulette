@@ -290,9 +290,9 @@ export class App {
         this.visualizationSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
 
-            // Visualization is immutable after the session starts
-            // (planA.md §15): reject and restore the previous value.
-            if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) {
+            // Visualization cannot change mid-animation; between spins it is
+            // editable, like duration and easing. Reject and restore otherwise.
+            if (this.gameSession.isSpinInProgress) {
                 target.value = this.settings.visualization;
                 return;
             }
@@ -709,12 +709,13 @@ export class App {
      *   - session locked, spinning   → only Reset enabled;
      *   - session locked, not spinning (Survival mid-game, or finished)
      *                               → Spin (unless finished), duration,
-     *                                 sorting, Reset enabled;
+     *                                 visualization, easing, sorting,
+     *                                 Reset enabled;
      *   - session unlocked           → everything enabled.
      *
-     * Duration and sorting are intentionally tied to the *spin-time* lock
-     * only: they are the settings the user is allowed to change between
-     * Survival spins (planA.md §5).
+     * Duration, visualization and easing are intentionally tied to the
+     * *spin-time* lock only: they are the settings the user is allowed to
+     * change between Survival spins (planA.md §5). Sorting is never locked.
      */
     private updateControlsState(): void {
         const spinning = this.gameSession.isSpinInProgress;
@@ -727,12 +728,10 @@ export class App {
         // Reset is always available — the user must be able to abandon the session
         if (this.resetBtn) this.resetBtn.disabled = false;
 
-        // Session-level configuration (mode, visualization, import, clear, easing)
+        // Session-level configuration (mode, import, clear) — locked for the whole session
         if (this.modeSelect) this.modeSelect.disabled = sessionLevelLocked;
-        if (this.visualizationSelect) this.visualizationSelect.disabled = sessionLevelLocked;
         if (this.importBtnControls) this.importBtnControls.disabled = sessionLevelLocked;
         if (this.clearBtnControls) this.clearBtnControls.disabled = sessionLevelLocked;
-        if (this.easingSelect) this.easingSelect.disabled = sessionLevelLocked;
 
         // Lot editing
         const lockableControls = document.querySelectorAll<
@@ -743,10 +742,13 @@ export class App {
         );
         lockableControls.forEach(el => { el.disabled = sessionLevelLocked; });
 
-        // Duration: available between spins (planA.md §5); disabled only
-        // while the spin-time lock is held.
+        // Spin-time configuration (duration, visualization, easing) — available
+        // between spins (planA.md §5); disabled only while the spin-time lock
+        // is held.
         if (this.durationSlider) this.durationSlider.disabled = spinning;
         if (this.durationInput) this.durationInput.disabled = spinning;
+        if (this.visualizationSelect) this.visualizationSelect.disabled = spinning;
+        if (this.easingSelect) this.easingSelect.disabled = spinning;
 
         // Sorting is purely a presentation operation (planA.md §11) — it is
         // never disabled in any lifecycle state. The sort buttons always
