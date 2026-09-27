@@ -666,8 +666,13 @@ export class App {
             // (`spinInProgress` was released in GameSession's `finally`, but
             // `sessionLocked` persists and `gameFinished` is not set).
             // Reset is the escape hatch. Never present this as a normal spin.
+            //
+            // A1 follow-up: this dialog used to pass the *title* key as both
+            // the message and the title, so the user just saw "⚠ Error" in
+            // the body. Use a dedicated message key instead; the title stays
+            // the generic "⚠ Error".
             console.error('GameSession.finishSpin() threw during processRoll():', err);
-            new ErrorDialog(t('dialog.errorTitle'), t('dialog.errorTitle')).open();
+            new ErrorDialog(t('error.spinProcessingFailed'), t('dialog.errorTitle')).open();
             this.updateControlsState();
             return;
         }

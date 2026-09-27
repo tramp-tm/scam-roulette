@@ -97,5 +97,6 @@
   "import.sessionLocked": "Cannot import: the game has already started. Press Reset to start over.",
   "error.invalidName": "Please enter a lot name.",
   "error.invalidAmount": "Please enter a valid amount greater than zero.",
-  "error.maxLotsReached": "Maximum lot limit reached ({{max}} lots). Please delete some existing lots before adding new ones."
+  "error.maxLotsReached": "Maximum lot limit reached ({{max}} lots). Please delete some existing lots before adding new ones.",
+  "error.spinProcessingFailed": "Spin processing failed. The game state may be inconsistent — press Reset to start a new session."
 }
