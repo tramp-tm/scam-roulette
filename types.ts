@@ -180,8 +180,8 @@ export interface IRenderer {
     /** Set highlighted lot ID */
     setHighlightedLot(id: string | null): void;
     
-    /** Render the visualization to canvas */
-    render(canvasWidth: number, canvasHeight: number): void;
+    /** Render the visualization to canvas (uses the renderer's own logical canvas size) */
+    render(): void;
     
     /** Reset renderer state */
     reset(): void;

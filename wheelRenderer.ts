@@ -44,7 +44,8 @@ export class WheelRenderer extends BaseRenderer {
     /**
      * Main render method - renders wheel visualization.
      */
-    render(canvasWidth: number, canvasHeight: number): void {
+    render(): void {
+        const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const radius = Math.min(centerX, centerY) - WHEEL_MARGIN;

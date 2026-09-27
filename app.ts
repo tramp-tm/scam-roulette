@@ -951,8 +951,7 @@ export class App {
     }
 
     private render(): void {
-        const rect = this.canvas.getBoundingClientRect();
-        this.renderer.render(rect.width, rect.height);
+        this.renderer.render();
     }
 
     /** Handles clearing all lots */

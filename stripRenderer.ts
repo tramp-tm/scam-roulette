@@ -48,7 +48,8 @@ export class StripRenderer extends BaseRenderer {
      * Uses modulo arithmetic to map large mathematical offsets to visual offsets,
      * then renders multiple buffer copies for a seamless infinite illusion.
      */
-    public render(canvasWidth: number, canvasHeight: number): void {
+    public render(): void {
+        const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerY = canvasHeight / 2;
 
         // Clear canvas

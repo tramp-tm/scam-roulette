@@ -114,8 +114,9 @@ export class CountingRhymeRenderer extends BaseRenderer {
     // Rendering
     // ------------------------------------------------------------------
 
-    render(canvasWidth: number, canvasHeight: number): void {
+    render(): void {
         const ctx = this.ctx;
+        const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         if (this.layout.length === 0) return;
@@ -189,9 +190,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         if (n === 0) return;
 
         // Logical CSS pixels — the backing store is dpr-scaled by BaseRenderer.
-        const rect = this.canvas.getBoundingClientRect();
-        const width = rect.width || BaseRenderer.FALLBACK_WIDTH;
-        const height = rect.height || BaseRenderer.FALLBACK_HEIGHT;
+        const { width, height } = this.getLogicalSize();
 
         const aspect = width / height;
         const cols = Math.max(1, Math.ceil(Math.sqrt(n * aspect)));

@@ -31,10 +31,7 @@ export abstract class BaseRenderer implements IRenderer {
      */
     protected setupHighDPI(): void {
         const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
-
-        const width = rect.width || BaseRenderer.FALLBACK_WIDTH;
-        const height = rect.height || BaseRenderer.FALLBACK_HEIGHT;
+        const { width, height } = this.getLogicalSize();
 
         this.canvas.width = width * dpr;
         this.canvas.height = height * dpr;
@@ -79,5 +76,19 @@ export abstract class BaseRenderer implements IRenderer {
         this.segments = [];
     }
 
-    abstract render(canvasWidth: number, canvasHeight: number): void;
+    /**
+     * Logical (CSS-pixel) size of the renderer's canvas, with the shared
+     * fallbacks applied when layout has not yet run (rect dimension = 0).
+     * Single source of the fallback used by setupHighDPI() and every
+     * concrete render().
+     */
+    protected getLogicalSize(): { width: number; height: number } {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            width: rect.width || BaseRenderer.FALLBACK_WIDTH,
+            height: rect.height || BaseRenderer.FALLBACK_HEIGHT
+        };
+    }
+
+    abstract render(): void;
 }
