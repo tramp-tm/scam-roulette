@@ -46,7 +46,7 @@ export class App {
 
     private lotManager: LotManager;
     private gameSession: GameSession;
-    private renderer!: IRenderer;
+    private renderer: IRenderer;
     private animationController: AnimationController;
     
     private settings: Settings = {
@@ -130,7 +130,7 @@ export class App {
         // Stage 5: `visualizationStrategy.ts` is the sole renderer registry
         // (`rendererFactory.ts` was collapsed into it). One lookup returns
         // the package whose `createRenderer` builds the concrete renderer.
-        this.recreateRenderer();
+        this.renderer = this.recreateRenderer();
 
         this.animationController = new AnimationController();
 
@@ -210,7 +210,7 @@ export class App {
     }
 
     /**
-     * (Re)creates the renderer for the currently selected visualization.
+     * Builds the renderer for the currently selected visualization.
      *
      * The visualization registry (`visualizationStrategy.ts`) is the sole
      * source of the concrete renderer class (Stage 5) — callers never
@@ -219,12 +219,12 @@ export class App {
      * `visualizationSelect` change handler whenever the user swaps
      * visualization between spins.
      *
-     * This method only swaps the renderer implementation; it does not
-     * seed segments or trigger a draw. Callers must follow up with
-     * `renderer.updateSegments(...)` and `render()`.
+     * This method is a pure factory: it builds the renderer but does not
+     * assign it or draw. Callers must assign the result to `this.renderer`
+     * and follow up with `renderer.updateSegments(...)` and `render()`.
      */
-    private recreateRenderer(): void {
-        this.renderer = getVisualizationPackage(this.settings.visualization)
+    private recreateRenderer(): IRenderer {
+        return getVisualizationPackage(this.settings.visualization)
             .createRenderer(this.canvas);
     }
 
@@ -322,7 +322,7 @@ export class App {
             
             // Recreate renderer with new visualization type via the package
             // registry (Stage 5: `rendererFactory.ts` was removed).
-            this.recreateRenderer();
+            this.renderer = this.recreateRenderer();
             
             // Re-initialize segments and render
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
