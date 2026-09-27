@@ -6,10 +6,11 @@ Client-only, single-page web application.
 > **STATUS: consolidated state.**
 > The staged refactor has completed through **Stage 5**, **Sub-stage A**
 > (session / spin lifecycle locks), **Sub-stage B** (spin-time configuration
-> widening), and the **A1/A2 corrective pass** (lifecycle consistency,
+> widening), the **A1/A2 corrective pass** (lifecycle consistency,
 > exception safety, structured spin-failure reporting, finished-game UI
-> freeze, unified lock derivation). §20 lists what remains for later
-> stages.
+> freeze, unified lock derivation), and **PlanB** (decision-time mode
+> pinning — the pending spin carries both the rolled lot and the mode that
+> produced it). §20 lists what remains for later stages.
 
 ---
 
@@ -151,6 +152,7 @@ The evolution of the model across the staged iterations is documented in §20.
 | `RollResult` | `{ finished, winner: Lot\|null, deactivate: string[], message? }` |
 | `PrepareSpinFailureReason` | `'spinInProgress' \| 'gameFinished' \| 'noActiveLots' \| 'noValidWeights'` — the four current `prepareSpin()` refusal branches (A1/A2) |
 | `PrepareSpinResult` | Discriminated union: `{ ok: true, lot }` \| `{ ok: false, reason }` — replaces the previous `Lot \| null` (A1/A2) |
+| `PendingSpin` | `{ rolledLot: Lot, mode: GameMode }` — internal turn context (PlanB): the decided lot plus the mode instance that produced it, pinned by `prepareSpin()` and consumed by `finishSpin()` |
 | `GameMode` | `{ id, name, description, calculateWeight, getRollText, processRoll }` |
 | `IRenderer` | `updateSegments`, `setRotation`, `getCurrentRotation`, `setHighlightedLot`, `render`, `reset`. `render()` takes **no arguments** — each renderer derives its own logical canvas size |
 | `VisualizationPackage` | `{ id, createRenderer, computeFinalPosition }` (optional `canvasWidth?` in `computeFinalPosition`) |
@@ -179,8 +181,8 @@ owned by `LotManager`.
 | `clearLots()` | Empties participation (paired with `LotManager.clearAll`). **Rejected while `sessionLocked`.** |
 | `reset()` | Clears the pending spin context and **releases every lifecycle flag** (`sessionLocked`, `spinInProgress`, `gameFinished`); re-seeds `activeLotIds` from the current global list. |
 | `reconcileAfterBulkChange(previousIds)` | Post-import diff: kept ids preserve prior participation, new ids become active, stale ids dropped. **Rejected while `sessionLocked`.** |
-| `prepareSpin()` | Validates via `RouletteEngine.canSpin()`, refuses if a spin is in flight or the game is finished, rolls via `RouletteEngine.roll()`, stores the pending rolled lot, and **atomically raises both `sessionLocked` and `spinInProgress`**. Returns a discriminated **`PrepareSpinResult`** — `{ ok: true, lot }` on success, `{ ok: false, reason }` on each of the four refusal branches. The winner is decided *before* any animation starts. |
-| `finishSpin()` | Reads the pending rolled lot; **nulls the pending context** and invokes `GameMode.processRoll` **inside a `try/finally`**. Applies any eliminations internally (`deactivateMany`), sets `gameFinished` on a `finished` result, and **releases `spinInProgress` in `finally`**. Returns `{ rolledLot, result }` — or `null` if there is no pending spin. An exception from `processRoll` is **not** swallowed: it propagates to `App`, and the session stays `sessionLocked` with `gameFinished` untouched. |
+| `prepareSpin()` | Validates via `RouletteEngine.canSpin()`, refuses if a spin is in flight or the game is finished, captures `this.currentMode` **once, before the roll**, rolls via `RouletteEngine.roll(activeLots, modeAtDecision)`, stores the pending spin context (`pendingSpin = { rolledLot, mode: modeAtDecision }`), and **atomically raises both `sessionLocked` and `spinInProgress`**. Returns a discriminated **`PrepareSpinResult`** — `{ ok: true, lot }` on success, `{ ok: false, reason }` on each of the four refusal branches. The winner is decided *before* any animation starts (PlanB: the mode is pinned at decision time). |
+| `finishSpin()` | Reads the pending spin context; **nulls it before processing** and invokes the **pinned** mode's `processRoll` (`pending.mode.processRoll(...)` — never `this.currentMode`) **inside a `try/finally`**. Applies any eliminations internally (`deactivateMany`), sets `gameFinished` on a `finished` result, and **releases `spinInProgress` in `finally`**. Returns `{ rolledLot, result }` — or `null` if there is no pending spin. An exception from `processRoll` is **not** swallowed: it propagates to `App`, and the session stays `sessionLocked` with `gameFinished` untouched. |
 | `setMode(modeId)` | Single authoritative mode change. **Rejected while `sessionLocked`** (planA §14). Participation is preserved across a switch. |
 | `isSessionLocked` / `isSpinInProgress` / `isGameFinished` (getters) | Read-only mirrors of the three lifecycle flags; the UI derives `disabled` states from them and stores no copy. |
 
@@ -219,7 +221,9 @@ invariant when it simplifies its session-level guards (§11).
   invoking `processRoll`, and `reset()` nulls it as well, so re-entrant or
   late completions cannot replay a stale roll (refac4.md §12 / §17).
 - A failed `prepareSpin()` (any `{ ok: false, reason }` result) leaves all
-  three lifecycle flags and `pendingRolledLot` untouched (A1/A2).
+  three lifecycle flags and `pendingSpin` untouched (A1/A2). The pinning
+  capture happens only on the success path — after every validation branch
+  has already returned.
 
 ---
 
@@ -607,9 +611,10 @@ GameSession.prepareSpin()
   ├─ if spinInProgress → { ok: false, reason: 'spinInProgress' }
   ├─ if gameFinished   → { ok: false, reason: 'gameFinished' }
   ├─ if !RouletteEngine.canSpin(activeLots) → { ok: false, reason: 'noActiveLots' }
-  ├─ rolledLot = RouletteEngine.roll(activeLots, currentMode)   // DECISION MADE HERE
+  ├─ modeAtDecision = currentMode                               // pinned ONCE (PlanB)
+  ├─ rolledLot = RouletteEngine.roll(activeLots, modeAtDecision) // DECISION MADE HERE
   ├─ if !rolledLot → { ok: false, reason: 'noValidWeights' }
-  ├─ pendingRolledLot = rolledLot
+  ├─ pendingSpin = { rolledLot, mode: modeAtDecision }
   ├─ sessionLocked = true                                       // persists until reset()
   ├─ spinInProgress = true                                      // released by finishSpin()
   └─ { ok: true, lot: rolledLot }
@@ -629,10 +634,11 @@ finishSpin() [App]
   └─ renderer.updateSegments(gameSession.activeLots, mode); renderer.render()
 
 GameSession.finishSpin()
-  ├─ rolledLot = pendingRolledLot; if !rolledLot → return null
-  ├─ pendingRolledLot = null                                    // clear BEFORE processing
+  ├─ pending = pendingSpin; if !pending → return null
+  ├─ pendingSpin = null                                         // clear BEFORE processing
+  ├─ { rolledLot, mode } = pending
   ├─ try:
-  │     result = currentMode.processRoll(rolledLot, state)      // RULES APPLIED HERE
+  │     result = mode.processRoll(rolledLot, state)             // PINNED mode — RULES APPLIED HERE
   │     if result.deactivate.length > 0 → deactivateMany(result.deactivate)
   │     if result.finished → gameFinished = true
   │     return { rolledLot, result }
@@ -644,7 +650,7 @@ The winner is decided inside `GameSession.prepareSpin()`, i.e. **before**
 `App` configures or starts any animation; the animation only moves the
 wheel / strip / circle grid to a pre-computed position.
 
-**Refactor notes (Stage 4 + Sub-stage A + A1).**
+**Refactor notes (Stage 4 + Sub-stage A + A1 + PlanB).**
 
 - `App` never touches `GameSession.activeLotIds`, never calls `processRoll`
   and never calls `deactivateMany` — all of that is inside
@@ -659,11 +665,22 @@ wheel / strip / circle grid to a pre-computed position.
   `gameFinished` stays untouched, so the failure is distinguishable from a
   normal completed turn. The exception itself propagates to `App`, which
   surfaces it via `ErrorDialog`.
-- `reset()` on the session nulls the pending rolled lot and releases every
-  flag, so a late `onComplete` (e.g. after `AnimationController.stop()`
-  followed by a fresh start) cannot replay a stale roll —
+- `reset()` on the session nulls the pending spin context
+  (`pendingSpin = null`) and releases every flag, so a late `onComplete`
+  (e.g. after `AnimationController.stop()` followed by a fresh start)
+  cannot replay a stale roll —
   `GameSession.finishSpin()` returns `null` in that case and `App` is a
   no-op apart from re-evaluating control state.
+- **PlanB (decision-time mode pinning):** `prepareSpin()` captures the
+  governing `GameMode` **once, before the roll**, and stores it on the
+  pending context alongside the rolled lot. `finishSpin()` consumes
+  `pending.mode` — it never re-reads `this.currentMode`. Since `modes.ts`
+  holds one stateless singleton per `Mode`, the pinned instance is stable
+  and identity-comparable, so `calculateWeight` / `getRollText` /
+  `processRoll` used during a turn are guaranteed to come from the same
+  object. This closes the theoretical drift between the decision and its
+  application, independent of the session lock that already forbids mode
+  changes after the first spin.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
@@ -800,7 +817,7 @@ the frame callback early-returns whenever the start time is `null`, so a
 late `onComplete` from a cancelled animation cannot fire. This is the
 guarantee `App.reset()` relies on: it calls `animationController.stop()`
 *before* `gameSession.reset()`, and that session reset additionally nulls
-the pending rolled lot — so even if a stray completion reached
+the pending spin context — so even if a stray completion reached
 `App.finishSpin()`, `GameSession.finishSpin()` would return `null`. Two
 independent invalidation mechanisms, not a timing assumption.
 
@@ -844,10 +861,13 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
 7. **GameSession owns the turn lifecycle.** Since Stage 4, rules are applied
    inside `GameSession.finishSpin()`. `App` reads the returned
    `{ rolledLot, result }` for UI only and never mutates game state itself.
-8. **Pending-spin context is single-use.** A pending rolled lot exists only
-   between `prepareSpin()` and `finishSpin()`; `finishSpin()` clears it
-   before invoking `processRoll`, and `reset()` clears it too — a stale roll
-   can never be replayed.
+8. **Pending-spin context is single-use and mode-pinned.** The pending spin
+   context (rolled lot **and** the `GameMode` instance that produced it)
+   exists only between `prepareSpin()` and `finishSpin()`. `finishSpin()`
+   clears it before invoking `processRoll` and always applies the pinned
+   mode — never the session's current mode — so a stale roll can never be
+   replayed and the outcome cannot drift from the decision (PlanB).
+   `reset()` clears the context too.
 9. **Two distinct locks, never conflated.** `sessionLocked` (raised once,
    cleared only by reset) governs session-level mutations; `spinInProgress`
    (raised/cleared by the spin pair) governs the controls that cannot change
@@ -855,7 +875,8 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
    copy.
 10. **No state change on a failed spin.** A `prepareSpin()` that returns
     `{ ok: false, reason }` leaves `sessionLocked`, `spinInProgress`,
-    `gameFinished`, and `pendingRolledLot` untouched.
+    `gameFinished`, and `pendingSpin` untouched. The mode-pinning capture
+    (`pendingSpin = { rolledLot, mode }`) happens only on the success path.
 11. **Spin-time lock always released.** `finishSpin()` uses `try/finally` so
     `spinInProgress` is released even when the mode's `processRoll` throws.
     The exception itself is not swallowed — it propagates to `App`, which
@@ -947,3 +968,12 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
     Each renderer derives its dimensions from its own canvas via
     `BaseRenderer.getLogicalSize()`. `App.render()` was removed; every call
     site now calls `renderer.render()` directly.
+- **PlanB:** the pending spin context was promoted from `pendingRolledLot:
+  Lot | null` to `pendingSpin: PendingSpin | null`
+  (`{ rolledLot, mode }`). `prepareSpin()` now captures the governing
+  `GameMode` **once, before the roll**, and stores it on the pending
+  context. `finishSpin()` invokes `pending.mode.processRoll(...)` — never
+  `this.currentMode.processRoll(...)`. `reset()` sets
+  `pendingSpin = null`. `PrepareSpinResult` (the public result the UI
+  consumes) is unchanged. No public API of `GameSession`, `App`,
+  `GameMode`, `RouletteEngine`, or any renderer was touched.
