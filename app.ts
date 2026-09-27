@@ -46,7 +46,7 @@ export class App {
 
     private lotManager: LotManager;
     private gameSession: GameSession;
-    private renderer: IRenderer;
+    private renderer!: IRenderer;
     private animationController: AnimationController;
     
     private settings: Settings = {
@@ -122,15 +122,19 @@ export class App {
             this.settings.modeId,
             () => this.lotManager.getAllLots()
         );
-        const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
+
+        // The canvas must be resolved before the renderer is built
+        // (see recreateRenderer()).
+        this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
+
         // Stage 5: `visualizationStrategy.ts` is the sole renderer registry
         // (`rendererFactory.ts` was collapsed into it). One lookup returns
         // the package whose `createRenderer` builds the concrete renderer.
-        this.renderer = getVisualizationPackage(this.settings.visualization).createRenderer(canvas);
+        this.recreateRenderer();
+
         this.animationController = new AnimationController();
-        
+
         // Initialize DOM elements
-        this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
         this.resultDisplay = document.getElementById('result-display');
         this.resultText = document.getElementById('result-text');
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
@@ -205,7 +209,24 @@ export class App {
         
     }
 
-
+    /**
+     * (Re)creates the renderer for the currently selected visualization.
+     *
+     * The visualization registry (`visualizationStrategy.ts`) is the sole
+     * source of the concrete renderer class (Stage 5) — callers never
+     * reach for a renderer constructor directly. Called from the
+     * constructor once `this.canvas` exists, and from the
+     * `visualizationSelect` change handler whenever the user swaps
+     * visualization between spins.
+     *
+     * This method only swaps the renderer implementation; it does not
+     * seed segments or trigger a draw. Callers must follow up with
+     * `renderer.updateSegments(...)` and `render()`.
+     */
+    private recreateRenderer(): void {
+        this.renderer = getVisualizationPackage(this.settings.visualization)
+            .createRenderer(this.canvas);
+    }
 
     /**
      * Updates result text to show current mode name when no winner is highlighted.
@@ -301,8 +322,7 @@ export class App {
             
             // Recreate renderer with new visualization type via the package
             // registry (Stage 5: `rendererFactory.ts` was removed).
-            const canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
-            this.renderer = getVisualizationPackage(this.settings.visualization).createRenderer(canvas);
+            this.recreateRenderer();
             
             // Re-initialize segments and render
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
