@@ -41,7 +41,7 @@ five themes (dark, light, emerald, nordic, monochrome).
 
 ## 3. Project structure
 
-$
+```
 /
 ├── index.html                  # static shell + inline theme bootstrap script
 ├── styles.css                  # all styling; 5 theme palettes via :root[data-theme="…"]
@@ -76,11 +76,7 @@ $
     ├── errorDialog.ts              # generic error/info dialog
     ├── modalDialog.ts              # abstract modal base class
     └── modalManager.ts             # singleton modal stack manager
-$
-
-*(The `$` fence around the tree is a rendering convenience; it carries no
-runtime meaning — see the note at the top of the reply about internal code
-blocks.)*
+```
 
 ---
 
@@ -88,7 +84,7 @@ blocks.)*
 
 Dependencies point downward only.
 
-$$
+```
         ┌──────────────────────────────────────────────┐
  L6 UI   │ app.ts           (orchestration, DOM, loop)  │
         └───────┬──────────────┬───────────────┬───────┘
@@ -116,7 +112,7 @@ $$
                 │ animation.ts,          │
                 │ csvParser.ts           │
                 └────────────────────────┘
-$
+```
 
 **Core rule:** dependencies point downward only. `App` knows *that* a game
 mode exists, never *how* it plays. `RouletteEngine` and `LotManager` are
@@ -222,13 +218,13 @@ All mode-specific rules live inside a `GameMode` implementation. There is no
 
 ### Registry (`modes.ts`)
 
-$$
+```
 export const MODES: Record<Mode, GameMode> = {
     normal: new NormalMode(),
     survival: new SurvivalMode()
 };
 export function getMode(modeId: Mode): GameMode { return MODES[modeId]; }
-$
+```
 
 Mode instances are stateless and shared. Adding a new mode requires one new
 class and one line in `MODES`; nothing else changes.
@@ -252,8 +248,7 @@ A single spin selects the winner; the game ends immediately.
 | `processRoll` | Eliminates the rolled lot; decides the winner from the **post-elimination** state |
 
 `processRoll` logic:
-
-$$
+```
 remaining = state.activeLots.filter(l => l.id !== rolledLot.id)
 
 if remaining.length === 1:
@@ -261,7 +256,7 @@ if remaining.length === 1:
         message: completionMessage(remaining[0]) }
 otherwise:
     → { finished: false, winner: null, deactivate: [rolledLot.id] }
-$
+```
 
 **Key design point:** the winner is computed from the list *after* removing
 the rolled lot. This prevents the historical bug where the last lot standing
@@ -411,13 +406,13 @@ driven for this renderer).
 Each visualization is a `VisualizationPackage` bundling a renderer factory and
 a final-position function:
 
-$$
+```
 WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
 STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
 COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
 export const VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' } as const;
 export function getVisualizationPackage(type): VisualizationPackage;
-$
+```
 
 `computeFinalPosition` exposes an optional `canvasWidth?: number`. The wheel
 and strip packages forward it; the Counting Rhyme package deliberately does
@@ -517,7 +512,7 @@ paint, so the theme never flashes on reload.
 Since Stage 4 the turn lifecycle is split cleanly between `App` (animation +
 UI) and `GameSession` (validation, rolling, state transitions, locks).
 
-$$
+```
 spin() [App]
   ├─ rolledLot = gameSession.prepareSpin()                  // session: validate + roll + remember
   │     └─ if null → alert(noLotsToSpin); return            // no state change on failure
@@ -562,7 +557,7 @@ GameSession.finishSpin()  (internal)
   ├─ if result.deactivate.length > 0 → deactivateMany(result.deactivate)
   ├─ if result.finished → gameFinished = true
   └─ return { rolledLot, result }
-$
+```
 
 The winner is decided inside `GameSession.prepareSpin()`, i.e. **before**
 `App` configures or starts any animation; the animation only moves the
@@ -583,12 +578,12 @@ wheel / strip / circle grid to a pre-computed position.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
-$$
+```
 spin #1 → prepareSpin rolls B → finishSpin: deactivate B → active = {A, C}
         → finished=false → spin lock released → next spin allowed
 spin #2 → prepareSpin rolls C → finishSpin: remaining = {A} → winner A,
         finished=true → gameFinished=true → Spin disabled until Reset
-$
+```
 
 No third spin occurs. For Normal mode, a single spin yields `finished=true`
 with the rolled lot as winner.
@@ -803,9 +798,7 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
   raised *inside* `prepareSpin()` after validation succeeds, so a failed spin
   cannot leave the UI locked. The CSS disabled-control rule was extended to
   `input`, `select`, and `textarea`, closing the previous "buttons look
-  disabled, other controls don't" gap.
-- **Sub-stage B:** `visualizationSelect` and `easingSelect` were moved from
-  the session-lock class to the spin-time-lock class, joining the duration
+  disabled, other controls don't" gap. `visualizationSelect` and `easingSelect` were moved from  the session-lock class to the spin-time-lock class, joining the duration
   controls. They are now editable between spins of an unfinished Survival
   game. `App.updateControlsState()` splits its "session-level" and
   "spin-time" blocks accordingly; the visualization-change handler narrows
