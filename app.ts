@@ -101,6 +101,8 @@ export class App {
     private easingSelect: HTMLSelectElement | null = null;
     public languageSelect: HTMLSelectElement | null = null;
     private themeSelect: HTMLSelectElement | null = null;
+    private modeHelp: HTMLElement | null = null;
+    private easingHelp: HTMLElement | null = null;
 
     
     // Sort control elements
@@ -161,6 +163,8 @@ export class App {
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
         this.themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+        this.modeHelp = document.getElementById('mode-help');
+        this.easingHelp = document.getElementById('easing-help');
 
         
         // Sort control elements
@@ -204,6 +208,11 @@ export class App {
         if (this.resultText) {
             this.updateResultTextWithModeName();
         }
+
+        // Populate the help tooltips now that i18n is ready (startApp()
+        // awaits initI18n before `new App()`).
+        this.updateModeHelpTooltip();
+        this.updateEasingHelpTooltip();
         
         // Event listeners
         this.setupEventListeners();
@@ -231,6 +240,31 @@ export class App {
             case 'noActiveLots':   return 'validation.noLotsToSpin';
             case 'noValidWeights': return 'validation.noValidWeights';
         }
+    }
+
+    /**
+     * Sets the Game Mode tooltip to the description of the *currently
+     * selected* mode (`mode.<id>.description`). The mode name shown inside
+     * the select is driven by `mode.<id>.name` via `data-i18n` — the two
+     * surfaces reuse the same locale namespace, no duplication.
+     */
+    private updateModeHelpTooltip(): void {
+        if (!this.modeHelp) return;
+        this.modeHelp.dataset.tooltip = t(`mode.${this.gameSession.mode.id}.description`);
+    }
+
+    /**
+     * Sets the Easing Function tooltip to the description of the *currently
+     * selected* easing. The option value matches a key of `EasingFunctions`;
+     * the entry's `name` field is the i18n key base, giving the option label
+     * (`easing.<name>.name`) and this tooltip (`easing.<name>.description`)
+     * from a single source.
+     */
+    private updateEasingHelpTooltip(): void {
+        if (!this.easingHelp || !this.easingSelect) return;
+        const entry = EasingFunctions[this.easingSelect.value];
+        if (!entry) return;
+        this.easingHelp.dataset.tooltip = t(`easing.${entry.name}.description`);
     }
 
     /**
@@ -303,6 +337,7 @@ export class App {
             this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
             // Update result text to show new mode name if no winner highlighted
             this.updateResultTextWithModeName();
+            this.updateModeHelpTooltip();
         });
         
         this.visualizationSelect?.addEventListener('change', (e) => {
@@ -373,31 +408,15 @@ export class App {
             }
         });
         
-        // Easing function select - updates App.settings.easingFunction on change
+        // Easing function select — the option value is a key of
+        // EasingFunctions; the entry carries both the curve and its i18n
+        // name (used by the tooltip).
         this.easingSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
-            const easingName = target.value;
-            
-            // Map selected value to actual easing function from EasingFunctions object
-            switch (easingName) {
-                case 'easeOutCubic':
-                    this.easingFunction = EasingFunctions.easeOutCubic;
-                    break;
-                case 'easeOutQuart':
-                    this.easingFunction = EasingFunctions.easeOutQuart;
-                    break;
-                case 'easeOutQuint':
-                    this.easingFunction = EasingFunctions.easeOutQuint;
-                    break;
-                case 'easeOutExpo':
-                    this.easingFunction = EasingFunctions.easeOutExpo;
-                    break;
-                case 'linear':
-                    this.easingFunction = EasingFunctions.linear;
-                    break;
-                default: // rouletteEaseOut is the default
-                    this.easingFunction = EasingFunctions.rouletteEaseOut;
-            }
+            const entry = EasingFunctions[target.value];
+            if (!entry) return;
+            this.easingFunction = entry.fn;
+            this.updateEasingHelpTooltip();
         });
 
 
@@ -417,6 +436,11 @@ export class App {
 
                 // Update result text to show mode name in new language (if no winner)
                 this.updateResultTextWithModeName();
+
+                // The tooltips are set via `data-tooltip`, not `data-i18n`,
+                // so translateDOM() does not touch them — refresh explicitly.
+                this.updateModeHelpTooltip();
+                this.updateEasingHelpTooltip();
 
             });
         });

@@ -5,57 +5,65 @@
 import { EasingFunction } from './types.js';
 
 /**
- * Collection of easing functions for smooth animation.
+ * An entry of `EasingFunctions`: the curve itself plus a name used as the
+ * i18n key base for its label and description (`easing.<name>.name` /
+ * `easing.<name>.description`).
  */
-export const EasingFunctions = {
+export interface EasingFunctionDefinition {
+    fn: EasingFunction;
+    /** i18n key base — see locales/en.json / locales/ru.json. */
+    name: string;
+}
+
+/**
+ * Collection of easing functions for smooth animation.
+ * Each entry carries the curve (`fn`) and its i18n `name`.
+ */
+export const EasingFunctions: Record<string, EasingFunctionDefinition> = {
+    linear: {
+        name: 'linear',
+        fn: (t: number): number => t
+    },
+
+    easeOutCubic: {
+        name: 'easeOutCubic',
+        fn: (t: number): number => 1 - Math.pow(1 - t, 3)
+    },
+
+    easeOutQuart: {
+        name: 'easeOutQuart',
+        fn: (t: number): number => 1 - Math.pow(1 - t, 4)
+    },
+
+    easeOutQuint: {
+        name: 'easeOutQuint',
+        fn: (t: number): number => 1 - Math.pow(1 - t, 5)
+    },
+
+    easeOutExpo: {
+        name: 'easeOutExpo',
+        fn: (t: number): number => t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
+    },
+
     /**
-     * Linear easing - constant speed throughout animation
+     * Custom roulette easing — deliberately distinct from easeOutQuint.
+     * A blend of cubic and quintic ease-out: gentler in the first half,
+     * long dramatic tail at the end.
      */
-    linear: (t: number): number => t,
-    
-    /**
-     * Cubic ease out - decelerates with cubic curve
-     */
-    easeOutCubic: (t: number): number => 1 - Math.pow(1 - t, 3),
-    
-    /**
-     * Quartic ease out - stronger deceleration than cubic
-     */
-    easeOutQuart: (t: number): number => 1 - Math.pow(1 - t, 4),
-    
-    /**
-     * Quintic ease out - very strong deceleration
-     */
-    easeOutQuint: (t: number): number => 1 - Math.pow(1 - t, 5),
-    
-    /**
-     * Exponential ease out - extremely smooth deceleration
-     */
-    easeOutExpo: (t: number): number => 
-        t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
-    
-    /**
-     * Custom roulette easing - deliberately distinct from easeOutQuint.
-     *
-     * A blend of cubic and quintic ease-out: it starts closer to the gentler
-     * cubic curve (so the wheel sheds speed more gradually over the first
-     * half) and finishes closer to quintic (for a long, dramatic tail).
-     *
-     * The curve is strictly monotonic on [0, 1] and differs from both the
-     * cubic and quintic curves above, so selecting it produces a visibly
-     * different animation (previously it was byte-identical to easeOutQuint).
-     */
-    rouletteEaseOut: (t: number): number => {
-        const cubic = 1 - Math.pow(1 - t, 3);
-        const quintic = 1 - Math.pow(1 - t, 5);
-        return cubic * (1 - t) + quintic * t;
+    rouletteEaseOut: {
+        name: 'rouletteEaseOut',
+        fn: (t: number): number => {
+            const cubic = 1 - Math.pow(1 - t, 3);
+            const quintic = 1 - Math.pow(1 - t, 5);
+            return cubic * (1 - t) + quintic * t;
+        }
     }
 };
 
 /**
  * Default easing function for roulette animation
  */
-export const DEFAULT_EASING: EasingFunction = EasingFunctions.rouletteEaseOut;
+export const DEFAULT_EASING: EasingFunction = EasingFunctions.rouletteEaseOut.fn;
 
 /**
  * Animation controller class that manages time-based animations.
