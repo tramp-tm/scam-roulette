@@ -1,10 +1,10 @@
 import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
-import { AnimationController, EasingFunctions, DEFAULT_EASING } from './animation.js';
-import { getVisualizationPackage } from './visualizationStrategy.js';
+import { EasingFunctions, DEFAULT_EASING } from './animation.js';
+import { VisualizationDriver } from './visualizationDriver.js';
 import { GameSession } from './gameSession.js';
-import { IRenderer, VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ImportStrategy, SortField, SortDirection, VisualizationPackage, EasingFunction, PrepareSpinFailureReason, Lot, RollResult } from './types.js';
+import { VisualizationType, Settings, Mode, GameMode, RenderableLot, LotsListRenderOptions, ParsedLot, ImportStrategy, SortField, SortDirection, EasingFunction, PrepareSpinFailureReason, Lot, RollResult } from './types.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
 import { 
     generateRandomReadableColor, 
@@ -46,8 +46,7 @@ export class App {
 
     private lotManager: LotManager;
     private gameSession: GameSession;
-    private renderer: IRenderer;
-    private animationController: AnimationController;
+    private visualizationDriver: VisualizationDriver;
     
     private settings: Settings = {
         modeId: 'normal',
@@ -123,16 +122,18 @@ export class App {
             () => this.lotManager.getAllLots()
         );
 
-        // The canvas must be resolved before the renderer is built
-        // (see recreateRenderer()).
+        // The canvas must be resolved before the visualization driver is
+        // built — the driver constructs the initial renderer in its
+        // constructor.
         this.canvas = document.getElementById('roulette-canvas') as HTMLCanvasElement;
 
-        // Stage 5: `visualizationStrategy.ts` is the sole renderer registry
-        // (`rendererFactory.ts` was collapsed into it). One lookup returns
-        // the package whose `createRenderer` builds the concrete renderer.
-        this.renderer = this.recreateRenderer();
-
-        this.animationController = new AnimationController();
+        // VisualizationDriver owns the renderer + animation controller + canvas.
+        // `App` talks to the visualization pipeline only through this boundary
+        // (app-refac-task.md §§1–7).
+        this.visualizationDriver = new VisualizationDriver(
+            this.canvas,
+            this.settings.visualization
+        );
 
         // Initialize DOM elements
         this.resultDisplay = document.getElementById('result-display');
@@ -207,25 +208,6 @@ export class App {
         // Event listeners
         this.setupEventListeners();
         
-    }
-
-    /**
-     * Builds the renderer for the currently selected visualization.
-     *
-     * The visualization registry (`visualizationStrategy.ts`) is the sole
-     * source of the concrete renderer class (Stage 5) — callers never
-     * reach for a renderer constructor directly. Called from the
-     * constructor once `this.canvas` exists, and from the
-     * `visualizationSelect` change handler whenever the user swaps
-     * visualization between spins.
-     *
-     * This method is a pure factory: it builds the renderer but does not
-     * assign it or draw. Callers must assign the result to `this.renderer`
-     * and follow up with `renderer.updateSegments(...)` and `render()`.
-     */
-    private recreateRenderer(): IRenderer {
-        return getVisualizationPackage(this.settings.visualization)
-            .createRenderer(this.canvas);
     }
 
     /**
@@ -318,8 +300,7 @@ export class App {
             // session's participation set is deliberately preserved across a
             // mode switch (matches the behaviour shipped in Stage 1/2 — the
             // Stage 3 plan §13 keeps this behaviour).
-            this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-            this.renderer.render();
+            this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
             // Update result text to show new mode name if no winner highlighted
             this.updateResultTextWithModeName();
         });
@@ -339,13 +320,13 @@ export class App {
 
             this.settings.visualization = target.value as VisualizationType;
             
-            // Recreate renderer with new visualization type via the package
-            // registry (Stage 5: `rendererFactory.ts` was removed).
-            this.renderer = this.recreateRenderer();
-            
-            // Re-initialize segments and render
-            this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-            this.renderer.render();
+            // Recreate renderer with new visualization type and refresh — the
+            // swap is entirely contained in the visualization boundary.
+            this.visualizationDriver.setVisualization(
+                this.settings.visualization,
+                this.gameSession.activeLots,
+                this.gameSession.mode
+            );
         });
         
 
@@ -446,7 +427,7 @@ export class App {
             this.applyTheme(target.value);
 
             // Re-render so canvas-based visuals pick up the new theme (if applicable)
-            this.renderer.render();
+            this.visualizationDriver.render();
         });
 
         
@@ -571,8 +552,7 @@ export class App {
         
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.renderer.render();
+        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
     }
 
     private spin(): void {
@@ -585,56 +565,21 @@ export class App {
             alert(t(this.prepareSpinFailureKey(prepared.reason)));
             return;
         }
-        const rolledLot = prepared.lot;
 
         // A successful prepareSpin() has atomically established the session
         // and spin-time locks (Sub-stage A §7); reflect that in the DOM.
-        // This is one of the few remaining direct call sites — the other
-        // paths funnel through `renderLotsList()` (A1 — single derivation
-        // point).
         this.updateControlsState();
 
-        // Capture the current mode once so the visualization final-position
-        // calculation uses the same mode that decided the roll (Stage 5 §20-1).
-        const mode = this.gameSession.mode;
-
-        // Calculate final position using visualization strategy pattern
-        const currentRotation = this.renderer.getCurrentRotation();
-        const targetLotId = rolledLot.id;
-        const animationDuration = this.settings.animationDuration;
-
-        // Get canvas dimensions
-        const rect = this.canvas.getBoundingClientRect();
-
-        // Use bundled visualization package - single lookup returns
-        // everything needed
-        const vizPackage: VisualizationPackage = getVisualizationPackage(this.settings.visualization);
-        const endRotation = vizPackage.computeFinalPosition(
-            this.gameSession.activeLots,
-            mode,
-            targetLotId,
-            currentRotation,
-            animationDuration,
-            rect.width  // Always passed - package handles it appropriately
-        );
-
-        // Configure animation
-        this.animationController.configure({
-            startValue: currentRotation,
-            endValue: endRotation,
-            duration: animationDuration,
-            easing: this.easingFunction,
-            onUpdate: (value) => {
-                this.renderer.setRotation(value);
-                this.renderer.render();
-            },
-            onComplete: () => {
-                this.finishSpin();
-            }
+        // Hand the already-decided target to the visualization boundary.
+        // App says *what* to animate; the driver decides *how* (app-refac-task.md §8).
+        this.visualizationDriver.spinTo({
+            lots:        this.gameSession.activeLots,
+            mode:        this.gameSession.mode,
+            targetLotId: prepared.lot.id,
+            durationMs:  this.settings.animationDuration,
+            easing:      this.easingFunction,
+            onComplete:  () => this.finishSpin()
         });
-
-        // Start animation
-        this.animationController.start();
     }
 
     /**
@@ -719,40 +664,35 @@ export class App {
         // automatically by `renderLotsList()` inside `updateUI()`, so no
         // trailing `updateControlsState()` is needed on this normal path.
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, mode);
-        this.renderer.render();
+        this.visualizationDriver.refresh(this.gameSession.activeLots, mode);
     }
 
     private reset(): void {
-        // Stop any running animation. This cancels the pending RAF so a
-        // late `onComplete` cannot fire after the session has been reset
-        // (Sub-stage A §9). The order below is deliberate: stop first,
-        // then reset the session — if a late `onComplete` somehow reached
-        // `finishSpin()`, it would already find `pendingRolledLot === null`.
-        this.animationController.stop();
-        
         // Reset state
         this.highlightedLotId = null;
 
         // Reset the current game session (Stage 3 §14 / Stage 4 §17,
         // Sub-stage A §9): every lot currently in the global list becomes
         // an active participant again, any in-flight spin context is
-        // cleared, and every lifecycle lock is released so the next
-        // session starts unlocked.
+        // cleared, and every lifecycle lock is released.
         this.gameSession.reset();
-        
-        // Reset renderer
-        this.renderer.reset();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        
+
+        // Reset the visualization (stops any animation, resets the renderer,
+        // re-seeds segments for the now-reset session, redraws). The whole
+        // sequence is synchronous: no RAF callback can run between
+        // `gameSession.reset()` (which nulls the pending spin) and the
+        // driver's `animationController.stop()` — so a late `onComplete`
+        // remains a no-op for two independent reasons.
+        this.visualizationDriver.reset(
+            this.gameSession.activeLots,
+            this.gameSession.mode
+        );
+
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
-        
+
         // Update UI
         this.updateUI();
-        
-        // Redraw the roulette wheel
-        this.renderer.render();
     }
 
     private updateUI(): void {
@@ -980,8 +920,7 @@ export class App {
                 // Amount changes do not affect participation; no session
                 // mutation is required. The next read of `session.activeLots`
                 // already reflects the updated amount.
-                this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-                this.renderer.render();
+                this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
             }
         });
 
@@ -1015,8 +954,7 @@ export class App {
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.renderer.render();
+        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
     }
 
     /** Handles clearing all lots */
@@ -1052,8 +990,7 @@ export class App {
         
         // Update UI and renderer
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.renderer.render();
+        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
     }
 
     /** Opens the import dialog */
@@ -1129,8 +1066,7 @@ export class App {
         
         // Update UI and renderer after import completes
         this.updateUI();
-        this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.renderer.render();
+        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
         
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {
