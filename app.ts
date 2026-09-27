@@ -303,7 +303,7 @@ export class App {
             // mode switch (matches the behaviour shipped in Stage 1/2 — the
             // Stage 3 plan §13 keeps this behaviour).
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-            this.render();
+            this.renderer.render();
             // Update result text to show new mode name if no winner highlighted
             this.updateResultTextWithModeName();
         });
@@ -326,7 +326,7 @@ export class App {
             
             // Re-initialize segments and render
             this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-            this.render();
+            this.renderer.render();
         });
         
 
@@ -427,7 +427,7 @@ export class App {
             this.applyTheme(target.value);
 
             // Re-render so canvas-based visuals pick up the new theme (if applicable)
-            this.render();
+            this.renderer.render();
         });
 
         
@@ -551,7 +551,7 @@ export class App {
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.render();
+        this.renderer.render();
     }
 
     private spin(): void {
@@ -600,7 +600,7 @@ export class App {
             easing: this.easingFunction,
             onUpdate: (value) => {
                 this.renderer.setRotation(value);
-                this.render();
+                this.renderer.render();
             },
             onComplete: () => {
                 this.finishSpin();
@@ -666,7 +666,7 @@ export class App {
         // Refresh UI + renderer to reflect the new active-lot list
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, mode);
-        this.render();
+        this.renderer.render();
         this.updateControlsState();
     }
 
@@ -699,7 +699,7 @@ export class App {
         this.updateUI();
         
         // Redraw the roulette wheel
-        this.render();
+        this.renderer.render();
     }
 
     private updateUI(): void {
@@ -920,7 +920,7 @@ export class App {
                 // mutation is required. The next read of `session.activeLots`
                 // already reflects the updated amount.
                 this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-                this.render();
+                this.renderer.render();
             }
         });
     }
@@ -947,10 +947,6 @@ export class App {
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.render();
-    }
-
-    private render(): void {
         this.renderer.render();
     }
 
@@ -986,7 +982,7 @@ export class App {
         // Update UI and renderer
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.render();
+        this.renderer.render();
     }
 
     /** Opens the import dialog */
@@ -1056,7 +1052,7 @@ export class App {
         // Update UI and renderer after import completes
         this.updateUI();
         this.renderer.updateSegments(this.gameSession.activeLots, this.gameSession.mode);
-        this.render();
+        this.renderer.render();
         
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {
