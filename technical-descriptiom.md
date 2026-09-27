@@ -43,7 +43,7 @@ five themes (dark, light, emerald, nordic, monochrome).
 
 ## 3. Project structure
 
-$$$$
+```
 /
 ├── index.html                  # static shell + inline theme bootstrap script
 ├── styles.css                  # all styling; 5 theme palettes via :root[data-theme="…"]
@@ -78,7 +78,7 @@ $$$$
     ├── errorDialog.ts              # generic error/info dialog
     ├── modalDialog.ts              # abstract modal base class
     └── modalManager.ts             # singleton modal stack manager
-$$$$
+```
 
 ---
 
@@ -86,7 +86,7 @@ $$$$
 
 Dependencies point downward only.
 
-$$$$
+```
         ┌──────────────────────────────────────────────┐
  L6 UI   │ app.ts           (orchestration, DOM, loop)  │
         └───────┬──────────────┬───────────────┬───────┘
@@ -114,7 +114,7 @@ $$$$
                 │ animation.ts,          │
                 │ csvParser.ts           │
                 └────────────────────────┘
-$$$$
+```
 
 **Core rule:** dependencies point downward only. `App` knows *that* a game
 mode exists, never *how* it plays. `RouletteEngine` and `LotManager` are
@@ -255,7 +255,7 @@ A single spin selects the winner; the game ends immediately.
 
 `processRoll` logic:
 
-$$$$
+```
 remaining = state.activeLots minus the rolled lot
 
 if remaining.length === 1:
@@ -267,7 +267,7 @@ otherwise:
     finished  = false
     winner    = null
     deactivate = [rolledLot.id]
-$$$$
+```
 
 **Key design point:** the winner is computed from the list *after* removing
 the rolled lot. This prevents the historical bug where the last lot standing
@@ -422,13 +422,13 @@ driven for this renderer). `render()` reads its own dimensions via
 Each visualization is a `VisualizationPackage` bundling a renderer factory and
 a final-position function:
 
-$$$$
+```
 WHEEL_PACKAGE          = { id: 'wheel',          createRenderer, computeFinalPosition → computeFinalRotation }
 STRIP_PACKAGE          = { id: 'strip',          createRenderer, computeFinalPosition → computeFinalScrollOffset }
 COUNTING_RHYME_PACKAGE = { id: 'counting-rhyme', createRenderer, computeFinalPosition → computeFinalCountingPosition }
 VISUALIZATION_PACKAGES = { wheel, strip, 'counting-rhyme' }
 getVisualizationPackage(type) → the corresponding package
-$$$$
+```
 
 `computeFinalPosition` exposes an optional `canvasWidth?: number`. The wheel
 and strip packages forward it; the Counting Rhyme package deliberately does
@@ -587,7 +587,7 @@ UI) and `GameSession` (validation, rolling, state transitions, locks).
 The A1/A2 pass tightened the failure paths (structured `prepareSpin()`
 result; `try/finally` around `processRoll`; dedicated error dialogs).
 
-$$$$
+```
 spin() [App]
   ├─ prepared = gameSession.prepareSpin()
   │     └─ if !prepared.ok → alert(prepareSpinFailureKey(prepared.reason))
@@ -638,7 +638,7 @@ GameSession.finishSpin()
   │     return { rolledLot, result }
   └─ finally:
         spinInProgress = false                                  // ALWAYS released
-$$$$
+```
 
 The winner is decided inside `GameSession.prepareSpin()`, i.e. **before**
 `App` configures or starts any animation; the animation only moves the
@@ -667,12 +667,12 @@ wheel / strip / circle grid to a pre-computed position.
 
 ### Worked example — Survival with three lots (A=1302, B=150, C=148.5)
 
-$$$$
+```
 spin #1 → prepareSpin rolls B → finishSpin: deactivate B → active = {A, C}
         → finished=false → spin lock released → next spin allowed
 spin #2 → prepareSpin rolls C → finishSpin: remaining = {A} → winner A,
         finished=true → gameFinished=true → Spin disabled until Reset
-$$$$
+```
 
 No third spin occurs. For Normal mode, a single spin yields `finished=true`
 with the rolled lot as winner.
