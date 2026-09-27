@@ -556,7 +556,10 @@ button {
     background: var(--btn-secondary-hover);
 }
 
-button:disabled {
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

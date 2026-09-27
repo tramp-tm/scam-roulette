@@ -743,13 +743,15 @@ export class App {
         );
         lockableControls.forEach(el => { el.disabled = sessionLevelLocked; });
 
-        // Duration and sorting: available between spins (planA.md §5), disabled only while animating
+        // Duration: available between spins (planA.md §5); disabled only
+        // while the spin-time lock is held.
         if (this.durationSlider) this.durationSlider.disabled = spinning;
         if (this.durationInput) this.durationInput.disabled = spinning;
-        const sortButtons = document.querySelectorAll<HTMLButtonElement>(
-            '#sort-controls .switch-btn'
-        );
-        sortButtons.forEach(el => { el.disabled = spinning; });
+
+        // Sorting is purely a presentation operation (planA.md §11) — it is
+        // never disabled in any lifecycle state. The sort buttons always
+        // accept clicks; `setSortField()` re-applies the current lock state
+        // to the freshly-rendered list controls afterwards.
     }
 
     /**
