@@ -69,7 +69,6 @@ export class App {
     }
     
     private highlightedLotId: string | null = null;
-    private isSettingsLocked: boolean = false;
     private importDialog: ImportDialog | null = null;
     
     // Sort state
@@ -261,6 +260,15 @@ export class App {
         // Settings changes
         this.modeSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
+
+            // The mode is immutable after the session starts (planA.md §14):
+            // reject the change (and restore the previous visible value)
+            // rather than only relying on the disabled attribute.
+            if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) {
+                target.value = this.gameSession.mode.id;
+                return;
+            }
+
             const newModeId = target.value as Mode;
 
             // Single point of mode change (§3). GameSession owns the current
@@ -281,6 +289,14 @@ export class App {
         
         this.visualizationSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
+
+            // Visualization is immutable after the session starts
+            // (planA.md §15): reject and restore the previous value.
+            if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) {
+                target.value = this.settings.visualization;
+                return;
+            }
+
             this.settings.visualization = target.value as VisualizationType;
             
             // Recreate renderer with new visualization type via the package
@@ -439,8 +455,15 @@ export class App {
         // Update button visual states
         this.updateSortButtons();
         
-        // Re-render lots list with new sort order
+        // Re-render lots list with new sort order.
+        //
+        // Sorting is strictly a presentation operation (planA.md §11): it
+        // never touches `GameSession.activeLotIds`. It does, however,
+        // rebuild the `#lots-list` DOM from scratch, so any lock state on
+        // the freshly created amount inputs / delete buttons must be
+        // re-applied — see the following call.
         this.renderLotsList();
+        this.updateControlsState();   // re-apply the lock state to freshly-rendered controls
     }
     
     /** Updates visual state of sort buttons */
@@ -470,6 +493,11 @@ export class App {
     }
 
     private addLot(): void {
+        // State-level guard at the entry point as well (planA.md §13): this
+        // prevents even the `LotManager` mutation that `GameSession` would
+        // otherwise reject its participation tracking for.
+        if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
+
         const name = this.lotNameInput.value.trim();
         const amount = parseFloat(this.lotAmountInput.value);
         const color = this.newLotColorIndicator.style.backgroundColor;
@@ -516,8 +544,8 @@ export class App {
             return;
         }
 
-        // Lock settings
-        this.isSettingsLocked = true;
+        // A successful prepareSpin() has atomically established the session
+        // and spin-time locks (Sub-stage A §7); reflect that in the DOM.
         this.updateControlsState();
 
         // Capture the current mode once so the visualization final-position
@@ -570,6 +598,9 @@ export class App {
      * `gameSession.finishSpin()` processes the stored roll through the
      * current mode and applies eliminations internally. `App` only reads
      * the returned outcome for UI display.
+     *
+     * Lifecycle-wise (Sub-stage A §8): `finishSpin()` releases only the
+     * spin-time lock; the session lock persists until reset.
      */
     private finishSpin(): void {
         // Capture the current mode once so the roll text and the renderer
@@ -605,12 +636,12 @@ export class App {
                 setTimeout(() => alert(result.message), 500);
             }
 
-            // Lock until the user presses Reset
-            this.isSettingsLocked = true;
-        } else {
-            // More spins to go
-            this.isSettingsLocked = false;
+            // The finished-game lock is tracked inside GameSession via its
+            // `gameFinished` lifecycle flag (planA.md §8) — no `App`-side
+            // copy is needed.
         }
+        // Otherwise: the session stays locked, but the spin-time lock has
+        // been released and a subsequent Survival spin may be prepared.
 
         // Refresh UI + renderer to reflect the new active-lot list
         this.updateUI();
@@ -620,17 +651,21 @@ export class App {
     }
 
     private reset(): void {
-        // Stop any running animation
+        // Stop any running animation. This cancels the pending RAF so a
+        // late `onComplete` cannot fire after the session has been reset
+        // (Sub-stage A §9). The order below is deliberate: stop first,
+        // then reset the session — if a late `onComplete` somehow reached
+        // `finishSpin()`, it would already find `pendingRolledLot === null`.
         this.animationController.stop();
         
         // Reset state
         this.highlightedLotId = null;
-        this.isSettingsLocked = false;
 
-        // Reset the current game session (Stage 3 §14 / Stage 4 §17):
-        // every lot currently in the global list becomes an active
-        // participant again, and any in-flight spin context is cleared so a
-        // stale pending turn cannot be replayed after the reset.
+        // Reset the current game session (Stage 3 §14 / Stage 4 §17,
+        // Sub-stage A §9): every lot currently in the global list becomes
+        // an active participant again, any in-flight spin context is
+        // cleared, and every lifecycle lock is released so the next
+        // session starts unlocked.
         this.gameSession.reset();
         
         // Reset renderer
@@ -664,36 +699,57 @@ export class App {
         this.updateControlsState();
     }
 
+    /**
+     * Reflects the GameSession's two lifecycle locks onto the DOM
+     * (planA.md §10). `App` keeps no lock state of its own — it merely
+     * translates the session's read-only properties into `disabled`.
+     *
+     * Three meaningful combinations:
+     *
+     *   - session locked, spinning   → only Reset enabled;
+     *   - session locked, not spinning (Survival mid-game, or finished)
+     *                               → Spin (unless finished), duration,
+     *                                 sorting, Reset enabled;
+     *   - session unlocked           → everything enabled.
+     *
+     * Duration and sorting are intentionally tied to the *spin-time* lock
+     * only: they are the settings the user is allowed to change between
+     * Survival spins (planA.md §5).
+     */
     private updateControlsState(): void {
-        const isAnimating = this.animationController.isAnimating();
-        const locked = this.isSettingsLocked;
-        const disableEditControls = locked || isAnimating;
+        const spinning = this.gameSession.isSpinInProgress;
+        const finished = this.gameSession.isGameFinished;
+        const sessionLevelLocked = this.gameSession.isSessionLocked || spinning;
 
-        if (this.spinBtn) this.spinBtn.disabled = disableEditControls;
-        if (this.resetBtn) this.resetBtn.disabled = isAnimating;
-        if (this.importBtnControls) this.importBtnControls.disabled = isAnimating;
-        if (this.clearBtnControls) this.clearBtnControls.disabled = isAnimating;
+        // Spin: only between spins of an unfinished game
+        if (this.spinBtn) this.spinBtn.disabled = spinning || finished;
 
-        // Disable every lot-editing control while the game is locked or animating.
-        //
-        // The previous `#lot-form input` selector matched nothing because no
-        // <form id="lot-form"> exists in index.html, so the add-lot row and the
-        // per-lot amount / delete controls stayed interactive mid-spin — which
-        // desyncs the "decision-before-animation" contract and lets the user
-        // edit the pool after a finished game was supposed to be frozen.
-        //
-        // Target the actual elements instead:
-        //   • add-lot row:    #new-lot-name, #new-lot-amount, #add-lot-btn
-        //   • per-lot list:   #lots-list .lot-amount-input, #lots-list .btn-delete
+        // Reset is always available — the user must be able to abandon the session
+        if (this.resetBtn) this.resetBtn.disabled = false;
+
+        // Session-level configuration (mode, visualization, import, clear, easing)
+        if (this.modeSelect) this.modeSelect.disabled = sessionLevelLocked;
+        if (this.visualizationSelect) this.visualizationSelect.disabled = sessionLevelLocked;
+        if (this.importBtnControls) this.importBtnControls.disabled = sessionLevelLocked;
+        if (this.clearBtnControls) this.clearBtnControls.disabled = sessionLevelLocked;
+        if (this.easingSelect) this.easingSelect.disabled = sessionLevelLocked;
+
+        // Lot editing
         const lockableControls = document.querySelectorAll<
             HTMLInputElement | HTMLButtonElement
         >(
             '#new-lot-name, #new-lot-amount, #add-lot-btn, ' +
             '#lots-list .lot-amount-input, #lots-list .btn-delete'
         );
-        lockableControls.forEach(el => {
-            el.disabled = disableEditControls;
-        });
+        lockableControls.forEach(el => { el.disabled = sessionLevelLocked; });
+
+        // Duration and sorting: available between spins (planA.md §5), disabled only while animating
+        if (this.durationSlider) this.durationSlider.disabled = spinning;
+        if (this.durationInput) this.durationInput.disabled = spinning;
+        const sortButtons = document.querySelectorAll<HTMLButtonElement>(
+            '#sort-controls .switch-btn'
+        );
+        sortButtons.forEach(el => { el.disabled = spinning; });
     }
 
     /**
@@ -796,7 +852,14 @@ export class App {
         // Global lots come from LotManager (owner of the global collection).
         const allLots = this.lotManager.getAllLots();
         
-        // Apply sorting based on current sort state
+        // Apply sorting based on current sort state.
+        //
+        // NOTE (planA.md §11): sorting is purely a presentation operation.
+        // The following `sorted` array is a *copy* (`[...allLots]`) used to
+        // order the rendered list; it never mutates `LotManager` and never
+        // touches `GameSession.activeLotIds`. Participation is projected
+        // below from the session, so an eliminated lot stays eliminated
+        // regardless of the sort order.
         const sorted = [...allLots].sort((a, b) => {
             if (this.sortField === 'name') {
                 return this.sortDirection === 'asc' 
@@ -824,6 +887,10 @@ export class App {
             editableAmount: true,
             onAmountChange: (id: string, newAmount: number) => {
                 if (!id) return; // Safety check for undefined id
+                // State-level guard (planA.md §13 / §15): rejected while the
+                // session is locked or a spin is in flight, mirroring the
+                // GameSession-boundary rejection.
+                if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
                 this.lotManager.updateLot(id, { amount: newAmount });
                 // Amount changes do not affect participation; no session
                 // mutation is required. The next read of `session.activeLots`
@@ -835,6 +902,9 @@ export class App {
     }
 
     private deleteLot(id: string): void {
+        // State-level guard at the entry point (planA.md §13).
+        if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
+
         if (!confirm(t('confirmation.deleteLot'))) return;
 
         // Two independent operations (Stage 3 §6 / §7):
@@ -863,6 +933,9 @@ export class App {
 
     /** Handles clearing all lots */
     private handleClearLots(): void {
+        // State-level guard at the entry point (planA.md §13).
+        if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
+
         const totalLots = this.lotManager.getTotalCount();
         
         if (totalLots === 0) {
@@ -895,6 +968,11 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
+        // State-level guard at the entry point (planA.md §13). The button is
+        // also disabled while the session is locked, but this makes the
+        // rejection independent of the DOM.
+        if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
+
         // Ensure any existing ImportDialog is destroyed before creating a new one
         if (this.importDialog) {
             this.importDialog.destroy();
@@ -930,6 +1008,11 @@ export class App {
 
     /** Executes the import using the selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
+        // State-level guard at the entry point (planA.md §13). Also covers
+        // the case where the conflict dialog was opened *before* the session
+        // locked and its callback fires afterwards.
+        if (this.gameSession.isSessionLocked || this.gameSession.isSpinInProgress) return;
+
         // Snapshot the global id set *before* the strategy runs so the
         // session can tell "kept / updated" lots (preserve participation)
         // apart from "created" lots (become active). See GameSession
@@ -943,7 +1026,8 @@ export class App {
 
         // Reconcile the session's participation set with the new global list
         // (Stage 3 §6). This is the explicit bulk-change entry point; no
-        // syncGameSession() is involved.
+        // syncGameSession() is involved. GameSession also rejects this call
+        // itself while locked (planA.md §3).
         this.gameSession.reconcileAfterBulkChange(idsBefore);
         
         // Update UI and renderer after import completes

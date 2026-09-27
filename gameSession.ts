@@ -18,6 +18,10 @@ import { RouletteEngine } from './rouletteEngine.js';
  *     in the current session);
  *   - own the spin lifecycle (Stage 4): prepare the roll, decide the result
  *     before animation, apply the mode's state transitions on completion;
+ *   - own the *session* and *spin-time* lifecycle locks (Sub-stage A): the
+ *     session becomes locked on the first successful `prepareSpin()` and
+ *     stays locked until `reset()`; a separate spin-time lock is held only
+ *     while the animation/turn is in flight;
  *   - expose a single authoritative point of mode change via `setMode()`;
  *   - expose explicit mutation operations (`addLot`, `removeLot`,
  *     `deactivateMany`, `clearLots`, `reset`, `reconcileAfterBulkChange`) so
@@ -74,6 +78,24 @@ import { RouletteEngine } from './rouletteEngine.js';
  *       `processRoll`, applies the resulting eliminations internally and
  *       returns the outcome for UI. `App` never mutates game state itself
  *       (§6, §11). `GameMode` stays the sole owner of the rules (§7).
+ *
+ * Lifecycle locks (Sub-stage A, planA.md):
+ *
+ *   Two distinct concepts are tracked here, never conflated into one
+ *   ambiguous flag:
+ *
+ *     - the **session lock** — set on the first successful `prepareSpin()`,
+ *       cleared only by `reset()`. While it is held, session-level
+ *       mutations (participation, mode, bulk reconciliation) are rejected
+ *       at the state boundary, not merely hidden in the UI.
+ *     - the **spin-time lock** — set by the same `prepareSpin()` and
+ *       cleared by the matching `finishSpin()`. It is held only while the
+ *       animation/turn is in flight; between spins of an unfinished
+ *       Survival game it is released, which is what keeps duration and
+ *       sorting editable while the round-trip is idle.
+ *
+ *   `App` derives its DOM `disabled` states from these two read-only
+ *   properties; it never stores its own copy.
  */
 export class GameSession {
     private currentMode: GameMode;
@@ -92,6 +114,27 @@ export class GameSession {
      * replayed (Stage 4 §12 / §17).
      */
     private pendingRolledLot: Lot | null = null;
+
+    /**
+     * True from the first successful `prepareSpin()` until `reset()`.
+     * While set, session-level mutations are rejected at the state
+     * boundary (planA.md §2–§4). Never cleared by `finishSpin()`.
+     */
+    private sessionLocked = false;
+
+    /**
+     * True only between a successful `prepareSpin()` and its matching
+     * `finishSpin()`. This is the spin-time lock (planA.md §5): duration
+     * and sorting are precisely the things it is meant to freeze.
+     */
+    private spinInProgress = false;
+
+    /**
+     * True after a `RollResult` with `finished === true` has been applied,
+     * until `reset()`. Drives the finished-game UI lock; the winner is
+     * frozen and only Reset can start a new session.
+     */
+    private gameFinished = false;
 
     /**
      * @param modeId  The initial mode governing this session.
@@ -113,6 +156,30 @@ export class GameSession {
     /** The mode currently governing this session. */
     get mode(): GameMode {
         return this.currentMode;
+    }
+
+    /**
+     * Session lock state (planA.md §2): true from the first successful
+     * `prepareSpin()` until `reset()`. Read-only mirror for the UI.
+     */
+    get isSessionLocked(): boolean {
+        return this.sessionLocked;
+    }
+
+    /**
+     * Spin-time lock state (planA.md §5): true only while a prepared roll
+     * is awaiting its `finishSpin()`. Read-only mirror for the UI.
+     */
+    get isSpinInProgress(): boolean {
+        return this.spinInProgress;
+    }
+
+    /**
+     * True after a finished `RollResult` until `reset()` (planA.md §5).
+     * Read-only mirror for the UI's finished-game lock.
+     */
+    get isGameFinished(): boolean {
+        return this.gameFinished;
     }
 
     /**
@@ -175,8 +242,12 @@ export class GameSession {
     /**
      * Registers a newly created lot as participating in this session.
      * Called by `App` right after a successful `LotManager.addLot`.
+     *
+     * Rejected while the session lock is held (planA.md §3): once the first
+     * spin has started, the participant pool is frozen.
      */
     addLot(lot: Lot): void {
+        if (this.sessionLocked) return;
         this.activeLotIds.add(lot.id);
     }
 
@@ -185,14 +256,20 @@ export class GameSession {
      * Called by `App` right after a successful `LotManager.deleteLot`, so
      * the session never holds a reference to a globally absent lot
      * (Stage 3 §7).
+     *
+     * Rejected while the session lock is held (planA.md §3).
      */
     removeLot(lotId: string): void {
+        if (this.sessionLocked) return;
         this.activeLotIds.delete(lotId);
     }
 
     /**
      * Deactivates several lots in this session (e.g. the eliminations
      * produced by `GameMode.processRoll`).
+     *
+     * Deliberately NOT guarded by the session lock: it is invoked from
+     * `finishSpin()` while the session is already locked — see planA.md §3.
      */
     deactivateMany(ids: readonly string[]): void {
         for (const id of ids) {
@@ -204,14 +281,18 @@ export class GameSession {
      * Empties the session's participation set.
      * Called by `App` right after `LotManager.clearAll`, keeping the
      * session consistent with the (now empty) global lot list.
+     *
+     * Rejected while the session lock is held (planA.md §3).
      */
     clearLots(): void {
+        if (this.sessionLocked) return;
         this.activeLotIds.clear();
     }
 
     /**
-     * Resets the *current game* (Stage 3 §14): every lot currently present
-     * in the global list becomes an active participant again.
+     * Resets the *current game* (Stage 3 §14, Sub-stage A §9): every lot
+     * currently present in the global list becomes an active participant
+     * again, and every lifecycle lock is released.
      *
      * Note: this is distinct from any global-lot reset performed on
      * `LotManager`. `App` orchestrates both when the UI "Reset" button is
@@ -221,6 +302,11 @@ export class GameSession {
         // Clear any in-flight spin context so an aborted animation cannot
         // leave a stale pending roll behind (Stage 4 §17).
         this.pendingRolledLot = null;
+        // Release both lifecycle locks and the finished-game state so the
+        // next session starts unlocked (planA.md §9).
+        this.spinInProgress = false;
+        this.sessionLocked = false;
+        this.gameFinished = false;
         this.activeLotIds = new Set(this.getLots().map(lot => lot.id));
     }
 
@@ -238,11 +324,17 @@ export class GameSession {
      *     `MERGE_STRATEGY`'s new entries likewise join as active);
      *   - a lot that no longer exists globally is dropped from the set.
      *
+     * Rejected while the session lock is held (planA.md §3): import is a
+     * session-level configuration operation and must not be able to mutate
+     * a started session.
+     *
      * @param previousIds Snapshot of the global lot ids taken immediately
      *                    *before* the bulk mutation. The diff against the
      *                    current list is what drives the rules above.
      */
     reconcileAfterBulkChange(previousIds: ReadonlySet<string>): void {
+        if (this.sessionLocked) return;
+
         const currentIds = new Set(this.getLots().map(lot => lot.id));
 
         // Drop stale entries whose lots no longer exist globally.
@@ -261,22 +353,29 @@ export class GameSession {
     }
 
     // ---------------------------------------------------------------
-    // Spin lifecycle (Stage 4)
+    // Spin lifecycle (Stage 4, Sub-stage A §7–§8)
     // ---------------------------------------------------------------
 
     /**
-     * Prepares a spin (Stage 4 §3–§4): validates, rolls the winning lot with
-     * the current mode, stores it as the pending spin context, and returns
-     * it so `App` can drive the animation.
+     * Prepares a spin (Stage 4 §3–§4, Sub-stage A §7): validates, rolls the
+     * winning lot with the current mode, stores it as the pending spin
+     * context, atomically establishes the session + spin-time locks, and
+     * returns the lot so `App` can drive the animation.
      *
-     * Returning `null` means the spin cannot proceed (no active lots, or a
-     * degenerate zero-weight pool) — the caller must not start the
-     * animation.
+     * Returning `null` means the spin cannot proceed (no active lots, a
+     * degenerate zero-weight pool, a spin already in flight, or a finished
+     * game). On failure, **none** of the lifecycle flags change — the
+     * session must not become locked merely because a spin was attempted
+     * (planA.md §7).
      *
      * The winner is decided here, *before* any animation starts; the
      * animation only represents the already-decided result (§4).
      */
     prepareSpin(): Lot | null {
+        // A second spin cannot start while one is in flight, nor after the
+        // game has finished (planA.md §7 / §8).
+        if (this.spinInProgress || this.gameFinished) return null;
+
         const active = this.activeLots;
         if (!RouletteEngine.canSpin(active)) {
             return null;
@@ -287,15 +386,20 @@ export class GameSession {
             return null;
         }
 
+        // Success — establish both locks atomically from the caller's
+        // point of view. `sessionLocked` persists until reset(); the
+        // spin-time lock is released in finishSpin().
         this.pendingRolledLot = rolledLot;
+        this.sessionLocked = true;
+        this.spinInProgress = true;
         return rolledLot;
     }
 
     /**
-     * Finishes the in-progress spin (Stage 4 §6 / §11): processes the stored
-     * rolled lot through the current mode, applies the resulting state
-     * transitions (eliminations) to this session, and returns the outcome
-     * plus the rolled lot so `App` can update the UI.
+     * Finishes the in-progress spin (Stage 4 §6 / §11, Sub-stage A §8):
+     * processes the stored rolled lot through the current mode, applies the
+     * resulting state transitions (eliminations) to this session, and
+     * returns the outcome plus the rolled lot so `App` can update the UI.
      *
      * Guarantees that `activeLots` / `activeCount` / `state` are fully
      * up-to-date upon return — no follow-up sync call from `App` is needed
@@ -303,6 +407,10 @@ export class GameSession {
      *
      * Returns `null` if there is no pending spin (e.g. a late `onComplete`
      * after `reset()`); the caller treats that as a no-op for UI (§12).
+     *
+     * The session lock is deliberately kept; only the spin-time lock is
+     * released here so a subsequent Survival spin can be prepared and the
+     * between-spins settings (duration, sorting) become editable again.
      */
     finishSpin(): { rolledLot: Lot; result: RollResult } | null {
         const rolledLot = this.pendingRolledLot;
@@ -311,12 +419,17 @@ export class GameSession {
         }
 
         // Clear the pending context *before* applying the transition so a
-        // re-entrant call cannot process the same roll twice (§12).
+        // re-entrant call cannot process the same roll twice (§12), and
+        // release the spin-time lock.
         this.pendingRolledLot = null;
+        this.spinInProgress = false;
 
         const result = this.currentMode.processRoll(rolledLot, this.state);
         if (result.deactivate.length > 0) {
             this.deactivateMany(result.deactivate);
+        }
+        if (result.finished) {
+            this.gameFinished = true;
         }
 
         return { rolledLot, result };
@@ -338,8 +451,12 @@ export class GameSession {
      * the new rules apply to the current participants rather than resetting
      * them (matches the behaviour shipped in Stage 1/2 — §13 of the plan
      * explicitly preserves this behaviour).
+     *
+     * Rejected while the session lock is held (planA.md §14): the mode is
+     * immutable after the session has started.
      */
     setMode(modeId: Mode): void {
+        if (this.sessionLocked) return;
         this.currentMode = getMode(modeId);
     }
 }
