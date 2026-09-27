@@ -103,11 +103,14 @@
                 <div class="settings-main-block">
                     <div class="settings-group">
                         <label for="mode-select" data-i18n="settings.gameMode">Game Mode</label>
-                    <select id="mode-select">
-                        <option value="normal" selected data-i18n="settings.modeNormal">Normal (Higher amount = Higher chance)</option>
-                        <option value="survival" data-i18n="settings.modeSurvival">Survival (Lower amount = Eliminated first)</option>
-                    </select>
-                </div>
+                        <div class="select-with-help">
+                            <select id="mode-select">
+                                <option value="normal" selected data-i18n="settings.modeNormal">Normal (Higher amount = Higher chance)</option>
+                                <option value="survival" data-i18n="settings.modeSurvival">Survival (Lower amount = Eliminated first)</option>
+                            </select>
+                            <span class="settings-help" aria-hidden="true">?</span>
+                        </div>
+                    </div>
 
                 <div class="settings-group">
                     <label for="visualization-select" data-i18n="settings.visualization">Visualization</label>
@@ -154,14 +157,17 @@
 
                     <div class="settings-group">
                         <label for="easing-select" data-i18n="settings.easingFunction">Easing Function</label>
-                        <select id="easing-select">
-                            <option value="rouletteEaseOut" selected data-i18n="settings.easingRoulette">Roulette Ease Out (Default)</option>
-                            <option value="easeOutCubic" data-i18n="settings.easingCubic">Cubic Ease Out</option>
-                            <option value="easeOutQuart" data-i18n="settings.easingQuart">Quartic Ease Out</option>
-                            <option value="easeOutQuint" data-i18n="settings.easingQuint">Quintic Ease Out</option>
-                            <option value="easeOutExpo" data-i18n="settings.easingExpo">Exponential Ease Out</option>
-                            <option value="linear" data-i18n="settings.easingLinear">Linear (No Easing)</option>
-                        </select>
+                        <div class="select-with-help">
+                            <select id="easing-select">
+                                <option value="rouletteEaseOut" selected data-i18n="settings.easingRoulette">Roulette Ease Out (Default)</option>
+                                <option value="easeOutCubic" data-i18n="settings.easingCubic">Cubic Ease Out</option>
+                                <option value="easeOutQuart" data-i18n="settings.easingQuart">Quartic Ease Out</option>
+                                <option value="easeOutQuint" data-i18n="settings.easingQuint">Quintic Ease Out</option>
+                                <option value="easeOutExpo" data-i18n="settings.easingExpo">Exponential Ease Out</option>
+                                <option value="linear" data-i18n="settings.easingLinear">Linear (No Easing)</option>
+                            </select>
+                            <span class="settings-help" aria-hidden="true">?</span>
+                        </div>
                     </div>
                 </div>
             </div>

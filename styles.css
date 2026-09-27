@@ -696,7 +696,51 @@ textarea:disabled {
 
 .settings-group select {
     width: 100%;
-    max-width: 280px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Select paired with an inline help icon on the same row (Game Mode,
+   Easing Function). The select keeps the row width minus the icon. */
+.select-with-help {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.select-with-help select {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
+/* "?" help icon: question mark drawn inside a bordered circle. */
+.settings-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.75em;
+    font-weight: bold;
+    line-height: 1;
+    cursor: help;
+    opacity: 0.7;
+    flex-shrink: 0;
+    user-select: none;
+    transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.settings-help:hover {
+    opacity: 1;
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .slider-container {
@@ -708,8 +752,8 @@ textarea:disabled {
 }
 
 .slider-container input[type="range"] {
-    flex: 1;
-    min-width: 150px; /* Prevents shrinking too much */
+    flex: 1 1 auto;
+    min-width: 100px; /* Prevents shrinking too much */
     height: 6px;
     padding: 0;
 }
@@ -735,7 +779,7 @@ textarea:disabled {
     display: flex;
     align-items: center;
     gap: 5px;
-    min-width: fit-content; /* Prevents overflow */
+    flex-shrink: 0; /* Number input + unit keep their natural size */
 }
 
 .slider-value {
