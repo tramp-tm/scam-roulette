@@ -1,4 +1,4 @@
-import type { GameMode, GameState, Lot, Mode, RollResult } from './types.js';
+import type { GameMode, GameState, Lot, Mode, PrepareSpinResult, RollResult } from './types.js';
 import { getMode } from './modes.js';
 import { RouletteEngine } from './rouletteEngine.js';
 
@@ -126,6 +126,10 @@ export class GameSession {
      * True only between a successful `prepareSpin()` and its matching
      * `finishSpin()`. This is the spin-time lock (planA.md §5): duration
      * and sorting are precisely the things it is meant to freeze.
+     *
+     * Invariant (planA.md A1 §2): `spinInProgress === true` implies
+     * `sessionLocked === true` — both are raised by the same successful
+     * `prepareSpin()` and only `finishSpin()` releases the spin-time one.
      */
     private spinInProgress = false;
 
@@ -362,28 +366,33 @@ export class GameSession {
      * context, atomically establishes the session + spin-time locks, and
      * returns the lot so `App` can drive the animation.
      *
-     * Returning `null` means the spin cannot proceed (no active lots, a
-     * degenerate zero-weight pool, a spin already in flight, or a finished
-     * game). On failure, **none** of the lifecycle flags change — the
-     * session must not become locked merely because a spin was attempted
-     * (planA.md §7).
+     * Returning `{ ok: false, reason }` means the spin cannot proceed
+     * (no active lots, a degenerate zero-weight pool, a spin already in
+     * flight, or a finished game). On failure, **none** of the lifecycle
+     * flags change — the session must not become locked merely because a
+     * spin was attempted (planA.md §7; A2 §2).
      *
      * The winner is decided here, *before* any animation starts; the
      * animation only represents the already-decided result (§4).
      */
-    prepareSpin(): Lot | null {
+    prepareSpin(): PrepareSpinResult {
         // A second spin cannot start while one is in flight, nor after the
         // game has finished (planA.md §7 / §8).
-        if (this.spinInProgress || this.gameFinished) return null;
+        if (this.spinInProgress) {
+            return { ok: false, reason: 'spinInProgress' };
+        }
+        if (this.gameFinished) {
+            return { ok: false, reason: 'gameFinished' };
+        }
 
         const active = this.activeLots;
         if (!RouletteEngine.canSpin(active)) {
-            return null;
+            return { ok: false, reason: 'noActiveLots' };
         }
 
         const rolledLot = RouletteEngine.roll(active, this.currentMode);
         if (!rolledLot) {
-            return null;
+            return { ok: false, reason: 'noValidWeights' };
         }
 
         // Success — establish both locks atomically from the caller's
@@ -392,7 +401,7 @@ export class GameSession {
         this.pendingRolledLot = rolledLot;
         this.sessionLocked = true;
         this.spinInProgress = true;
-        return rolledLot;
+        return { ok: true, lot: rolledLot };
     }
 
     /**
@@ -411,6 +420,13 @@ export class GameSession {
      * The session lock is deliberately kept; only the spin-time lock is
      * released here so a subsequent Survival spin can be prepared and the
      * between-spins settings (duration, sorting) become editable again.
+     *
+     * Exception safety (A1): the spin-time lock is released in a `finally`
+     * block, so a throwing `processRoll()` cannot leave the session stuck
+     * "spinning". The session lock and `gameFinished` are left untouched on
+     * the exception path — the session has been started and only `reset()`
+     * can unlock it. The exception propagates to the caller (`App`), which
+     * surfaces it to the user; it is not swallowed here.
      */
     finishSpin(): { rolledLot: Lot; result: RollResult } | null {
         const rolledLot = this.pendingRolledLot;
@@ -419,20 +435,26 @@ export class GameSession {
         }
 
         // Clear the pending context *before* applying the transition so a
-        // re-entrant call cannot process the same roll twice (§12), and
-        // release the spin-time lock.
+        // re-entrant call cannot process the same roll twice (§12).
         this.pendingRolledLot = null;
-        this.spinInProgress = false;
 
-        const result = this.currentMode.processRoll(rolledLot, this.state);
-        if (result.deactivate.length > 0) {
-            this.deactivateMany(result.deactivate);
+        // Release the spin-time lock in `finally` so a throwing
+        // `processRoll()` cannot leave the session stuck "spinning". The
+        // session lock is deliberately preserved: the session has been
+        // started and only Reset can unlock it. Any exception propagates
+        // to `App.finishSpin()` — it is NOT swallowed here.
+        try {
+            const result = this.currentMode.processRoll(rolledLot, this.state);
+            if (result.deactivate.length > 0) {
+                this.deactivateMany(result.deactivate);
+            }
+            if (result.finished) {
+                this.gameFinished = true;
+            }
+            return { rolledLot, result };
+        } finally {
+            this.spinInProgress = false;
         }
-        if (result.finished) {
-            this.gameFinished = true;
-        }
-
-        return { rolledLot, result };
     }
 
     // ---------------------------------------------------------------

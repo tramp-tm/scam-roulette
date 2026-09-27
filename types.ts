@@ -29,6 +29,24 @@ export interface RollResult {
 }
 
 /**
+ * Reasons `GameSession.prepareSpin()` can refuse a spin. Exactly the
+ * four current failure branches — no hypothetical states.
+ */
+export type PrepareSpinFailureReason =
+    | 'spinInProgress'
+    | 'gameFinished'
+    | 'noActiveLots'
+    | 'noValidWeights';
+
+/**
+ * Result of `GameSession.prepareSpin()`. Replaces the previous
+ * `Lot | null` so `App` can surface the correct message.
+ */
+export type PrepareSpinResult =
+    | { ok: true; lot: Lot }
+    | { ok: false; reason: PrepareSpinFailureReason };
+
+/**
  * Game mode strategy. Encapsulates all mode-specific behavior without
  * switch statements or branching in the core app/engine.
  */
