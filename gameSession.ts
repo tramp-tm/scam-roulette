@@ -1,4 +1,4 @@
-import type { GameMode, GameState, Lot, Mode, PrepareSpinResult, RollResult } from './types.js';
+import type { GameMode, GameState, Lot, Mode, PendingSpin, PrepareSpinResult, RollResult } from './types.js';
 import { getMode } from './modes.js';
 import { RouletteEngine } from './rouletteEngine.js';
 
@@ -79,6 +79,16 @@ import { RouletteEngine } from './rouletteEngine.js';
  *       returns the outcome for UI. `App` never mutates game state itself
  *       (§6, §11). `GameMode` stays the sole owner of the rules (§7).
  *
+ * Decision-time mode pinning (planB, planB_exec.md):
+ *
+ *   The pending context carries both the rolled lot *and* the `GameMode`
+ *   instance that produced it. `prepareSpin()` captures `this.currentMode`
+ *   once, before the roll, and stores it on `pendingSpin.mode`;
+ *   `finishSpin()` consumes that pinned mode — never `this.currentMode` —
+ *   so a turn's outcome cannot drift if the session mode ever changed
+ *   between the two calls. `modes.ts` holds one stateless singleton per
+ *   `Mode`, so the pinned instance is stable and identity-comparable.
+ *
  * Lifecycle locks (Sub-stage A, planA.md):
  *
  *   Two distinct concepts are tracked here, never conflated into one
@@ -108,12 +118,13 @@ export class GameSession {
     private activeLotIds: Set<string>;
 
     /**
-     * Context of the in-progress spin (Stage 4 §5): the lot already decided
-     * by `prepareSpin()` and awaited by `finishSpin()`. Cleared by
-     * `finishSpin()` and by `reset()` so a stale pending roll can never be
-     * replayed (Stage 4 §12 / §17).
+     * Context of the in-progress spin (Stage 4 §5, planB): the decided lot
+     * plus the `GameMode` instance that produced it, as captured by
+     * `prepareSpin()` and awaited by `finishSpin()`. Cleared by
+     * `finishSpin()` and by `reset()` so a stale pending spin context can
+     * never be replayed (Stage 4 §12 / §17).
      */
-    private pendingRolledLot: Lot | null = null;
+    private pendingSpin: PendingSpin | null = null;
 
     /**
      * True from the first successful `prepareSpin()` until `reset()`.
@@ -304,8 +315,8 @@ export class GameSession {
      */
     reset(): void {
         // Clear any in-flight spin context so an aborted animation cannot
-        // leave a stale pending roll behind (Stage 4 §17).
-        this.pendingRolledLot = null;
+        // leave a stale pending spin behind (Stage 4 §17).
+        this.pendingSpin = null;
         // Release both lifecycle locks and the finished-game state so the
         // next session starts unlocked (planA.md §9).
         this.spinInProgress = false;
@@ -374,6 +385,10 @@ export class GameSession {
      *
      * The winner is decided here, *before* any animation starts; the
      * animation only represents the already-decided result (§4).
+     *
+     * planB: the current mode is captured *once*, before the roll, and
+     * stored on the pending context alongside the rolled lot, so the later
+     * application in `finishSpin()` cannot drift from the decision.
      */
     prepareSpin(): PrepareSpinResult {
         // A second spin cannot start while one is in flight, nor after the
@@ -390,15 +405,22 @@ export class GameSession {
             return { ok: false, reason: 'noActiveLots' };
         }
 
-        const rolledLot = RouletteEngine.roll(active, this.currentMode);
+        // Pin the mode at decision time (planB). Any later change to
+        // this.currentMode (there is none today — setMode() rejects while
+        // sessionLocked) cannot affect how this turn is applied in
+        // finishSpin().
+        const modeAtDecision = this.currentMode;
+
+        const rolledLot = RouletteEngine.roll(active, modeAtDecision);
         if (!rolledLot) {
             return { ok: false, reason: 'noValidWeights' };
         }
 
         // Success — establish both locks atomically from the caller's
-        // point of view. `sessionLocked` persists until reset(); the
-        // spin-time lock is released in finishSpin().
-        this.pendingRolledLot = rolledLot;
+        // point of view and store the pinned spin context.
+        // `sessionLocked` persists until reset(); the spin-time lock is
+        // released in finishSpin().
+        this.pendingSpin = { rolledLot, mode: modeAtDecision };
         this.sessionLocked = true;
         this.spinInProgress = true;
         return { ok: true, lot: rolledLot };
@@ -406,9 +428,10 @@ export class GameSession {
 
     /**
      * Finishes the in-progress spin (Stage 4 §6 / §11, Sub-stage A §8):
-     * processes the stored rolled lot through the current mode, applies the
-     * resulting state transitions (eliminations) to this session, and
-     * returns the outcome plus the rolled lot so `App` can update the UI.
+     * processes the stored rolled lot through the mode pinned by
+     * `prepareSpin()` (planB), applies the resulting state transitions
+     * (eliminations) to this session, and returns the outcome plus the
+     * rolled lot so `App` can update the UI.
      *
      * Guarantees that `activeLots` / `activeCount` / `state` are fully
      * up-to-date upon return — no follow-up sync call from `App` is needed
@@ -429,14 +452,16 @@ export class GameSession {
      * surfaces it to the user; it is not swallowed here.
      */
     finishSpin(): { rolledLot: Lot; result: RollResult } | null {
-        const rolledLot = this.pendingRolledLot;
-        if (!rolledLot) {
+        const pending = this.pendingSpin;
+        if (!pending) {
             return null;
         }
 
-        // Clear the pending context *before* applying the transition so a
+        // Null the pending context *before* applying the transition so a
         // re-entrant call cannot process the same roll twice (§12).
-        this.pendingRolledLot = null;
+        this.pendingSpin = null;
+
+        const { rolledLot, mode } = pending;
 
         // Release the spin-time lock in `finally` so a throwing
         // `processRoll()` cannot leave the session stuck "spinning". The
@@ -444,7 +469,9 @@ export class GameSession {
         // started and only Reset can unlock it. Any exception propagates
         // to `App.finishSpin()` — it is NOT swallowed here.
         try {
-            const result = this.currentMode.processRoll(rolledLot, this.state);
+            // planB: the pinned mode governs this turn — the same instance
+            // that produced the roll in prepareSpin().
+            const result = mode.processRoll(rolledLot, this.state);
             if (result.deactivate.length > 0) {
                 this.deactivateMany(result.deactivate);
             }

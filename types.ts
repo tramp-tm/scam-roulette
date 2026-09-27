@@ -47,6 +47,18 @@ export type PrepareSpinResult =
     | { ok: false; reason: PrepareSpinFailureReason };
 
 /**
+ * A spin that has been decided (lot AND mode chosen) but not yet applied.
+ * Created only by GameSession.prepareSpin(); consumed only by
+ * GameSession.finishSpin(). Carries the mode that governed the roll so the
+ * later application cannot drift if the session mode ever changed between
+ * the two calls (planB).
+ */
+export interface PendingSpin {
+    rolledLot: Lot;
+    mode: GameMode;
+}
+
+/**
  * Game mode strategy. Encapsulates all mode-specific behavior without
  * switch statements or branching in the core app/engine.
  */
