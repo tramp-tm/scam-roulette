@@ -6,7 +6,7 @@ import { RouletteEngine } from './rouletteEngine.js';
  * Represents the current game session: the active game mode paired with the
  * session-owned participation state for the current game.
  *
- * Layer position (after the Stage 3 refactor):
+ * Layer position (after the Stage 3–4 refactor):
  *
  *     App ──► GameSession ──► GameMode
  *               │
@@ -47,8 +47,8 @@ import { RouletteEngine } from './rouletteEngine.js';
  *       set, so the invariant
  *           "every lot present in the session's state also exists globally"
  *       holds by construction — a stale id can never leak into a view;
- *     - `Lot.active` is no longer read or written by game logic; it is
- *       retained on the interface during migration as an inert field.
+ *     - Stage 5 removed the transitional `Lot.active` field entirely;
+ *       `activeLotIds` is the only participation state.
  *
  *   Because participation lives here, mutations to the current game are
  *   expressed as explicit operations on this object rather than as side
@@ -162,7 +162,7 @@ export class GameSession {
     /**
      * Whether the given lot currently participates in this session.
      * UI code uses this to render the participation state, since `Lot.active`
-     * is no longer authoritative (Stage 3 §12).
+     * was removed in Stage 5.
      */
     isActive(lotId: string): boolean {
         return this.activeLotIds.has(lotId);
