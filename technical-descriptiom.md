@@ -769,7 +769,7 @@ Constants: `MIN_DURATION_SEC`, `MAX_DURATION_SEC`, `MAX_DURATION_SLIDER_VALUE`,
 | 5 | `App.updateControlsState()` is invoked imperatively from `updateUI()`, `spin()`, `finishSpin()`, and `setSortField()` | A future render path that forgets the follow-up call will render interactive controls on a locked session |
 | 6 | The mode-change and visualization-change handlers restore on rejection from two different sources (`gameSession.mode.id` vs `settings.visualization`) | Two patterns for the same §14/§15 protection; worth unifying |
 | 7 | After a finished game, duration controls remain enabled (tied only to `spinning`) while Spin is disabled | Harmless today but inconsistent with "finished freezes everything except Reset" |
-| 8 | The `|| isSpinInProgress` clauses in `App`'s guards are currently equivalent to `isSessionLocked` (because of the §5.1 invariant) | Kept intentionally so the two locks stay separate concept-wise; verify the invariant if either flag is ever raised independently |
+| 8 | The ORed `isSpinInProgress` clauses in `App`'s guards are currently equivalent to `isSessionLocked` (because of the §5.1 invariant) | Kept intentionally so the two locks stay separate concept-wise; verify the invariant if either flag is ever raised independently |
 
 **Resolved during the refactor (kept for traceability).**
 
