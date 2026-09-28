@@ -6,9 +6,6 @@ import { parseCSV } from './csvParser.js';
  */
 export class CsvTabContent {
     private textarea: HTMLTextAreaElement | null = null;
-    private statusEl: HTMLElement | null = null;
-    private validCountSpan: HTMLElement | null = null;
-    private errorCountSpan: HTMLElement | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 

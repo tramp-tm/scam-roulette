@@ -1,4 +1,4 @@
-import { SeparatorType, ParsedLot, ParseResult } from './types.js';
+import { SeparatorType, ParseResult } from './types.js';
 
 declare const Papa: {
     parse(

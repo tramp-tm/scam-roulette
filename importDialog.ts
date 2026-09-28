@@ -1,10 +1,8 @@
 import { ModalDialog } from './modalDialog.js';
-import { t, translateDOM } from './i18n.js';
+import { t } from './i18n.js';
 
-import { SeparatorType, ParsedLot, ImportCallback } from './types.js';
-import { parseCSV } from './csvParser.js';
+import { ParsedLot, ImportCallback } from './types.js';
 import { generateRandomReadableColor } from './utils.js';
-import { ModalManager } from './modalManager.js';
 
 // Import the new component classes
 import { CsvTabContent } from './csvTabContent.js';
@@ -17,7 +15,6 @@ import { LinkTabContent } from './linkTabContent.js';
 export class ImportDialog extends ModalDialog {
     private csvTabContent: CsvTabContent | null = null;
     private linkTabContent: LinkTabContent | null = null;
-    private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private importCallback: ImportCallback;
     private parsedLots: ParsedLot[] = [];
     private errorCount: number = 0;
@@ -28,10 +25,7 @@ export class ImportDialog extends ModalDialog {
         this.importCallback = importCallback;
         
         // Set up onClose callback for cleanup when dialog closes
-        this.onClose = (data?: unknown) => {
-            // Reset parsed result
-            this.parsedResult = null;
-            
+        this.onClose = () => {
             // Always destroy the dialog to clean up DOM nodes and event listeners
             // This prevents stale state issues when reopening the import dialog
             this.destroy();

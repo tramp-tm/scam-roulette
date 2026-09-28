@@ -19,7 +19,8 @@ import { BaseRenderer } from './baseRenderer.js';
  *  - §10: the per-frame highlighted circle is derived inside render() from
  *         `currentRotation` + `segments`. `highlightedLotId` (the field set by
  *         App via IRenderer.setHighlightedLot) is NOT the driver here.
- *         The resolved index lives in `currentHighlighted` and is internal.
+ *         The resolved index is local to computeIntensities() and is never
+ *         stored on the instance.
  *  - §11: `currentRotation` is measured in *cycles*. One unit = one full
  *         traversal of the circle ring. Circle i owns the interval
  *         [P_i, P_{i+1}) where P is the prefix sum of Segment.weight.
@@ -89,9 +90,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
     /** cellOfSegment[i] = grid cell index where segments[i] is drawn. */
     private cellOfSegment: number[] = [];
 
-    /** Currently resolved circle index (internal; not driven by highlightLotId). */
-    private currentHighlighted: number = -1;
-
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
@@ -109,7 +107,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
         this.layout = [];
         this.prefixSums = [];
         this.cellOfSegment = [];
-        this.currentHighlighted = -1;
     }
 
     // ------------------------------------------------------------------
@@ -365,7 +362,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
                 break;
             }
         }
-        this.currentHighlighted = idx;
 
         const start = this.prefixSums[idx];
         const weight = this.segments[idx].weight;

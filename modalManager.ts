@@ -72,17 +72,7 @@ export class ModalManager {
             if (content && content instanceof HTMLElement) {
                 // Re-translate the content
                 translateDOM();
-
-                // Trigger any custom translation logic in subclasses if needed
-                this.handleModalTranslation(content);
             }
         });
-    }
-    /**
-     * Handle custom translation logic for modals
-     */
-    private handleModalTranslation(content: HTMLElement): void {
-        // This can be overridden by subclasses to handle specific modal translation needs
-        // For now, we just ensure DOM elements are re-translated
     }
 }

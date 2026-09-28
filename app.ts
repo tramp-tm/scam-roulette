@@ -74,7 +74,6 @@ export class App {
 
     // DOM elements
     private canvas: HTMLCanvasElement;
-    private resultDisplay: HTMLElement | null = null;
     private resultText: HTMLElement | null = null;
     private spinBtn: HTMLButtonElement;
     private resetBtn: HTMLButtonElement;
@@ -132,7 +131,6 @@ export class App {
         );
 
         // Initialize DOM elements
-        this.resultDisplay = document.getElementById('result-display');
         this.resultText = document.getElementById('result-text');
         this.spinBtn = document.getElementById('spin-btn') as HTMLButtonElement;
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;

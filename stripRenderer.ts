@@ -68,7 +68,7 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.restore();
 
         // Draw center marker at viewport center (independent of scroll)
-        this.drawCenterMarker(canvasWidth / 2, centerY, canvasHeight);
+        this.drawCenterMarker(canvasWidth / 2, canvasHeight);
 
         // Draw outer decorative frame around the band
         this.drawFrame(canvasWidth, centerY);
@@ -148,7 +148,7 @@ export class StripRenderer extends BaseRenderer {
     /**
      * Draws the center marker for strip view (pointer position).
      */
-    private drawCenterMarker(x: number, y: number, canvasHeight: number): void {
+    private drawCenterMarker(x: number, canvasHeight: number): void {
         this.ctx.save();
 
         // Vertical dashed line through viewport

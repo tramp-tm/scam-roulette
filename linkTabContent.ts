@@ -1,7 +1,6 @@
-import { SeparatorType, ParsedLot } from './types.js';
+import { ParsedLot } from './types.js';
 import { parseCSV } from './csvParser.js';
 import { t } from './i18n.js';
-import Papa from 'papaparse';
 
 /**
  * Component for Link tab content in ImportDialog
@@ -96,7 +95,6 @@ export class LinkTabContent {
 
             // Show loading state
             if (this.fetchBtn) {
-                const originalText = this.fetchBtn.textContent;
                 this.fetchBtn.disabled = true;
                 this.fetchBtn.textContent = t('importDialog.loading');
 
