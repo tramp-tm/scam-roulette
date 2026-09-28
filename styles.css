@@ -284,7 +284,8 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Noto Sans', 'Roboto', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 14px;
     background: var(--bg-gradient);
     min-height: 100vh;
     color: var(--text-primary);
