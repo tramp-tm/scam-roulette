@@ -38,11 +38,13 @@ import { BaseRenderer } from './baseRenderer.js';
  *
  * NOTE ON COSMETIC SHUFFLE: the mapping segment i → grid cell is permuted so
  * the highlight order (still segments[0..n-1], the sole owner of dwell timing
- * §11) is decoupled from the visual position. The permutation is seeded
- * deterministically from the lot ids, so the same lot set yields the same
- * arrangement (no reshuffling between Survival eliminations) while still
- * breaking any perceived correlation between list order and screen position.
- * Math.random() is never called from render() — §27 is respected.
+ * §11) is decoupled from the visual position. A small in-cell jitter is then
+ * applied to each circle's center so the grid does not read as a rigid lattice.
+ * BOTH the permutation and the jitter are seeded deterministically from the
+ * lot ids, so the same lot set yields the same arrangement (no reshuffling
+ * between Survival eliminations) while still breaking any perceived
+ * correlation between list order and screen position. Math.random() is never
+ * called — neither from render() (§27) nor from rebuildLayout().
  */
 
 /** Gold that matches the wheel / strip pointers. */
@@ -179,9 +181,15 @@ export class CountingRhymeRenderer extends BaseRenderer {
      * cached for the whole spin. No per-frame repositioning.
      *
      * The segment → cell mapping is a deterministic permutation of the cells
-     * (see buildCellPermutation). computeIntensities() and render() both
-     * iterate by segment index i, so permuting cells only affects *where*
-     * segments[i] is drawn, never *when* it is highlighted.
+     * (see buildCellPermutation), and each circle's center is nudged within
+     * its cell by a deterministic jitter. computeIntensities() and render()
+     * both iterate by segment index i, so permuting cells only affects
+     * *where* segments[i] is drawn, never *when* it is highlighted.
+     *
+     * Both the permutation and the jitter are drawn from a single LCG seeded
+     * from the lot-id set, so an unchanged lot set reproduces its exact
+     * layout across refreshes — Survival eliminations do not reshuffle the
+     * surviving circles.
      */
     private rebuildLayout(): void {
         this.layout = [];
@@ -219,14 +227,17 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const safeMaxWeight = maxWeight > 0 ? maxWeight : 1;
         const radiusRange = Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
 
+        // One deterministic seed derived from the lot-id set drives BOTH the
+        // cell permutation and the cosmetic in-cell jitter. Same lot set →
+        // same layout, so Survival eliminations do not reshuffle the grid.
+        const seed = this.hashIds(this.segments.map(s => s.lot.id));
+        const rand = this.makeLcg(seed);
+
         // Shuffle which cell each segment occupies. This is cosmetic only:
         // the highlight order is still segments[0..n-1], but the highlighted
         // circle now appears to "hop" unpredictably across the grid. Seeded
         // from the lot ids, so identical lot sets yield identical layouts.
-        this.cellOfSegment = this.buildCellPermutation(
-            n,
-            this.segments.map(s => s.lot.id)
-        );
+        this.cellOfSegment = this.buildCellPermutation(n, rand);
 
         for (let i = 0; i < n; i++) {
             const cell = this.cellOfSegment[i];
@@ -237,11 +248,31 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const itemsInRow = row === rows - 1 ? n - row * cols : cols;
             const rowOffset = (cols - itemsInRow) / 2;
 
-            const cx = (col + rowOffset + 0.5) * cellWidth;
-            const cy = (row + 0.5) * cellHeight;
-
             const weightRatio = this.segments[i].weight / safeMaxWeight;
             const radius = MIN_CIRCLE_RADIUS + weightRatio * radiusRange;
+
+            // Free space around the circle inside its cell, along each axis.
+            // To keep the circle strictly inside the cell, the center may
+            // move by at most HALF of that gap in either direction —
+            // otherwise the outer radius would cross the cell boundary.
+            //
+            //   cellW - 2r  → total horizontal free space
+            //   (cellW - 2r) / 2 = cellW/2 - r   ← max shift of cx
+            //
+            // `Math.max(0, …)` guards the degenerate case where the circle
+            // already fills the cell (a very dense grid); there the jitter
+            // collapses to zero and the circle stays centered.
+            const gapW = Math.max(0, cellWidth  - 2 * radius);
+            const gapH = Math.max(0, cellHeight - 2 * radius);
+
+            // Uniform in [-gapW/2, +gapW/2] × [-gapH/2, +gapH/2], but drawn
+            // from the seeded stream so the offset is a pure function of the
+            // lot-id set (no Math.random() anywhere in the layout path).
+            const offsetX = (rand() - 0.5) * gapW;
+            const offsetY = (rand() - 0.5) * gapH;
+
+            const cx = (col + rowOffset + 0.5) * cellWidth + offsetX;
+            const cy = (row + 0.5) * cellHeight + offsetY;
 
             this.layout.push({
                 lotId: this.segments[i].lot.id,
@@ -253,29 +284,43 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     /**
-     * Deterministic Fisher–Yates shuffle of [0, n), seeded from the given
-     * lot ids. Because the seed depends only on the set of ids, the same lot
-     * set always yields the same arrangement — the grid does NOT reshuffle
-     * between Survival eliminations. Called once per updateSegments(), never
-     * from render(), so the random source stays off the animation hot path
-     * (§27). The deterministic part of the game (winner selection) lives in
-     * RouletteEngine.roll().
+     * FNV-1a hash over the given lot ids → a 32-bit seed. Depends only on
+     * the *set* of ids (order-sensitive, but the segment order is itself a
+     * deterministic function of the lot list), so an unchanged lot set
+     * reproduces the same seed — and therefore the same layout — across
+     * refreshes. Never touches Math.random().
      */
-    private buildCellPermutation(n: number, seedFrom: string[]): number[] {
-        // FNV-1a seed over the lot ids.
+    private hashIds(ids: string[]): number {
         let seed = 2166136261;
-        for (const s of seedFrom) {
+        for (const s of ids) {
             for (let i = 0; i < s.length; i++) {
                 seed = (seed ^ s.charCodeAt(i)) * 16777619 >>> 0;
             }
         }
+        return seed >>> 0;
+    }
 
-        // LCG returning values in [0, 1).
-        const rand = () => {
-            seed = (seed * 1664525 + 1013904223) >>> 0;
-            return seed / 0xFFFFFFFF;
+    /**
+     * Linear congruential generator seeded by hashIds(). Returns values in
+     * [0, 1). Used for both the cell permutation and the in-cell jitter, so
+     * a single seed fully determines the layout.
+     */
+    private makeLcg(seed: number): () => number {
+        let state = seed >>> 0;
+        return () => {
+            state = (state * 1664525 + 1013904223) >>> 0;
+            return state / 0xFFFFFFFF;
         };
+    }
 
+    /**
+     * Deterministic Fisher–Yates shuffle of [0, n) driven by the supplied
+     * `rand` stream. Called once per updateSegments(), never from render(),
+     * so the layout path stays off the animation hot path (§27). The
+     * deterministic part of the game (winner selection) lives in
+     * RouletteEngine.roll().
+     */
+    private buildCellPermutation(n: number, rand: () => number): number[] {
         const perm = new Array<number>(n);
         for (let i = 0; i < n; i++) perm[i] = i;
         for (let i = n - 1; i > 0; i--) {
@@ -303,8 +348,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
      * radius): the cycle must be partitioned by actual probabilities so that
      * dwell time stays proportional to weight (§11 / §15).
      *
-     * NOTE: this method is untouched by the cosmetic cell shuffle — the
-     * highlight index is by segment index, not by grid cell, so the dwell
+     * NOTE: this method is untouched by the cosmetic cell shuffle or jitter —
+     * the highlight index is by segment index, not by grid cell, so the dwell
      * partition and the last-frame guarantee (§21) are unaffected.
      */
     private computeIntensities(frac: number): number[] {
