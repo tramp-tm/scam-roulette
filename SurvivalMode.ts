@@ -29,8 +29,20 @@ export class SurvivalMode implements GameMode {
             };
         }
 
-        // More than one remains → continue; 0 is unreachable under the correct
-        // lifecycle (App never spins once the last lot is standing).
+        // Degenerate case: the rolled lot was the only active participant.
+        // There is no elimination to perform — declare it the winner so the
+        // session reaches a proper terminal state (gameFinished), instead of
+        // deactivating the last lot and leaving the game unable to progress.
+        if (remaining.length === 0) {
+            return {
+                finished: true,
+                winner: rolledLot,
+                deactivate: [],
+                message: t('mode.survival.completionMessage', { name: rolledLot.name })
+            };
+        }
+
+        // More than one remains → continue.
         return {
             finished: false,
             winner: null,

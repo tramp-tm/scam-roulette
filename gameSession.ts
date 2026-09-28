@@ -280,13 +280,16 @@ export class GameSession {
     }
 
     /**
-     * Deactivates several lots in this session (e.g. the eliminations
-     * produced by `GameMode.processRoll`).
+     * Deactivates several lots in this session (e.g. the eliminations produced
+     * by `GameMode.processRoll`).
      *
-     * Deliberately NOT guarded by the session lock: it is invoked from
-     * `finishSpin()` while the session is already locked — see planA.md §3.
+     * Private: the only legal caller is `finishSpin()`, which runs inside the
+     * session-lock lifetime and therefore must be able to mutate participation
+     * while the session is locked. Keeping the method private preserves that
+     * exception without exposing an unguarded way for outside code to bypass
+     * the session lock.
      */
-    deactivateMany(ids: readonly string[]): void {
+    private deactivateMany(ids: readonly string[]): void {
         for (const id of ids) {
             this.activeLotIds.delete(id);
         }
