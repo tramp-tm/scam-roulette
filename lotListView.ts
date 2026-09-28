@@ -1,4 +1,3 @@
-import { t } from './i18n.js';
 import type { LotListViewOptions, RenderableLot, SortField, SortDirection } from './types.js';
 
 /**
@@ -10,11 +9,18 @@ import type { LotListViewOptions, RenderableLot, SortField, SortDirection } from
  *   - the list DOM (rebuilt on every render);
  *   - the sorting state (`sortField` / `sortDirection`) and the sort controls;
  *   - the disabled state of its own controls (amount inputs, delete buttons).
+ *   - the sort-direction arrow, written into the `.sort-direction` span
+ *     inside each sort button. The button's visible label lives in a
+ *     sibling `.label-primary` span carrying `data-i18n`, so it is owned by
+ *     translateDOM() and is never overwritten by this view.
  *
  * Does NOT own (and must not import or reference):
  *   - LotManager, GameSession, VisualizationDriver, App;
  *   - any lot mutation, session synchronisation, or visualization refresh;
- *   - confirmation dialogs or ErrorDialog.
+ *   - confirmation dialogs or ErrorDialog;
+ *   - translated strings — the view writes only direction glyphs, and the
+ *     labels are translated by translateDOM() from the DOM's `data-i18n`
+ *     attributes (this file no longer imports the i18n `t` helper at all).
  *
  * User actions inside the list are surfaced back to the caller through the
  * callbacks in `LotListViewOptions`; the caller decides whether and how to
@@ -179,6 +185,18 @@ export class LotListView {
         this.render(this.lastLots, this.lastOptions);
     }
 
+    /**
+     * Refreshes the sort controls' `active` state and direction arrow.
+     *
+     * Only two DOM facets are touched here:
+     *   - the `active` class on each button (which field is selected);
+     *   - the text of each `.sort-direction` span (the ↑/↓ glyph).
+     *
+     * The button labels themselves are NOT written — they live in the
+     * `.label-primary` spans and are owned by translateDOM(), keyed off
+     * their `data-i18n` attributes. Writing the button's `textContent`
+     * here would clobber the translated label on every sort click.
+     */
     private updateSortButtons(): void {
         if (!this.sortControls) return;
 
@@ -186,22 +204,22 @@ export class LotListView {
         const amountBtn = this.sortControls.querySelector<HTMLButtonElement>('#sort-by-amount');
         if (!nameBtn || !amountBtn) return;
 
-        const nameLabel = t('sort.byName');
-        const amountLabel = t('sort.byAmount');
+        const nameArrow = nameBtn.querySelector<HTMLSpanElement>('.sort-direction');
+        const amountArrow = amountBtn.querySelector<HTMLSpanElement>('.sort-direction');
 
         nameBtn.classList.remove('active');
         amountBtn.classList.remove('active');
-        nameBtn.textContent = nameLabel;
-        amountBtn.textContent = amountLabel;
+        if (nameArrow) nameArrow.textContent = '';
+        if (amountArrow) amountArrow.textContent = '';
+
+        const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
 
         if (this.sortField === 'name') {
             nameBtn.classList.add('active');
-            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            nameBtn.textContent = `${nameLabel} ${arrow}`;
+            if (nameArrow) nameArrow.textContent = arrow;
         } else {
             amountBtn.classList.add('active');
-            const arrow = this.sortDirection === 'asc' ? '↑' : '↓';
-            amountBtn.textContent = `${amountLabel} ${arrow}`;
+            if (amountArrow) amountArrow.textContent = arrow;
         }
     }
 

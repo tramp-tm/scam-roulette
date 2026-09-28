@@ -1039,6 +1039,12 @@ input[type="number"] {
     background: transparent;
     color: var(--switch-btn-color);
     transition: all 0.2s ease;
+    /* Inline spans inside a switch button (translated label + direction
+       arrow) need flexbox alignment, and the arrow must keep its width
+       even when empty so the button does not resize on sort toggles. */
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .switch-btn:hover {
@@ -1060,6 +1066,15 @@ input[type="number"] {
 .switch-btn:last-child {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
+}
+
+/* Direction arrow span inside a sort switch button. Written only by
+   LotListView.updateSortButtons(); the sibling .label-primary span holds
+   the translated label and is never touched by the view. */
+.switch-btn .sort-direction {
+    display: inline-block;
+    min-width: 0.8em;
+    text-align: center;
 }
 
 /* ========================================
