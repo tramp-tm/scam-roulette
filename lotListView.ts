@@ -30,11 +30,11 @@ export class LotListView {
     private readonly listContainer: HTMLUListElement;
     private readonly sortControls: HTMLElement | null;
 
-    // Sorting is presentation state owned by this view (task §4).
+    // Sorting is presentation state owned by this view.
     private sortField: SortField = 'name';
     private sortDirection: SortDirection = 'asc';
 
-    // Lock state — driven only by `setLocked(boolean)` (task §7).
+    // Lock state — driven only by `setLocked(boolean)`.
     private locked: boolean = false;
 
     // Cache of the latest render inputs so a sort click can re-render
@@ -49,8 +49,8 @@ export class LotListView {
     }
 
     /**
-     * Full re-render of the list. Sorting applies internally — callers
-     * pass un-sorted data and need not care about sort order (task §4 / §10).
+     * Full re-render of the list. Sorting applies internally — callers pass
+     * un-sorted data and need not care about sort order.
      */
     render(lots: RenderableLot[], options: LotListViewOptions = {}): void {
         this.lastLots = lots;
@@ -148,9 +148,8 @@ export class LotListView {
     }
 
     /**
-     * Applies the current lock state to the list's own controls. The
-     * boolean is the only thing the view ever receives from the
-     * application layer (task §7).
+     * Applies the current lock state to the list's own controls. The boolean
+     * is the only thing the view ever receives from the application layer.
      */
     setLocked(locked: boolean): void {
         this.locked = locked;

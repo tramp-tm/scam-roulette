@@ -23,17 +23,13 @@ export interface AddLotResult {
  *
  * Owns the *global* lot collection only. It knows nothing about game modes,
  * winners, rules, or which lots participate in the current game — that is
- * the responsibility of `GameSession` (see gameSession.ts and §8 of the
- * technical description).
+ * the responsibility of `GameSession` (see gameSession.ts).
  */
 export class LotManager {
     public static readonly MAX_LOTS = 3000;
     
     constructor(private lots: Lot[]) {}
 
-    /**
-     * Generates a unique ID for new lots.
-     */
     private static generateId(): string {
         return `lot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
@@ -84,9 +80,6 @@ export class LotManager {
         return { success: true, lot };
     }
 
-    /**
-     * Updates an existing lot.
-     */
     updateLot(id: string, updates: Partial<Pick<Lot, 'name' | 'amount' | 'color'>>): boolean {
         const lot = this.lots.find(l => l.id === id);
         if (!lot) return false;
@@ -104,9 +97,6 @@ export class LotManager {
         return true;
     }
 
-    /**
-     * Deletes a lot from the collection.
-     */
     deleteLot(id: string): boolean {
         const index = this.lots.findIndex(l => l.id === id);
         if (index === -1) return false;
@@ -115,30 +105,18 @@ export class LotManager {
         return true;
     }
 
-    /**
-     * Gets a lot by ID.
-     */
     getLotById(id: string): Lot | undefined {
         return this.lots.find(lot => lot.id === id);
     }
 
-    /**
-     * Clears all lots.
-     */
     clearAll(): void {
         this.lots.length = 0;
     }
 
-    /**
-     * Gets the total count of lots.
-     */
     getTotalCount(): number {
         return this.lots.length;
     }
 
-    /**
-     * Gets all lots.
-     */
     getAllLots(): Lot[] {
         return [...this.lots];
     }

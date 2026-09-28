@@ -3,8 +3,6 @@ import i18n from './i18next.js';
 
 import { ModalManager } from './modalManager.js';
 
-// Удалите статические импорты JSON, заменяем их на асинхронную функцию init
-
 const userLang = navigator.language || navigator.languages[0] || 'en';
 const DEFAULT_LANG = userLang.split('-')[0];
 const FALLBACK_LANG = 'en';
@@ -15,10 +13,10 @@ export const AVAILABLE_LANGUAGES: Record<string, string> = {
 };
 
 /**
- * Асинхронная инициализация i18n с загрузкой локальных файлов через fetch
+ * Initialises i18n by loading the locale files via fetch.
  */
 export async function initI18n(): Promise<void> {
-    // Скачиваем языковые файлы из папки locales параллельно
+    // Download the language files from the locales folder in parallel
     const [enRes, ruRes] = await Promise.all([
         fetch('./locales/en.json').then(res => res.json()),
                                              fetch('./locales/ru.json').then(res => res.json())
@@ -37,7 +35,7 @@ export async function initI18n(): Promise<void> {
         },
     });
 
-    // Делаем первичный перевод DOM сразу после готовности
+    // Run the initial DOM translation as soon as i18n is ready
     translateDOM();
 
     // Keep <html lang> aligned with the resolved language from the very start
@@ -63,9 +61,7 @@ export function translateDOM(): void {
  * Synchronises the <html lang> attribute with the currently active i18n
  * language, so screen readers and font shaping use the correct locale.
  *
- * Call after initI18n() and after every i18n.changeLanguage(...) — the
- * language switch in app.ts previously only ran translateDOM(), leaving
- * the document declared as lang="en" regardless of the selected language.
+ * Call after initI18n() and after every i18n.changeLanguage(...).
  */
 export function syncDocumentLang(): void {
     const lang = i18n.language || DEFAULT_LANG || FALLBACK_LANG;

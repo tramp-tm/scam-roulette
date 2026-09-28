@@ -39,19 +39,18 @@ export type PrepareSpinFailureReason =
     | 'noValidWeights';
 
 /**
- * Result of `GameSession.prepareSpin()`. Replaces the previous
- * `Lot | null` so `App` can surface the correct message.
+ * Result of `GameSession.prepareSpin()`. The failure reason lets `App`
+ * surface an accurate message.
  */
 export type PrepareSpinResult =
     | { ok: true; lot: Lot }
     | { ok: false; reason: PrepareSpinFailureReason };
 
 /**
- * A spin that has been decided (lot AND mode chosen) but not yet applied.
- * Created only by GameSession.prepareSpin(); consumed only by
- * GameSession.finishSpin(). Carries the mode that governed the roll so the
- * later application cannot drift if the session mode ever changed between
- * the two calls (planB).
+ * A decided spin: the rolled lot *and* the `GameMode` instance that
+ * produced it. Created only by `GameSession.prepareSpin()`, consumed only
+ * by `GameSession.finishSpin()`. The pinned mode guarantees the turn's
+ * outcome cannot drift from the decision.
  */
 export interface PendingSpin {
     rolledLot: Lot;
@@ -59,8 +58,8 @@ export interface PendingSpin {
 }
 
 /**
- * Game mode strategy. Encapsulates all mode-specific behavior without
- * switch statements or branching in the core app/engine.
+ * Game mode strategy. All mode-specific rules live here; the core app and
+ * engine never branch on a mode id.
  */
 export interface GameMode {
     readonly id: Mode;
@@ -79,7 +78,7 @@ export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
 // Settings interface
 export interface Settings {
-    modeId: Mode;  // Changed from 'mode' to 'modeId' for clarity
+    modeId: Mode;
     visualization: VisualizationType;
     animationDuration: number; // in milliseconds
 }
@@ -139,23 +138,14 @@ export interface ImportResult {
 }
 
 /**
- * Strategy object for handling import operations.
- * Encapsulates the logic for a specific import strategy.
- *
- * Note: the former `label` / `description` fields were removed. They were
- * dead code — the only UI consumer (importConflictDialog.ts) drives its
- * text through `data-i18n="importStrategy.<id>.label|description"` keys so
- * the strings are translated by translateDOM() and re-render on language
- * change. Any in-strategy strings would have been frozen at module-load
- * time (before initI18n resolved) and never reflected the active locale.
+ * Strategy object for import operations. Labels / descriptions are provided
+ * by `data-i18n="importStrategy.<id>.…"` keys in the locale files.
  */
 export interface ImportStrategy {
     id: 'replace' | 'merge';
     /** Execute function - LotManager type is referenced but not imported to avoid circular dependency */
     execute: (parsedLots: ParsedLot[], lotManager: any) => ImportResult;
 }
-
-/** Strategies are defined in strategies.ts to avoid circular dependencies */
 
 // ========================================
 // UI RENDERING TYPES

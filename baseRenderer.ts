@@ -3,8 +3,7 @@ import { RouletteEngine } from './rouletteEngine.js';
 
 /**
  * Shared base for all canvas renderers.
- * Owns state and lifecycle boilerplate previously duplicated
- * by StripRenderer and WheelRenderer.
+ * Owns state and lifecycle shared by every concrete renderer.
  */
 export abstract class BaseRenderer implements IRenderer {
     protected readonly canvas: HTMLCanvasElement;
@@ -24,10 +23,8 @@ export abstract class BaseRenderer implements IRenderer {
     }
 
     /**
-     * Sets up canvas for high DPI displays.
-     *
-     * No fake DOMRect: only width/height are needed, and `||` gives the same
-     * fallback the old branch did, in two lines.
+     * Configures the canvas for high-DPI displays, applying the shared
+     * logical-size fallback when layout has not yet run.
      */
     protected setupHighDPI(): void {
         const dpr = window.devicePixelRatio || 1;

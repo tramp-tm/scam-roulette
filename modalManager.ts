@@ -68,7 +68,6 @@ export class ModalManager {
             // Find the modal content container and translate it
             const content = modal.querySelector('.modal-content');
 
-            // ИСПРАВЛЕНО: Проверяем, что элемент существует и является HTMLElement
             if (content && content instanceof HTMLElement) {
                 // Re-translate the content
                 translateDOM();

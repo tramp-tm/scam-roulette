@@ -9,8 +9,7 @@ import { CountingRhymeRenderer } from './countingRhymeRenderer.js';
  *
  * `VISUALIZATION_PACKAGES` (+ `getVisualizationPackage`) is the single
  * authoritative source of truth for "which renderer / which final-position
- * logic corresponds to which visualization". The former `rendererFactory.ts`
- * was removed in Stage 5 as redundant — nothing else constructs a renderer.
+ * logic corresponds to which visualization".
  */
 
 /**
@@ -39,7 +38,7 @@ const STRIP_PACKAGE: VisualizationPackage = {
  * Note: computeFinalCountingPosition intentionally takes 5 arguments (no
  * canvasWidth) — its position math lives entirely in cycle space and does
  * not depend on pixel dimensions. The optional 6th parameter is simply not
- * forwarded (§13 / §17).
+ * forwarded.
  */
 const COUNTING_RHYME_PACKAGE: VisualizationPackage = {
     id: 'counting-rhyme',
@@ -58,8 +57,7 @@ export const VISUALIZATION_PACKAGES = {
 } as const;
 
 /**
- * Gets the visualization package for a given type.
- * Single object property access - no switch statement needed!
+ * Returns the visualization package for a given type.
  */
 export function getVisualizationPackage(type: VisualizationType): VisualizationPackage {
     return VISUALIZATION_PACKAGES[type];

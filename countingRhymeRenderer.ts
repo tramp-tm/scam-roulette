@@ -4,32 +4,32 @@ import { BaseRenderer } from './baseRenderer.js';
 /**
  * CountingRhymeRenderer
  * ---------------------
- * New visualization: each active lot is drawn as a circle whose radius
- * reflects its weight *relative to the heaviest active lot*. During animation
- * the "counting-rhyme" highlight hops from circle to circle.
+ * Each active lot is drawn as a circle whose radius reflects its weight
+ * *relative to the heaviest active lot*. During animation the
+ * "counting-rhyme" highlight hops from circle to circle.
  *
- * Contract (§ of the task spec):
- *  - §6:  weights come from the shared Segment[] produced by
- *         RouletteEngine.calculateSegments() via BaseRenderer.updateSegments().
- *         This renderer never calls GameMode.calculateWeight() itself.
- *  - §7:  radius is proportional to the lot's weight *relative to the largest
- *         active weight* (w_i / max(w)), not to the raw normalized weight.
- *         The mapping is still monotone in weight; only the baseline (the
- *         heaviest lot fills the cell) differs.
- *  - §10: the per-frame highlighted circle is derived inside render() from
- *         `currentRotation` + `segments`. `highlightedLotId` (the field set by
- *         App via IRenderer.setHighlightedLot) is NOT the driver here.
- *         The resolved index is local to computeIntensities() and is never
- *         stored on the instance.
- *  - §11: `currentRotation` is measured in *cycles*. One unit = one full
- *         traversal of the circle ring. Circle i owns the interval
- *         [P_i, P_{i+1}) where P is the prefix sum of Segment.weight.
- *         Dwell per traversal is therefore exactly w_i · T_cycle.
- *  - §21: the engine guarantees endValue ≡ targetMid (mod 1), so the final
- *         animated frame highlights the rolled lot.
- *  - §32: layout is computed once per updateSegments() and cached;
- *         render() never regenerates positions; the grid uses logical
- *         getBoundingClientRect() dimensions, not canvas.width / canvas.height.
+ * Contract:
+ *  - weights come from the shared Segment[] produced by
+ *    RouletteEngine.calculateSegments() via BaseRenderer.updateSegments().
+ *    This renderer never calls GameMode.calculateWeight() itself.
+ *  - radius is proportional to the lot's weight *relative to the largest
+ *    active weight* (w_i / max(w)), not to the raw normalized weight.
+ *    The mapping is still monotone in weight; only the baseline (the
+ *    heaviest lot fills the cell) differs.
+ *  - the per-frame highlighted circle is derived inside render() from
+ *    `currentRotation` + `segments`. `highlightedLotId` (the field set by
+ *    App via IRenderer.setHighlightedLot) is NOT the driver here.
+ *    The resolved index is local to computeIntensities() and is never
+ *    stored on the instance.
+ *  - `currentRotation` is measured in *cycles*. One unit = one full
+ *    traversal of the circle ring. Circle i owns the interval
+ *    [P_i, P_{i+1}) where P is the prefix sum of Segment.weight.
+ *    Dwell per traversal is therefore exactly w_i · T_cycle.
+ *  - the engine guarantees endValue ≡ targetMid (mod 1), so the final
+ *    animated frame highlights the rolled lot.
+ *  - layout is computed once per updateSegments() and cached;
+ *    render() never regenerates positions; the grid uses logical
+ *    getBoundingClientRect() dimensions, not canvas.width / canvas.height.
  *
  * NOTE: radius and dwell are deliberately derived from *two different*
  * normalizations of the same weight — timing from raw `w` (probability),
@@ -38,14 +38,14 @@ import { BaseRenderer } from './baseRenderer.js';
  * that computeIntensities() relies on.
  *
  * NOTE ON COSMETIC SHUFFLE: the mapping segment i → grid cell is permuted so
- * the highlight order (still segments[0..n-1], the sole owner of dwell timing
- * §11) is decoupled from the visual position. A small in-cell jitter is then
+ * the highlight order (still segments[0..n-1], the sole owner of dwell timing)
+ * is decoupled from the visual position. A small in-cell jitter is then
  * applied to each circle's center so the grid does not read as a rigid lattice.
  * BOTH the permutation and the jitter are seeded deterministically from the
  * lot ids, so the same lot set yields the same arrangement (no reshuffling
  * between Survival eliminations) while still breaking any perceived
  * correlation between list order and screen position. Math.random() is never
- * called — neither from render() (§27) nor from rebuildLayout().
+ * called — neither from render() nor from rebuildLayout().
  */
 
 /** Gold that matches the wheel / strip pointers. */
@@ -65,7 +65,7 @@ const CELL_FILL_RATIO =0.95;
 /**
  * Crossfade window expressed as a fraction of the *current* segment.
  * Because the window scales with the segment's own length, dwell time per
- * lot stays proportional to its weight (§15).
+ * lot stays proportional to its weight.
  */
 const TRANSITION_FRACTION = 0.2;
 
@@ -102,8 +102,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
 
     override reset(): void {
         super.reset();
-        // §23 / §32: also clear the cached layout so the next updateSegments()
-        // starts from a clean slate.
+        // Also clear the cached layout so the next updateSegments() starts
+        // from a clean slate.
         this.layout = [];
         this.prefixSums = [];
         this.cellOfSegment = [];
@@ -120,8 +120,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
 
         if (this.layout.length === 0) return;
 
-        // §10 / §11: resolve highlighted index from currentRotation — the
-        // animation value unit here is "cycles", not radians.
+        // Resolve the highlighted index from currentRotation — the animation
+        // value unit here is "cycles", not radians.
         const frac = this.normalizePosition(this.currentRotation);
         const intensities = this.computeIntensities(frac);
 
@@ -163,7 +163,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     // ------------------------------------------------------------------
-    // Layout (§8 / §9 / §32)
+    // Layout
     // ------------------------------------------------------------------
 
     private rebuildPrefixSums(): void {
@@ -205,7 +205,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const cellHeight = height / rows;
         const cellHalf = Math.min(cellWidth, cellHeight) / 2;
         // Single shared cap → monotonic radius mapping is preserved even
-        // when the grid is tight (§7).
+        // when the grid is tight.
         const effectiveMaxRadius = Math.min(
             MAX_CIRCLE_RADIUS,
             cellHalf * CELL_FILL_RATIO
@@ -216,7 +216,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         // that Σwᵢ = 1, using wᵢ directly would cap every circle at
         // MIN + (1/n)·range — the largest possible radius would shrink as
         // lots are added. Dividing by maxWeight lifts the heaviest lot to
-        // exactly effectiveMaxRadius and keeps monotonicity in weight (§7).
+        // exactly effectiveMaxRadius and keeps monotonicity in weight.
         let maxWeight = 0;
         for (const s of this.segments) {
             if (s.weight > maxWeight) maxWeight = s.weight;
@@ -313,7 +313,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
     /**
      * Deterministic Fisher–Yates shuffle of [0, n) driven by the supplied
      * `rand` stream. Called once per updateSegments(), never from render(),
-     * so the layout path stays off the animation hot path (§27). The
+     * so the layout path stays off the animation hot path. The
      * deterministic part of the game (winner selection) lives in
      * RouletteEngine.roll().
      */
@@ -328,7 +328,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     // ------------------------------------------------------------------
-    // Position → highlight (counting-rhyme mechanics, §11 / §20)
+    // Position → highlight (counting-rhyme mechanics)
     // ------------------------------------------------------------------
 
     private normalizePosition(position: number): number {
@@ -343,11 +343,11 @@ export class CountingRhymeRenderer extends BaseRenderer {
      *
      * Uses the raw normalized Segment.weight (NOT the per-max ratio used for
      * radius): the cycle must be partitioned by actual probabilities so that
-     * dwell time stays proportional to weight (§11 / §15).
+     * dwell time stays proportional to weight.
      *
      * NOTE: this method is untouched by the cosmetic cell shuffle or jitter —
      * the highlight index is by segment index, not by grid cell, so the dwell
-     * partition and the last-frame guarantee (§21) are unaffected.
+     * partition and the last-frame guarantee are unaffected.
      */
     private computeIntensities(frac: number): number[] {
         const n = this.segments.length;

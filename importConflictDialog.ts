@@ -79,9 +79,4 @@ export class ImportConflictDialog extends ModalDialog {
             }
         }
     }
-
-    /** Override open to show visual modal instead of prompt */
-    public override open(): void {
-        super.open();
-    }
 }

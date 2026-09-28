@@ -111,7 +111,7 @@ export class AnimationController {
     }
 
     /**
-     * Animation loop using requestAnimationFrame with delta time.
+     * Animation loop using requestAnimationFrame with absolute elapsed time.
      */
     private animate(currentTime: number): void {
         if (this.startTime === null) return;

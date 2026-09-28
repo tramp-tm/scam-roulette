@@ -8,7 +8,6 @@ import { t } from './i18n.js';
 export class LinkTabContent {
     private linkUrlInput: HTMLInputElement | null = null;
     private fetchBtn: HTMLButtonElement | null = null;
-    private linkTextarea: HTMLTextAreaElement | null = null;
     private linkStatusEl: HTMLElement | null = null;
     private parseResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
 
@@ -43,7 +42,6 @@ export class LinkTabContent {
         // Cache element references
         this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
         this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
-        this.linkTextarea = null; // Remove textarea reference since we're removing the element
         this.linkStatusEl = document.getElementById('link-status');
         
         // No need for manual translateDOM calls - let modal manager handle it
@@ -53,14 +51,6 @@ export class LinkTabContent {
         // Add event listener for fetch button
         if (this.fetchBtn) {
             this.fetchBtn.addEventListener('click', () => this.handleFetchFromUrl());
-        }
-        
-        // Add input listener to URL input field 
-        if (this.linkUrlInput) {
-            this.linkUrlInput.addEventListener('input', () => {
-                // Trigger update when URL changes - but we don't need to do anything special here since 
-                // the fetch process will trigger an event after successful fetch anyway
-            });
         }
     }
 
@@ -76,7 +66,6 @@ export class LinkTabContent {
             return;
         }
 
-        // Извлекаем оба значения из объекта
         const extracted = this.extractGoogleDocId(url);
         if (!extracted) {
             if (this.linkStatusEl) {
@@ -89,7 +78,6 @@ export class LinkTabContent {
         const { id, gid } = extracted;
 
         try {
-            // Формируем URL, используя полученные id и gid
             const exportUrl =
             `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`;
 
@@ -113,7 +101,6 @@ export class LinkTabContent {
                 // Parse the CSV data and store result for ImportDialog to use
                 this.parseResult = parseCSV(text, 'comma'); // Default to comma separator
 
-                // Update status - now we need to parse the CSV and update ImportDialog's parsed result
                 if (this.linkStatusEl) {
                     const count = this.parseResult.validLots.length;
                     this.linkStatusEl.textContent = t('importDialog.fetchSuccess', { count });
@@ -177,10 +164,6 @@ export class LinkTabContent {
 
     public getLinkUrlInput(): HTMLInputElement | null {
         return this.linkUrlInput;
-    }
-
-    public getLinkTextarea(): HTMLTextAreaElement | null {
-        return this.linkTextarea;
     }
 
     public getLinkStatusEl(): HTMLElement | null {

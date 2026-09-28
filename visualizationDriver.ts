@@ -15,10 +15,10 @@ import type { EasingFunction, GameMode, IRenderer, Lot, VisualizationType } from
  *   - the current `VisualizationType` (used for the package registry lookup);
  *   - the `AnimationController`.
  *
- * What this class deliberately does NOT own (per app-refac-task.md §10):
+ * What this class deliberately does NOT own:
  *   - active lots / mode / game rules / participation — those are GameSession's;
  *   - the highlight state — that stays in `App` (`highlightedLotId`);
- *   - user settings — `App` passes animation duration and easing per call.
+ *   - the user settings — `App` passes animation duration and easing per call.
  *
  * Every call into the visualization package registry (`getVisualizationPackage`),
  * into `IRenderer`, and into `AnimationController` lives here. `App` sees

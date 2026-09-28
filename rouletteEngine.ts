@@ -209,19 +209,19 @@ export class RouletteEngine {
     /**
      * Computes the final counting position for the counting-rhyme visualization.
      *
-     * Model (§11 / §13 / §14 / §15 / §21):
+     * Model:
      *   - `currentPosition` and the return value are measured in *cycles*.
      *   - One cycle spans the unit interval [0, 1) partitioned by the
      *     normalized Segment.weight prefix sums. Therefore one full traversal
-     *     shows each circle for exactly w_i of a cycle, satisfying §15.
+     *     shows each circle for exactly w_i of a cycle.
      *   - The engine returns a value `endValue` such that
      *         endValue ≡ targetMid (mod 1),  targetMid = P_i + w_i / 2,
      *     which guarantees the last animated frame — the one produced by
      *     AnimationController's `onUpdate(endValue, 1)` *before* `onComplete()` —
-     *     highlights the rolled lot (see animation.ts, §21).
-     *   - Forward motion only (§14.1). Extra full cycles are added so the
-     *     animation is visible for very short durations and does not grow
-     *     unboundedly for long ones (§16).
+     *     highlights the rolled lot (see animation.ts).
+     *   - Forward motion only. Extra full cycles are added so the animation is
+     *     visible for very short durations and does not grow unboundedly for
+     *     long ones.
      *
      * Note: no canvasWidth parameter — the circle layout is the renderer's
      * responsibility, and the sequence position math in cycle space does not
@@ -249,16 +249,15 @@ export class RouletteEngine {
         const targetWeight = segments[targetIdx].weight;
         const targetMid = prefix[targetIdx] + targetWeight / 2;
 
-        // §14.1: forward motion only. The smallest reachable position with
-        // the right fractional value that is strictly greater than the
-        // current one.
+        // Forward motion only. The smallest reachable position with the right
+        // fractional value that is strictly greater than the current one.
         let endValue = targetMid;
         while (endValue <= currentPosition) {
             endValue += 1;
         }
 
-        // §16: scale the extra traversal count with the configured duration
-        // so behaviour stays manageable across the 1 s – 60 s+ range. The
+        // Scale the extra traversal count with the configured duration so
+        // behaviour stays manageable across the 1 s – 60 s+ range. The
         // constant is in cycles per second and independent of lot count.
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const extraCycles = Math.max(2, Math.round(durationSeconds * 2));
