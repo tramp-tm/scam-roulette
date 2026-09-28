@@ -1,4 +1,4 @@
-import { ParsedLot } from './types.js';
+import type { ParsedLot } from './csvParser.js';
 import { parseCSV } from './csvParser.js';
 import { t } from './i18n.js';
 

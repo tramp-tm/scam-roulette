@@ -1,6 +1,22 @@
-import { Lot, ImportStrategy, ImportResult } from './types.js';
+import type { Lot } from './types.js';
 import { LotManager } from './lotManager.js';
+import type { ParsedLot } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
+
+/** Result of import execution - tracks success and truncation */
+export interface ImportResult {
+    lotsAdded: number;
+    lotsTruncated: number;  // How many were skipped due to MAX_LOTS limit
+}
+
+/**
+ * Strategy object for import operations. Labels / descriptions are provided
+ * by `data-i18n="importStrategy.<id>.…"` keys in the locale files.
+ */
+export interface ImportStrategy {
+    id: 'replace' | 'merge';
+    execute: (parsedLots: ParsedLot[], lotManager: LotManager) => ImportResult;
+}
 
 /** Replace strategy - clears existing lots and imports new ones */
 export const REPLACE_STRATEGY: ImportStrategy = {

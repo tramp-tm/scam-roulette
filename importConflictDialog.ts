@@ -1,6 +1,6 @@
 import { t } from './i18n.js';
 import { ModalDialog } from './modalDialog.js';
-import { ImportStrategy } from './types.js';
+import type { ImportStrategy } from './importStrategies.js';
 import { IMPORT_STRATEGIES } from './importStrategies.js';
 
 /**

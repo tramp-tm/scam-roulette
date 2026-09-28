@@ -1,4 +1,4 @@
-import { Segment } from './types.js';
+import type { Segment } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor } from './utils.js';
 

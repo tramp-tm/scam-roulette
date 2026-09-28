@@ -1,4 +1,31 @@
-import type { LotListViewOptions, RenderableLot, SortField, SortDirection } from './types.js';
+/** Sort field options for lots list */
+export type SortField = 'name' | 'amount';
+
+/** Sort direction */
+export type SortDirection = 'asc' | 'desc';
+
+/**
+ * Interface for lot data that can be rendered in a list.
+ * Supports both full Lot objects and ParsedLot from CSV import.
+ */
+export interface RenderableLot {
+    name: string;
+    amount: number;
+    id?: string;
+    color?: string;
+    active?: boolean;
+}
+
+/**
+ * Options for rendering a lots list via `LotListView`.
+ */
+export interface LotListViewOptions {
+    showActions?: boolean;
+    highlightId?: string | null;
+    editableAmount?: boolean;
+    onAmountChange?: (id: string, newAmount: number) => void;
+    onDelete?: (id: string) => void;
+}
 
 /**
  * LotListView

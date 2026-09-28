@@ -1,6 +1,7 @@
 import { AnimationController } from './animation.js';
+import type { EasingFunction } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
-import type { EasingFunction, GameMode, IRenderer, Lot, VisualizationType } from './types.js';
+import type { GameMode, IRenderer, Lot, VisualizationType } from './types.js';
 
 /**
  * VisualizationDriver

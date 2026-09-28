@@ -2,11 +2,16 @@ import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 
 import { EasingFunctions, DEFAULT_EASING } from './animation.js';
+import type { EasingFunction } from './animation.js';
 import { VisualizationDriver } from './visualizationDriver.js';
 import { LotListView } from './lotListView.js';
+import type { RenderableLot } from './lotListView.js';
 import { GameSession } from './gameSession.js';
-import { VisualizationType, Settings, Mode, GameMode, RenderableLot, ParsedLot, ImportStrategy, EasingFunction, PrepareSpinFailureReason, Lot, RollResult } from './types.js';
+import type { PrepareSpinFailureReason } from './gameSession.js';
+import { VisualizationType, Settings, Mode, GameMode, Lot, RollResult } from './types.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
+import type { ImportStrategy } from './importStrategies.js';
+import type { ParsedLot } from './csvParser.js';
 import { 
     generateRandomReadableColor, 
     sliderToDuration, 

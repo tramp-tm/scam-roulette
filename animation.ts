@@ -2,7 +2,11 @@
  * Animation utilities including easing functions.
  */
 
-import { EasingFunction } from './types.js';
+/**
+ * A pure scalar-to-scalar function used to reshape the animation's time
+ * axis. Convention: domain [0, 1] → [0, 1], with E(0) = 0 and E(1) = 1.
+ */
+export type EasingFunction = (t: number) => number;
 
 /**
  * An entry of `EasingFunctions`: the curve itself plus a name used as the

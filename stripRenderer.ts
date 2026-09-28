@@ -1,4 +1,5 @@
-import { Lot, Segment, GameMode } from './types.js';
+import { Lot, GameMode } from './types.js';
+import type { Segment } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor, getSegmentWidth } from './utils.js';
 

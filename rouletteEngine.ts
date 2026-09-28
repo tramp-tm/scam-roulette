@@ -2,6 +2,18 @@ import type { Lot, GameMode } from './types.js';
 import { getRandomPositionInRange, getSegmentWidth } from './utils.js';
 
 /**
+ * Segment of the roulette wheel, produced by `calculateSegments()`.
+ * `weight` is normalized (0–1); angles are in radians and total 2π across
+ * the full segment set.
+ */
+export interface Segment {
+    lot: Lot;
+    startAngle: number;
+    endAngle: number;
+    weight: number;
+}
+
+/**
  * Core roulette engine that handles weighted random selection.
  * 
  * CRITICAL: The result is determined BEFORE animation starts.
@@ -44,7 +56,7 @@ export class RouletteEngine {
     /**
      * Calculates all segments for rendering.
      */
-    static calculateSegments(lots: Lot[], mode: GameMode): { lot: Lot; startAngle: number; endAngle: number; weight: number }[] {
+    static calculateSegments(lots: Lot[], mode: GameMode): Segment[] {
         const weightedLots = lots.map(lot => ({
             lot,
             weight: mode.calculateWeight(lot, lots)
@@ -54,7 +66,7 @@ export class RouletteEngine {
         
         if (totalWeight <= 0) return [];
 
-        const segments: { lot: Lot; startAngle: number; endAngle: number; weight: number }[] = [];
+        const segments: Segment[] = [];
         let cumulativeWeight = 0;
 
         for (const { lot, weight } of weightedLots) {

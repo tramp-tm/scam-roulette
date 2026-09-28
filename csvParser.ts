@@ -1,5 +1,3 @@
-import { SeparatorType, ParseResult } from './types.js';
-
 declare const Papa: {
     parse(
         csv: string,
@@ -12,6 +10,28 @@ declare const Papa: {
         data: unknown[][];
     };
 };
+
+/**
+ * Separator types for CSV import parsing.
+ */
+export type SeparatorType = 'comma' | 'tab';
+
+/**
+ * Represents a lot parsed from CSV input (before being added to the application).
+ */
+export interface ParsedLot {
+    name: string;
+    amount: number;
+}
+
+/**
+ * Result of parsing CSV text.
+ * Contains valid lots that can be imported and count of error rows.
+ */
+export interface ParseResult {
+    validLots: ParsedLot[];
+    errorCount: number;
+}
 
 /**
  * Normalises a user-supplied amount string into a form `parseFloat` can read.

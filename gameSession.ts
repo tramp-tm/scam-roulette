@@ -1,6 +1,35 @@
-import type { GameMode, GameState, Lot, Mode, PendingSpin, PrepareSpinResult, RollResult } from './types.js';
+import type { GameMode, GameState, Lot, Mode, RollResult } from './types.js';
 import { getMode } from './modes.js';
 import { RouletteEngine } from './rouletteEngine.js';
+
+/**
+ * Reasons `GameSession.prepareSpin()` can refuse a spin. Exactly the
+ * four current failure branches — no hypothetical states.
+ */
+export type PrepareSpinFailureReason =
+    | 'spinInProgress'
+    | 'gameFinished'
+    | 'noActiveLots'
+    | 'noValidWeights';
+
+/**
+ * Result of `GameSession.prepareSpin()`. The failure reason lets `App`
+ * surface an accurate message.
+ */
+export type PrepareSpinResult =
+    | { ok: true; lot: Lot }
+    | { ok: false; reason: PrepareSpinFailureReason };
+
+/**
+ * A decided spin: the rolled lot *and* the `GameMode` instance that
+ * produced it. Created only by `GameSession.prepareSpin()`, consumed only
+ * by `GameSession.finishSpin()`. The pinned mode guarantees the turn's
+ * outcome cannot drift from the decision.
+ */
+export interface PendingSpin {
+    rolledLot: Lot;
+    mode: GameMode;
+}
 
 /**
  * Represents the current game session: the active game mode plus the

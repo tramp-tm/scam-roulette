@@ -1,12 +1,15 @@
 import { ModalDialog } from './modalDialog.js';
 import { t } from './i18n.js';
 
-import { ParsedLot, ImportCallback } from './types.js';
+import type { ParsedLot } from './csvParser.js';
 import { generateRandomReadableColor } from './utils.js';
 
 // Import the new component classes
 import { CsvTabContent } from './csvTabContent.js';
 import { LinkTabContent } from './linkTabContent.js';
+
+/** Callback type for receiving parsed lots from ImportDialog */
+export type ImportCallback = (parsedLots: ParsedLot[]) => void;
 
 /**
  * Dialog component for importing lots via CSV.

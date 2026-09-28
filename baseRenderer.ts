@@ -1,5 +1,6 @@
-import { Lot, GameMode, Segment, IRenderer } from './types.js';
+import { Lot, GameMode, IRenderer } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
+import type { Segment } from './rouletteEngine.js';
 
 /**
  * Shared base for all canvas renderers.

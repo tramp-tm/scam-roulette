@@ -1,4 +1,4 @@
-import { SeparatorType, ParsedLot } from './types.js';
+import type { SeparatorType, ParsedLot } from './csvParser.js';
 import { parseCSV } from './csvParser.js';
 
 /**
