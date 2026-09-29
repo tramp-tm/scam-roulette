@@ -6,12 +6,21 @@
     <title data-i18n="page.title">Scam Roulette</title>
     <script>
         // Apply the saved theme before first paint to avoid a flash of the wrong theme.
+        // When no theme has been chosen yet, follow the OS preference (fallback: light).
         (function () {
-            var theme = 'dark';
+            var theme = null;
             try {
-                theme = localStorage.getItem('theme') || 'dark';
-            } catch (e) {
-                theme = 'dark';
+                theme = localStorage.getItem('theme');
+            } catch (e) { /* storage unavailable */ }
+
+            if (!theme) {
+                theme = 'light';
+                try {
+                    if (window.matchMedia &&
+                        window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        theme = 'dark';
+                    }
+                } catch (e) { /* keep light fallback */ }
             }
             document.documentElement.setAttribute('data-theme', theme);
         })();

@@ -186,12 +186,20 @@ export class App {
         // Set initial random color for new lot indicator
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
 
-        // Apply the saved theme preference (defaults to dark) and sync the selector
-        let savedTheme = 'dark';
+        // Apply the saved theme preference; when none has been chosen yet,
+        // follow the OS preference (fallback: light). Keep this resolution in
+        // sync with the inline <head> script in index.html.
+        let savedTheme: string | null = null;
         try {
-            savedTheme = localStorage.getItem('theme') || 'dark';
+            savedTheme = localStorage.getItem('theme');
         } catch (e) {
-            // localStorage may be unavailable (e.g. private mode); fall back to dark
+            // localStorage may be unavailable (e.g. private mode); fall through
+        }
+        if (!savedTheme) {
+            savedTheme = (window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches)
+                ? 'dark'
+                : 'light';
         }
         this.applyTheme(savedTheme);
         if (this.themeSelect) {
