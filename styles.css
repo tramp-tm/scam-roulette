@@ -1,7 +1,7 @@
 /* ========================================
    THEME VARIABLES
    ======================================== */
-:root {
+:root[data-theme="dark"] {
     /* Backgrounds & surfaces */
     --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     --panel-bg: rgba(255, 255, 255, 0.1);
@@ -264,6 +264,115 @@
 
     /* Shadows */
     --modal-shadow: rgba(0, 0, 0, 0.75);
+}
+
+/* ========================================
+ *   THEME: DEEP SPACE NEBULA
+ *   ======================================== */
+:root[data-theme="nebula"] {
+    /* Backgrounds & surfaces */
+    --bg-gradient: linear-gradient(135deg, #0b001a 0%, #12002b 50%, #1a003c 100%);
+    --panel-bg: rgba(147, 51, 234, 0.07);
+    --surface-bg: rgba(147, 51, 234, 0.1);
+    --surface-hover: rgba(147, 51, 234, 0.18);
+    --surface-active: rgba(147, 51, 234, 0.25);
+    --lot-bg: rgba(255, 255, 255, 0.04);
+    --lot-hover: rgba(147, 51, 234, 0.12);
+    --add-row-bg: rgba(6, 182, 212, 0.1);
+    --add-row-border: rgba(6, 182, 212, 0.4);
+    --status-bg: rgba(147, 51, 234, 0.05);
+    --switch-bg: rgba(255, 255, 255, 0.08);
+    --modal-bg: linear-gradient(135deg, #1c0035 0%, #0f0022 100%);
+    --overlay-bg: rgba(5, 1, 15, 0.85);
+
+    /* Text */
+    --text-primary: #f8fafc;
+    --switch-btn-color: rgba(248, 250, 252, 0.7);
+
+    /* Borders */
+    --border-subtle: rgba(147, 51, 234, 0.25);
+    --modal-border: rgba(236, 72, 153, 0.3);
+
+    /* Inputs */
+    --input-bg: rgba(255, 255, 255, 0.95);
+    --input-color: #0b001a;
+
+    /* Accents (Neon Pink & Cyan) */
+    --accent: #d63283;
+    --accent-2: #db2777;
+    --accent-danger: #ef4444;
+    --accent-danger-dark: #b91c1c;
+    --accent-success: #10b981;
+    --accent-success-dark: #047857;
+    --accent-glow: rgba(236, 72, 153, 0.45);
+    --accent-glow-soft: rgba(147, 51, 234, 0.4);
+    --highlight-bg: rgba(236, 72, 153, 0.15);
+    --result-bg: rgba(6, 182, 212, 0.15);
+
+    /* Buttons */
+    --btn-secondary-bg: rgba(147, 51, 234, 0.2);
+    --btn-secondary-hover: rgba(147, 51, 234, 0.35);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(11, 0, 26, 0.5);
+    --scrollbar-thumb: rgba(236, 72, 153, 0.3);
+    --scrollbar-thumb-hover: rgba(236, 72, 153, 0.6);
+
+    /* Shadows */
+    --modal-shadow: rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme="eucalyptus"] {
+    /* Backgrounds & surfaces */
+    --bg-gradient: linear-gradient(135deg, #2b3a36 0%, #1e2624 100%);
+    --panel-bg: rgba(255, 255, 255, 0.05);
+    --surface-bg: rgba(255, 255, 255, 0.06);
+    --surface-hover: rgba(255, 255, 255, 0.1);
+    --surface-active: rgba(255, 255, 255, 0.14);
+    --lot-bg: rgba(255, 255, 255, 0.04);
+    --lot-hover: rgba(255, 255, 255, 0.08);
+    --add-row-bg: rgba(163, 190, 140, 0.08);
+    --add-row-border: rgba(163, 190, 140, 0.4);
+    --status-bg: rgba(255, 255, 255, 0.03);
+    --switch-bg: rgba(255, 255, 255, 0.06);
+    --modal-bg: linear-gradient(135deg, #32433e 0%, #222d2a 100%);
+    --overlay-bg: rgba(18, 24, 22, 0.75);
+
+    /* Text */
+    --text-primary: #e2e8f0;
+    --switch-btn-color: rgba(226, 232, 240, 0.65);
+
+    /* Borders */
+    --border-subtle: rgba(255, 255, 255, 0.12);
+    --modal-border: rgba(255, 255, 255, 0.08);
+
+    /* Inputs */
+    --input-bg: #f1f5f9;
+    --input-color: #1e2624;
+
+    /* Accents (Soft Sage & Dusty Amber) */
+    --accent: #a3be8c;
+    --accent-2: #8fa87a;
+    --accent-danger: #bf616a;
+    --accent-danger-dark: #a14b53;
+    --accent-success: #a3be8c;
+    --accent-success-dark: #8fa87a;
+    --accent-glow: rgba(163, 190, 140, 0.25);
+    --accent-glow-soft: rgba(208, 135, 112, 0.2);
+    --highlight-bg: rgba(208, 135, 112, 0.15); /* Мягкий янтарный для выделения */
+    --result-bg: rgba(163, 190, 140, 0.15);
+
+    /* Buttons */
+    --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+    --btn-secondary-hover: rgba(255, 255, 255, 0.15);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+
+    /* Shadows */
+    --modal-shadow: rgba(0, 0, 0, 0.4);
 }
 
 /* Автоматическая инверсия текста для акцентных элементов в Monochrome теме */

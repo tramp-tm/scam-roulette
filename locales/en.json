@@ -32,6 +32,8 @@
   "settings.themeEmerald": "Emerald",
   "settings.themeNordic": "Nordic",
   "settings.themeMonochrome": "Monochrome Tech",
+  "settings.themeNebula": "Nebula Deep Space",
+  "settings.themeEucalyptus": "Eucalyptus",
   "settings.easingFunction": "Easing Function",
   "duration.unit": "s",
   "easing.rouletteEaseOut.name": "Roulette Ease Out",
