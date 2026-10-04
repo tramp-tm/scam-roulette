@@ -1,8 +1,8 @@
-import type { Lot, GameMode } from './types.js';
+import type { Lot, WeightedLot } from './types.js';
 import { getRandomPositionInRange, getSegmentWidth } from './utils.js';
 
 /**
- * Segment of the roulette wheel, produced by `calculateSegments()`.
+ * Segment of a roulette-style visualization, produced by `calculateSegments()`.
  * `weight` is normalized (0–1); angles are in radians and total 2π across
  * the full segment set.
  */
@@ -14,68 +14,67 @@ export interface Segment {
 }
 
 /**
- * Core roulette engine that handles weighted random selection.
- * 
- * CRITICAL: The result is determined BEFORE animation starts.
- * Animation does NOT affect the result.
+ * Core roulette engine: weighted random selection plus the geometry used by
+ * the roulette-style visualizations (wheel / strip / counting-rhyme).
+ *
+ * The engine is mode-agnostic: it receives pre-computed weights
+ * (`WeightedLot[]`) and never references a GameMode, elimination, winner or
+ * completion. Roulette-specific animation math is an internal detail of the
+ * visualizations that call into these helpers.
+ *
+ * CRITICAL: the result is determined BEFORE animation starts; animation
+ * never affects the outcome.
  */
 export class RouletteEngine {
     /**
-     * Performs weighted random selection using cumulative distribution approach.
-     * Uses mode-specific weight calculation from GameMode.
+     * Weighted random selection over pre-computed weights using the
+     * cumulative-distribution approach. Returns the chosen entry, or null
+     * when there are no entries or the total weight is not positive.
      */
-    static roll(lots: Lot[], mode: GameMode): Lot | null {
-        if (lots.length === 0) return null;
-        
-        // Calculate weights for all lots using mode's calculateWeight function
-        const weightedLots = lots.map(lot => ({
-            lot,
-            weight: mode.calculateWeight(lot, lots)
-        }));
+    static rollWeighted(entries: readonly WeightedLot[]): WeightedLot | null {
+        if (entries.length === 0) return null;
 
-        // Calculate total weight
-        const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
+        const totalWeight = entries.reduce((sum, item) => sum + item.weight, 0);
+        if (!(totalWeight > 0)) return null;
 
-        if (totalWeight <= 0) return null;
-
-        // Generate random number in range [0, totalWeight)
         let randomValue = Math.random() * totalWeight;
-
-        // Find the selected lot using cumulative distribution
-        for (const { lot, weight } of weightedLots) {
-            if (randomValue < weight) {
-                return lot;
-            }
-            randomValue -= weight;
+        for (const entry of entries) {
+            if (randomValue < entry.weight) return entry;
+            randomValue -= entry.weight;
         }
 
-        // Fallback (should never reach here with correct math)
-        return weightedLots[weightedLots.length - 1].lot;
+        // Fallback (floating-point rounding at the very top of the range).
+        return entries[entries.length - 1];
+    }
+
+    /** True when there is at least one participant to spin. */
+    static canSpin(activeCount: number): boolean {
+        return activeCount >= 1;
     }
 
     /**
-     * Calculates all segments for rendering.
+     * Normalizes weights so they sum to 1 and lays them out over the angles
+     * [0, 2π). Entries with a non-positive weight are dropped so a
+     * zero-weight participant contributes no sector. Used by every
+     * roulette-style renderer and by the animation math below — a single
+     * source of geometry.
      */
-    static calculateSegments(lots: Lot[], mode: GameMode): Segment[] {
-        const weightedLots = lots.map(lot => ({
-            lot,
-            weight: mode.calculateWeight(lot, lots)
-        }));
-
-        const totalWeight = weightedLots.reduce((sum, item) => sum + item.weight, 0);
-        
-        if (totalWeight <= 0) return [];
+    static calculateSegments(entries: readonly WeightedLot[]): Segment[] {
+        const totalWeight = entries.reduce((sum, item) => sum + item.weight, 0);
+        if (!(totalWeight > 0)) return [];
 
         const segments: Segment[] = [];
         let cumulativeWeight = 0;
 
-        for (const { lot, weight } of weightedLots) {
-            const normalizedWeight = weight / totalWeight;
+        for (const entry of entries) {
+            if (!(entry.weight > 0)) continue;
+
+            const normalizedWeight = entry.weight / totalWeight;
             const segmentStart = cumulativeWeight * Math.PI * 2;
             const segmentEnd = (cumulativeWeight + normalizedWeight) * Math.PI * 2;
 
             segments.push({
-                lot,
+                lot: entry.lot,
                 startAngle: segmentStart,
                 endAngle: segmentEnd,
                 weight: normalizedWeight
@@ -88,55 +87,46 @@ export class RouletteEngine {
     }
 
     /**
-     * Computes the final rotation angle for animation.
+     * Computes the final rotation angle for the wheel.
      *
-     * CRITICAL: The pointer is fixed at the TOP of the wheel (angle = -π/2).
-     * When the wheel rotates by R, a segment at angle θ moves to θ + R.
-     * For the pointer to point to a segment center: segmentCenter + finalRotation ≡ -π/2 (mod 2π)
-     * Therefore: finalRotation = -π/2 - segmentCenter + fullRotations
+     * The pointer is fixed at the TOP of the wheel (angle = -π/2). When the
+     * wheel rotates by R, a segment at angle θ moves to θ + R. A random point
+     * inside the target segment (with an edge margin) is chosen as the landing
+     * position, so the pointer never lands exactly on a boundary; then full
+     * rotations are added so the wheel always turns forward.
      */
     static computeFinalRotation(
-        lots: Lot[],
-        mode: GameMode,
+        segments: readonly Segment[],
         targetLotId: string,
         currentRotation: number,
         animationDurationMs: number
     ): number {
-        const segments = this.calculateSegments(lots, mode);
-        
-        // Find winning segment
         const segment = segments.find(s => s.lot.id === targetLotId);
         if (!segment) return currentRotation;
 
-        // POINTER POSITION: Fixed at TOP of wheel = angle -π/2 (or equivalently 3π/2)
         const pointerAngle = -Math.PI / 2;
-        
-        // 1. Pick random point inside the segment for landing position
+
+        // 1. Pick a random point inside the segment for the landing position.
         const segmentSpan = segment.endAngle - segment.startAngle;
         const randomOffset = getRandomPositionInRange(segmentSpan, 0.02, 0.04);
-        
-        // Target angle within the winning segment
         const targetSegmentAngle = segment.startAngle + randomOffset;
-        
-        // 2. Calculate base rotation needed to bring target under pointer
-        // Formula: finalRotation ≡ pointerAngle - targetSegmentAngle (mod 2π)
+
+        // 2. Base rotation to bring the target under the pointer.
         let baseRotation = pointerAngle - targetSegmentAngle;
-        
-        // 3. Add full rotations to ensure smooth forward spin from current position
+
+        // 3. Forward-only full rotations, scaled by duration.
         const minSpinsPerSecond = 2;
         const maxSpinsPerSecond = 5;
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const minFullRotations = Math.floor(minSpinsPerSecond * durationSeconds);
         const maxFullRotations = Math.ceil(maxSpinsPerSecond * durationSeconds);
-        
-        // Find the smallest number of full rotations that puts us ahead of current rotation
+
         let totalRotation = baseRotation;
         while (totalRotation <= currentRotation) {
             totalRotation += Math.PI * 2;
         }
-        
-        // Add extra random full rotations for visual effect
-        const extraRotations = 
+
+        const extraRotations =
             Math.floor(Math.random() * (maxFullRotations - minFullRotations + 1)) + minFullRotations;
         totalRotation += extraRotations * Math.PI * 2;
 
@@ -144,112 +134,78 @@ export class RouletteEngine {
     }
 
     /**
-     * Validates that we have enough active lots to spin.
-     */
-    static canSpin(activeLots: Lot[]): boolean {
-        return activeLots.length >= 1;
-    }
-
-    /**
-     * Computes the final scroll offset for strip visualization.
-     * 
-     * The strip renders lots in an infinite repeating cycle. This method calculates
-     * the horizontal scroll position that brings the winning lot under the center pointer.
+     * Computes the final scroll offset for the strip. The strip renders lots
+     * in an infinite repeating cycle; this returns the horizontal offset that
+     * brings a random point inside the winning lot under the centre pointer,
+     * always scrolling forward, plus extra cycles scaled by duration.
      */
     static computeFinalScrollOffset(
-        lots: Lot[],
-        mode: GameMode,
+        segments: readonly Segment[],
         targetLotId: string,
         currentOffset: number,
         animationDurationMs: number,
         canvasWidth: number
     ): number {
-        const segments = this.calculateSegments(lots, mode);
-        
-        // Calculate total width of one complete cycle
         let totalCycleWidth = 0;
         for (const segment of segments) {
             totalCycleWidth += getSegmentWidth(segment.weight);
         }
-
         if (totalCycleWidth === 0) return currentOffset;
 
-        // Find target lot's position within one cycle
         let cumulativeWidth = 0;
-        
         for (const segment of segments) {
             const segmentWidth = getSegmentWidth(segment.weight);
-            
+
             if (segment.lot.id === targetLotId) {
-                // Pick random point within this lot's width (with margin from edges)
                 const randomOffset = getRandomPositionInRange(segmentWidth, 0.02, 3);
-                
-                // Target position within the cycle where this lot should land under center pointer
                 const targetPositionInCycle = cumulativeWidth + randomOffset;
-                
-                // Calculate base scroll offset to bring target under center pointer
+
                 const centerX = canvasWidth / 2;
                 let baseOffset = targetPositionInCycle - centerX;
-                
-                // Add full cycles to ensure smooth forward scroll from current position
+
                 while (baseOffset <= currentOffset) {
                     baseOffset += totalCycleWidth;
                 }
-                
-                // Add extra cycles based on duration for visual effect
+
                 const minCyclesPerSecond = 2;
                 const maxCyclesPerSecond = 5;
                 const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
                 const minFullCycles = Math.floor(minCyclesPerSecond * durationSeconds);
                 const maxFullCycles = Math.ceil(maxCyclesPerSecond * durationSeconds);
-                
-                // Add random extra cycles for visual variety
-                const extraCycles = 
+
+                const extraCycles =
                     Math.floor(Math.random() * (maxFullCycles - minFullCycles + 1)) + minFullCycles;
                 baseOffset += extraCycles * totalCycleWidth;
 
                 return baseOffset;
             }
-            
+
             cumulativeWidth += segmentWidth;
         }
 
-        // Fallback if target not found
         return currentOffset;
     }
 
     /**
-     * Computes the final counting position for the counting-rhyme visualization.
+     * Computes the final counting position for the counting-rhyme
+     * visualization.
      *
-     * Model:
-     *   - `currentPosition` and the return value are measured in *cycles*.
-     *   - One cycle spans the unit interval [0, 1) partitioned by the
-     *     normalized Segment.weight prefix sums. Therefore one full traversal
-     *     shows each circle for exactly w_i of a cycle.
-     *   - The engine returns a value `endValue` such that
-     *         endValue ≡ targetMid (mod 1),  targetMid = P_i + w_i / 2,
-     *     which guarantees the last animated frame — the one produced by
-     *     AnimationController's `onUpdate(endValue, 1)` *before* `onComplete()` —
-     *     highlights the rolled lot (see animation.ts).
-     *   - Forward motion only. Extra full cycles are added so the animation is
-     *     visible for very short durations and does not grow unboundedly for
-     *     long ones.
-     *
-     * Note: no canvasWidth parameter — the circle layout is the renderer's
-     * responsibility, and the sequence position math in cycle space does not
-     * depend on pixel dimensions.
+     * `currentPosition` and the return value are measured in *cycles*: one
+     * cycle spans [0, 1) partitioned by the normalized prefix sums, so one
+     * traversal shows each circle for exactly w_i of a cycle. The returned
+     * value satisfies `endValue ≡ targetMid (mod 1)`, guaranteeing the last
+     * animated frame highlights the rolled lot. Forward motion only; extra
+     * cycles scale with duration. No canvasWidth — the circle layout is the
+     * renderer's responsibility and cycle-space math is pixel-independent.
      */
     static computeFinalCountingPosition(
-        lots: Lot[],
-        mode: GameMode,
+        segments: readonly Segment[],
         targetLotId: string,
         currentPosition: number,
         animationDurationMs: number
     ): number {
-        const segments = this.calculateSegments(lots, mode);
         if (segments.length === 0) return currentPosition;
 
-        // Prefix sums of normalized weights.
         const prefix: number[] = [0];
         for (const s of segments) {
             prefix.push(prefix[prefix.length - 1] + s.weight);
@@ -261,16 +217,11 @@ export class RouletteEngine {
         const targetWeight = segments[targetIdx].weight;
         const targetMid = prefix[targetIdx] + targetWeight / 2;
 
-        // Forward motion only. The smallest reachable position with the right
-        // fractional value that is strictly greater than the current one.
         let endValue = targetMid;
         while (endValue <= currentPosition) {
             endValue += 1;
         }
 
-        // Scale the extra traversal count with the configured duration so
-        // behaviour stays manageable across the 1 s – 60 s+ range. The
-        // constant is in cycles per second and independent of lot count.
         const durationSeconds = Math.max(0.5, animationDurationMs / 1000);
         const extraCycles = Math.max(2, Math.round(durationSeconds * 2));
         endValue += extraCycles;

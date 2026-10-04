@@ -7,15 +7,16 @@ import { VisualizationDriver } from './visualizationDriver.js';
 import { LotListView } from './lotListView.js';
 import type { RenderableLot } from './lotListView.js';
 import { GameSession } from './gameSession.js';
-import type { PrepareSpinFailureReason } from './gameSession.js';
-import { VisualizationType, Settings, Mode, GameMode, Lot, RollResult } from './types.js';
+import type { FinishSpinResult, PrepareSpinFailureReason } from './gameSession.js';
+import type { HighlightState, Mode, Settings, VisualizationType } from './types.js';
+import { gameHighlightForOutcome, makeHighlight, OUTCOME_TRANSITION_DURATION_MS } from './presentation.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
 import type { ImportStrategy } from './importStrategies.js';
 import type { ParsedLot } from './csvParser.js';
-import { 
-    generateRandomReadableColor, 
-    sliderToDuration, 
-    durationToSlider, 
+import {
+    generateRandomReadableColor,
+    sliderToDuration,
+    durationToSlider,
     MIN_DURATION_SEC,
     MAX_DURATION_SEC
 } from './utils.js';
@@ -46,6 +47,11 @@ async function startApp() {
 
 /**
  * Main application controller for the roulette game.
+ *
+ * `App` owns UI orchestration only: it contains no mode-specific logic, no
+ * game-state mutation and no knowledge of `modeState` structure. It reads the
+ * presentation model (`GameSession.viewState`) and drives the visualization
+ * boundary (`VisualizationDriver`).
  */
 export class App {
 
@@ -54,26 +60,35 @@ export class App {
     private gameSession: GameSession;
     private visualizationDriver: VisualizationDriver;
     private lotListView: LotListView;
-    
+
     private settings: Settings = {
         modeId: 'normal',
         visualization: 'wheel',
         animationDuration: 3000
     };
-    
+
     // Easing function setting - source of truth for user preference
     private easingFunction: EasingFunction = DEFAULT_EASING;
-    
+
     /**
      * Current game mode, delegated to the active GameSession. GameSession is the
      * single source of truth for the current mode; `settings.modeId` is a UI /
      * persistence mirror only and is never read back to drive the session.
      */
-    get mode(): GameMode {
+    get mode() {
         return this.gameSession.mode;
     }
-    
-    private highlightedLotId: string | null = null;
+
+    /**
+     * Game highlight (winners / eliminated), owned by `App` and derived from
+     * the last outcome. The cursor highlight is owned by the visualization and
+     * never mixed into this set.
+     */
+    private gameHighlight: Set<string> = new Set();
+
+    /** True while the post-spin outcome transition is playing. */
+    private outcomeInProgress = false;
+
     private importDialog: ImportDialog | null = null;
 
     // DOM elements
@@ -83,16 +98,16 @@ export class App {
     private resetBtn: HTMLButtonElement;
     private importBtnControls: HTMLButtonElement;
     private clearBtnControls: HTMLButtonElement;
-    
+
     // Lots list elements
     private lotsList: HTMLUListElement;
-    
+
     // Add row elements (inline at bottom of lots table)
     private lotNameInput: HTMLInputElement;
     private lotAmountInput: HTMLInputElement;
     private addBtn: HTMLButtonElement;
     private newLotColorIndicator: HTMLElement;
-    
+
     // Settings elements
     private modeSelect: HTMLSelectElement | null = null;
     private visualizationSelect: HTMLSelectElement | null = null;
@@ -105,16 +120,15 @@ export class App {
     private modeHelp: HTMLElement | null = null;
     private easingHelp: HTMLElement | null = null;
 
-    
+
     // Settings toggle element
     private settingsToggleBtn: HTMLButtonElement | null = null;
 
     constructor() {
         this.lotManager = new LotManager([]);
         // `LotManager` owns the global lot list; `GameSession` owns the current game
-        // (mode + participation state). The session reads the global list through this
-        // accessor so it never caches a stale snapshot; its participation set
-        // (`activeLotIds`) is its own.
+        // (mode + participation + mode state). The session reads the global list
+        // through this accessor so it never caches a stale snapshot.
         this.gameSession = new GameSession(
             this.settings.modeId,
             () => this.lotManager.getAllLots()
@@ -138,16 +152,16 @@ export class App {
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
         this.clearBtnControls = document.getElementById('clear-btn-controls') as HTMLButtonElement;
-        
+
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
-        
+
         // Add row elements (inline at bottom of lots table)
         this.lotNameInput = document.getElementById('new-lot-name') as HTMLInputElement;
         this.lotAmountInput = document.getElementById('new-lot-amount') as HTMLInputElement;
         this.addBtn = document.getElementById('add-lot-btn') as HTMLButtonElement;
         this.newLotColorIndicator = document.getElementById('new-lot-color-indicator') as HTMLElement;
-        
+
         // Settings elements
         this.modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
         this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
@@ -164,25 +178,25 @@ export class App {
         // sits outside `#lots-list`, so it is passed in explicitly.
         const sortControls = document.getElementById('sort-controls');
         this.lotListView = new LotListView(this.lotsList, sortControls);
-        
+
         // Settings toggle button
         this.settingsToggleBtn = document.getElementById('toggle-settings-subblock') as HTMLButtonElement;
 
         // Initialize UI
         this.updateUI();
-        
+
         // Set initial slider and number input positions based on default duration (3s)
         if (this.durationSlider && this.durationInput) {
             const initialSeconds = 3; // Default 3 SECONDS
             this.durationSlider.value = String(durationToSlider(initialSeconds));
             this.durationInput.value = String(initialSeconds);
-            
+
             // Update the display value as well
             if (this.durationValue) {
                 this.durationValue.textContent = initialSeconds.toFixed(1);
             }
         }
-        
+
         // Set initial random color for new lot indicator
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
 
@@ -205,7 +219,7 @@ export class App {
         if (this.themeSelect) {
             this.themeSelect.value = savedTheme;
         }
-        
+
         // Update result display with current mode name initially
         if (this.resultText) {
             this.updateResultTextWithModeName();
@@ -215,17 +229,26 @@ export class App {
         // awaits initI18n before `new App()`).
         this.updateModeHelpTooltip();
         this.updateEasingHelpTooltip();
-        
+
         // Event listeners
         this.setupEventListeners();
-        
+
     }
 
     /**
-     * Updates result text to show current mode name when no winner is highlighted.
+     * Current highlight state: the game highlight set. The visualization's
+     * cursor is derived by the renderer itself and is not part of this state.
+     */
+    private highlight(): HighlightState {
+        return makeHighlight(this.gameHighlight);
+    }
+
+    /**
+     * Updates result text to show current mode name when no game highlight is
+     * active.
      */
     private updateResultTextWithModeName(): void {
-        if (this.resultText && !this.highlightedLotId) {
+        if (this.resultText && this.gameHighlight.size === 0) {
             this.resultText.textContent = this.mode.name;
         }
     }
@@ -253,10 +276,9 @@ export class App {
         // GameSession-boundary rejection.
         if (this.gameSession.isSessionLocked) return;
         this.lotManager.updateLot(id, { amount: newAmount });
-        // Amount changes do not affect participation; no session mutation
-        // is required. The next read of session.activeLots already reflects
-        // the updated amount.
-        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
+        // Amount changes do not affect participation; the next view-state read
+        // already reflects the updated weight.
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 
     /**
@@ -300,7 +322,7 @@ export class App {
     private setupEventListeners(): void {
         // Inline add lot button (at bottom of lots table)
         this.addBtn.addEventListener('click', () => this.addLot());
-        
+
         // Allow Enter key to submit in name input
         this.lotNameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -308,23 +330,23 @@ export class App {
                 this.addLot();
             }
         });
-        
+
         // Spin button
         this.spinBtn.addEventListener('click', () => this.spin());
-        
+
         // Reset button
         this.resetBtn.addEventListener('click', () => this.reset());
-        
+
         // Import button - opens import dialog component
         this.importBtnControls.addEventListener('click', () => {
             this.openImportDialog();
         });
-        
+
         // Clear button - clears all lots with confirmation
         this.clearBtnControls.addEventListener('click', () => {
             this.handleClearLots();
         });
-        
+
         // Settings changes
         this.modeSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
@@ -345,15 +367,14 @@ export class App {
             this.gameSession.setMode(newModeId);
             this.settings.modeId = newModeId;
 
-            // Re-render wheel with the new mode's weight calculation. The
-            // session's participation set is deliberately preserved across a
-            // mode switch.
-            this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
-            // Update result text to show new mode name if no winner highlighted
+            // Re-render with the new mode's weight calculation. Participation is
+            // deliberately preserved across a mode switch.
+            this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+            // Update result text to show new mode name if no highlight active
             this.updateResultTextWithModeName();
             this.updateModeHelpTooltip();
         });
-        
+
         this.visualizationSelect?.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
 
@@ -366,16 +387,16 @@ export class App {
             }
 
             this.settings.visualization = target.value as VisualizationType;
-            
+
             // Recreate renderer with new visualization type and refresh — the
             // swap is entirely contained in the visualization boundary.
             this.visualizationDriver.setVisualization(
                 this.settings.visualization,
-                this.gameSession.activeLots,
-                this.gameSession.mode
+                this.gameSession.viewState,
+                this.highlight()
             );
         });
-        
+
 
         // Duration slider - uses non-linear mapping for better control at lower values
         this.durationSlider?.addEventListener('input', () => {
@@ -397,16 +418,16 @@ export class App {
         this.durationInput?.addEventListener('change', () => {
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
-                
+
                 // Correct invalid value to closest valid [MIN_DURATION_SEC, MAX_DURATION_SEC] SECONDS
                 if (isNaN(seconds)) {
                     seconds = MIN_DURATION_SEC; // Default to minimum if not a number
                 } else {
                     seconds = Math.max(MIN_DURATION_SEC, Math.min(MAX_DURATION_SEC, seconds)); // Clamp to range
                 }
-                
+
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
-                
+
                 // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
@@ -414,12 +435,12 @@ export class App {
                 if (this.durationValue) {
                     this.durationValue.textContent = seconds.toFixed(1);
                 }
-                
+
                 // Update the input field to show corrected value
                 this.durationInput.value = String(Math.round(seconds));
             }
         });
-        
+
         // Easing function select — the option value is a key of
         // EasingFunctions; the entry carries both the curve and its i18n
         // name (used by the tooltip).
@@ -446,7 +467,7 @@ export class App {
                 // Keep <html lang> in sync so screen readers / font shaping use the right locale
                 syncDocumentLang();
 
-                // Update result text to show mode name in new language (if no winner)
+                // Update result text to show mode name in new language (if no highlight)
                 this.updateResultTextWithModeName();
 
                 // The tooltips are set via `data-tooltip`, not `data-i18n`,
@@ -472,7 +493,7 @@ export class App {
                 const subBlock = document.getElementById('settings-subblock') as HTMLElement;
                 if (subBlock) {
                     subBlock.classList.toggle('hidden');
-                    
+
                     // Update button text to indicate state
                     this.settingsToggleBtn!.textContent = subBlock.classList.contains('hidden') ? '⁝' : '✕';
                 }
@@ -492,12 +513,12 @@ export class App {
 
         // Call lotManager.addLot which now returns detailed error info
         const result = this.lotManager.addLot(name, amount, color);
-        
+
         if (!result.success) {
             // Show error dialog with the reason
             const errorDialog = new ErrorDialog(result.message);
             errorDialog.open();
-            
+
             // Don't clear form on error - let user fix their input
             return;
         }
@@ -510,18 +531,19 @@ export class App {
         this.lotNameInput.value = '';
         this.lotAmountInput.value = '1';
         this.newLotColorIndicator.style.backgroundColor = generateRandomReadableColor();
-        
+
         // Focus back on name input
         this.lotNameInput.focus();
-        
+
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 
     private spin(): void {
         // Preparation belongs to the session: validation, rolling, and remembering
-        // the pending spin. The result is decided here, before any animation starts.
+        // the pending spin + before-state. The result is decided here, before any
+        // animation starts.
         const prepared = this.gameSession.prepareSpin();
         if (!prepared.ok) {
             alert(t(this.prepareSpinFailureKey(prepared.reason)));
@@ -533,31 +555,28 @@ export class App {
         this.updateControlsState();
 
         // Hand the already-decided target to the visualization boundary.
-        // App says *what* to animate; the driver decides *how*.
+        // App says *what* to animate; the driver/visualization decide *how*.
         this.visualizationDriver.spinTo({
-            lots:        this.gameSession.activeLots,
-            mode:        this.gameSession.mode,
+            view: this.gameSession.viewState,
+            highlight: this.highlight(),
             targetLotId: prepared.lot.id,
-            durationMs:  this.settings.animationDuration,
-            easing:      this.easingFunction,
-            onComplete:  () => this.finishSpin()
+            durationMs: this.settings.animationDuration,
+            easing: this.easingFunction,
+            onComplete: () => this.finishSpin()
         });
     }
 
     /**
-     * Finishes the spin. Delegates the state transition to `gameSession.finishSpin()`
-     * (mode processing, eliminations). On a `processRoll()` exception the session
-     * stays locked and `gameFinished` is not set; the failure is surfaced via
+     * Finishes the spin. Delegates the state transition to
+     * `gameSession.finishSpin()` (mode processing, eliminations), then plays
+     * the outcome transition. On a `processRoll()` exception the session stays
+     * locked and `gameFinished` is not set; the failure is surfaced via
      * ErrorDialog and never presented as a normal spin completion.
      */
     private finishSpin(): void {
-        // Capture the current mode once so the roll text and the renderer
-        // segment update use the same mode that decided the roll.
-        const mode = this.gameSession.mode;
-
-        let outcome: { rolledLot: Lot; result: RollResult } | null;
+        let result: FinishSpinResult | null;
         try {
-            outcome = this.gameSession.finishSpin();
+            result = this.gameSession.finishSpin();
         } catch (err) {
             // The session stays locked (`spinInProgress` was released in
             // GameSession's `finally`, but `sessionLocked` persists and
@@ -569,7 +588,7 @@ export class App {
             return;
         }
 
-        if (!outcome) {
+        if (!result) {
             // No pending spin (e.g. the animation was stopped/aborted).
             // This path does not go through `updateUI()` below, so refresh
             // the controls here.
@@ -577,59 +596,57 @@ export class App {
             return;
         }
 
-        const { rolledLot, result } = outcome;
+        const { outcome, transition, after } = result;
 
-        // Immediate visual: show the rolled lot highlighted and its roll
-        // text. These are UI concerns only — `getRollText` is a
-        // mode-provided display string, not a game-state mutation.
-        this.highlightedLotId = rolledLot.id;
+        // Immediate visual: the roll text. It is a mode-provided descriptor, so
+        // it stays language-switchable.
         if (this.resultText) {
-            this.resultText.textContent = mode.getRollText(rolledLot);
+            this.resultText.textContent = t(outcome.result.key, outcome.result.params);
         }
 
-        if (result.finished) {
-            // A surviving winner (e.g. SurvivalMode) may differ from the
-            // rolled lot.
-            if (result.winner) {
-                this.highlightedLotId = result.winner.id;
+        const gameHighlight = gameHighlightForOutcome(outcome);
+        const finalHighlight = makeHighlight(gameHighlight);
+
+        // Reflect the finished/locked state right away, and gate Spin until the
+        // outcome transition has settled.
+        this.outcomeInProgress = true;
+        this.updateControlsState();
+
+        // Animate the state transition (eliminated participants shrink out,
+        // the game highlight ramps in), then adopt the stable snapshot.
+        this.visualizationDriver.animateOutcome({
+            transition,
+            highlight: finalHighlight,
+            durationMs: OUTCOME_TRANSITION_DURATION_MS,
+            easing: this.easingFunction,
+            onComplete: () => {
+                this.outcomeInProgress = false;
+                this.gameHighlight = gameHighlight;
+                this.updateUI();
+                this.visualizationDriver.refresh(after, finalHighlight);
+
+                if (outcome.message) {
+                    const message = outcome.message;
+                    setTimeout(() => alert(t(message.key, message.params)), 500);
+                }
             }
-
-            if (result.message) {
-                setTimeout(() => alert(result.message), 500);
-            }
-
-            // The finished-game lock is tracked inside GameSession via its
-            // `gameFinished` lifecycle flag — no `App`-side copy is needed.
-        }
-        // Otherwise: the session stays locked, but the spin-time lock has
-        // been released and a subsequent Survival spin may be prepared.
-
-        // Refresh UI + renderer to reflect the new active-lot list. The lock
-        // state is re-applied automatically by the render path inside `updateUI()`,
-        // so no trailing `updateControlsState()` is needed on this normal path.
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.activeLots, mode);
+        });
     }
 
     private reset(): void {
-        // Reset state
-        this.highlightedLotId = null;
-
         // Reset the current game session: every lot currently in the global list
-        // becomes an active participant again, any in-flight spin context is cleared,
-        // and every lifecycle lock is released.
+        // becomes an active participant again, pending spin context is cleared,
+        // mode state is recreated, and every lifecycle lock is released.
         this.gameSession.reset();
 
+        // Clear the game highlight; the cursor is owned by the visualization.
+        this.gameHighlight = new Set();
+        this.outcomeInProgress = false;
+
         // Reset the visualization (stops any animation, resets the renderer,
-        // re-seeds segments for the now-reset session, redraws). The whole
-        // sequence is synchronous: no RAF callback can run between
-        // `gameSession.reset()` (which nulls the pending spin) and the
-        // driver's `animationController.stop()` — so a late `onComplete`
-        // remains a no-op for two independent reasons.
-        this.visualizationDriver.reset(
-            this.gameSession.activeLots,
-            this.gameSession.mode
-        );
+        // shows the now-reset view). The whole sequence is synchronous, so a
+        // late `onComplete` cannot replay a stale spin.
+        this.visualizationDriver.reset(this.gameSession.viewState, this.highlight());
 
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
@@ -639,24 +656,28 @@ export class App {
     }
 
     private updateUI(): void {
-        // Global lot data comes from `LotManager`; participation is
-        // projected from the session. Sorting is delegated to the view.
-        const allLots = this.lotManager.getAllLots();
-        const renderables: RenderableLot[] = allLots.map(lot => ({
-            ...lot,
-            active: this.gameSession.isActive(lot.id)
+        // Global lot data comes from `LotManager`; participation and weights are
+        // projected by the session. Sorting is delegated to the view.
+        const view = this.gameSession.viewState;
+        const renderables: RenderableLot[] = view.participants.map(p => ({
+            name: p.lot.name,
+            amount: p.lot.amount,
+            id: p.lot.id,
+            color: p.lot.color,
+            active: p.active,
+            modeData: p.modeData
         }));
 
         this.lotListView.render(renderables, {
             showActions: true,
-            highlightId: this.highlightedLotId,
+            highlightIds: this.gameHighlight,
             editableAmount: true,
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
             onDelete: (id) => this.deleteLot(id)
         });
 
-        // Update stats. Game-session counters are read from the GameSession
-        // (§8): `activeLots` and the current mode are game state.
+        // Update stats. Game-session counters are read from the GameSession:
+        // `activeCount` and the current mode are game state.
         const totalEl = document.getElementById('total-lots');
         const activeEl = document.getElementById('active-lots');
         if (totalEl) totalEl.textContent = this.lotManager.getTotalCount().toString();
@@ -669,7 +690,7 @@ export class App {
     }
 
     /**
-     * Reflects the GameSession's two lifecycle locks onto the DOM.
+     * Reflects the GameSession's lifecycle locks onto the DOM.
      * Three combinations:
      *
      *   - session locked, spinning → only Reset enabled;
@@ -680,12 +701,14 @@ export class App {
     private updateControlsState(): void {
         const spinning = this.gameSession.isSpinInProgress;
         const finished = this.gameSession.isGameFinished;
+        const outcomePlaying = this.outcomeInProgress;
         // spinInProgress ⇒ sessionLocked, so the session lock alone suffices here.
         const sessionLevelLocked = this.gameSession.isSessionLocked;
-        const spinTimeLocked = spinning || finished;
+        const spinTimeLocked = spinning || finished || outcomePlaying;
 
-        // Spin: only between spins of an unfinished game
-        if (this.spinBtn) this.spinBtn.disabled = spinning || finished;
+        // Spin: only between spins of an unfinished game, once the outcome
+        // transition has settled.
+        if (this.spinBtn) this.spinBtn.disabled = spinning || finished || outcomePlaying;
 
         // Reset is always available — the user must be able to abandon the session
         if (this.resetBtn) this.resetBtn.disabled = false;
@@ -726,20 +749,17 @@ export class App {
 
         // Two independent operations:
         //   • LotManager.deleteLot(id) — removes the lot globally;
-        //   • GameSession.removeLot(id) — drops it from the session's
-        //     participation set. The session never references a globally
-        //     absent lot.
+        //   • GameSession.removeLot(id) — drops it from participation. The
+        //     session never references a globally absent lot.
         this.lotManager.deleteLot(id);
         this.gameSession.removeLot(id);
-        
-        // Clear highlight if deleted lot was highlighted
-        if (this.highlightedLotId === id) {
-            this.highlightedLotId = null;
-        }
+
+        // Clear highlight if the deleted lot was highlighted
+        this.gameHighlight.delete(id);
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 
     /** Handles clearing all lots */
@@ -748,32 +768,32 @@ export class App {
         if (this.gameSession.isSessionLocked) return;
 
         const totalLots = this.lotManager.getTotalCount();
-        
+
         if (totalLots === 0) {
             alert(t('validation.noLotsToClear'));
             return;
         }
-        
+
         const message = t('confirmation.clearAllLots', { count: totalLots });
         if (!confirm(message)) {
             return;
         }
-        
+
         // Two independent operations:
         //   • LotManager.clearAll() — empties the global list;
-        //   • GameSession.clearLots() — empties the participation set.
+        //   • GameSession.clearLots() — empties participation.
         this.lotManager.clearAll();
         this.gameSession.clearLots();
-        
+
         // Reset highlight and result display
-        this.highlightedLotId = null;
+        this.gameHighlight = new Set();
         if (this.resultText) {
             this.updateResultTextWithModeName();
         }
-        
+
         // Update UI and renderer
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 
     /** Opens the import dialog */
@@ -787,31 +807,31 @@ export class App {
             this.importDialog.destroy();
             this.importDialog = null;
         }
-        
+
         this.importDialog = new ImportDialog((parsedLots) => {
             this.handleImportConflict(parsedLots);
         });
-        
+
         this.importDialog.open();
     }
 
     /** Handles conflict resolution when importing lots */
     private handleImportConflict(parsedLots: ParsedLot[]): void {
         const existingCount = this.lotManager.getTotalCount();
-        
+
         // If no existing lots, proceed directly with merge strategy (no conflict)
         if (existingCount === 0) {
             this.executeImport(parsedLots, MERGE_STRATEGY);
             return;
         }
-        
+
         // Show conflict resolution dialog - callback receives ImportStrategy | null
         const conflictDialog = new ImportConflictDialog(existingCount, (strategy) => {
             if (strategy) {  // If strategy is not null (user didn't cancel)
                 this.executeImport(parsedLots, strategy);
             }
         });
-        
+
         conflictDialog.open();
     }
 
@@ -824,30 +844,27 @@ export class App {
             return;
         }
 
-        // Snapshot the global id set *before* the strategy runs so the
-        // session can tell "kept / updated" lots (preserve participation)
-        // apart from "created" lots (become active). See GameSession
-        // .reconcileAfterBulkChange() for the exact rules — they preserve
-        // the shipped behaviour of both strategies without either strategy
-        // needing to know about the session.
+        // Snapshot the global id set *before* the strategy runs so the session
+        // can tell "kept / updated" lots (preserve participation) apart from
+        // "created" lots (become active).
         const idsBefore = new Set(this.lotManager.getAllLots().map(l => l.id));
 
         const result = strategy.execute(parsedLots, this.lotManager);
 
-        // Reconcile the session's participation set with the new global list after
-        // the strategy ran. GameSession also rejects this call itself while locked.
+        // Reconcile participation with the new global list after the strategy ran.
+        // GameSession also rejects this call itself while locked.
         this.gameSession.reconcileAfterBulkChange(idsBefore);
-        
+
         // Update UI and renderer after import completes
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.activeLots, this.gameSession.mode);
-        
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {
             this.importDialog.close();
             this.importDialog = null;
         }
-        
+
         // Show info modal if lots were truncated due to MAX_LOTS limit
         if (result.lotsTruncated > 0) {
             const message = t('import.summaryWithTruncation', {
@@ -856,7 +873,7 @@ export class App {
                 maxLots: LotManager.MAX_LOTS,
                 totalLots: this.lotManager.getTotalCount()
             });
-            
+
             const infoDialog = new ErrorDialog(message, t('import.summaryTitle'));
             infoDialog.open();
         }
@@ -869,7 +886,6 @@ document.addEventListener('DOMContentLoaded', () => {
     startApp();
 
 
-    
     // Ensure translations are applied after everything is set up
     translateDOM();
 });

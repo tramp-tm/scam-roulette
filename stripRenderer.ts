@@ -1,5 +1,5 @@
-import { Lot, GameMode } from './types.js';
 import type { Segment } from './rouletteEngine.js';
+import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor, getSegmentWidth } from './utils.js';
 
@@ -17,49 +17,51 @@ const LABEL_MAX_CHARS = 15;
 const LABEL_TRUNCATED_CHARS = 13;
 
 // Highlight glow
-const HIGHLIGHT_BRIGHTNESS = 40;
+const GAME_HIGHLIGHT_BRIGHTNESS = 40;
+const GAME_HIGHLIGHT_BOOST = 45;
+const CURSOR_HIGHLIGHT_BRIGHTNESS = 18;
 const HIGHLIGHT_SHADOW_COLOR = 'rgba(255, 215, 0, 0.8)';
 const HIGHLIGHT_SHADOW_BLUR = 15;
 
 /**
  * Strip (ribbon) visualization renderer.
+ *
+ * Spin math (target scroll offset + cursor resolution) is internal to this
+ * visualization.
  */
 export class StripRenderer extends BaseRenderer {
-    /** Cached output of getSegmentWidth() summed over one full cycle. */
+    /** Cached sum of getSegmentWidth() over one full cycle (drawing geometry). */
     private totalCycleWidth = 0;
 
-    constructor(canvas: HTMLCanvasElement) {
-        super(canvas);
-    }
+    /** Same sum over the stable timing partition (for cursor resolution). */
+    private timingCycleWidth = 0;
 
-    /**
-     * Updates the segments to render and caches the total cycle width.
-     */
-    updateSegments(lots: Lot[], mode: GameMode): void {
-        super.updateSegments(lots, mode);
+    protected override onViewStateChanged(): void {
         this.totalCycleWidth = this.segments.reduce(
+            (sum, s) => sum + getSegmentWidth(s.weight),
+            0
+        );
+        this.timingCycleWidth = this.timingSegments.reduce(
             (sum, s) => sum + getSegmentWidth(s.weight),
             0
         );
     }
 
-    /**
-     * Renders the strip visualization with infinite scrolling effect.
-     *
-     * Uses modulo arithmetic to map large mathematical offsets to visual offsets,
-     * then renders multiple buffer copies for a seamless infinite illusion.
-     */
-    public render(): void {
+    protected override onReset(): void {
+        this.totalCycleWidth = 0;
+        this.timingCycleWidth = 0;
+    }
+
+    render(): void {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerY = canvasHeight / 2;
 
-        // Clear canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         if (this.segments.length === 0 || this.totalCycleWidth === 0) return;
 
-        const visualScrollOffset = this.getVisualOffset(this.totalCycleWidth);
-        const cyclesNeeded = this.getCyclesNeeded(canvasWidth, this.totalCycleWidth);
+        const visualScrollOffset = this.getVisualOffset();
+        const cyclesNeeded = this.getCyclesNeeded(canvasWidth);
 
         this.ctx.save();
         this.ctx.translate(-visualScrollOffset, 0);
@@ -68,66 +70,92 @@ export class StripRenderer extends BaseRenderer {
         }
         this.ctx.restore();
 
-        // Draw center marker at viewport center (independent of scroll)
         this.drawCenterMarker(canvasWidth / 2, canvasHeight);
-
-        // Draw outer decorative frame around the band
         this.drawFrame(canvasWidth, centerY);
     }
 
-    /**
-     * Maps the mathematical scroll offset into [0, totalCycleWidth).
-     */
-    private getVisualOffset(totalCycleWidth: number): number {
-        let offset = this.currentRotation % totalCycleWidth;
-        if (offset < 0) offset += totalCycleWidth;
+    computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        return RouletteEngine.computeFinalScrollOffset(
+            this.segments,
+            rolledLotId,
+            this.animationValue,
+            durationMs,
+            this.getLogicalSize().width
+        );
+    }
+
+    getCursorLotId(animationValue: number): string | null {
+        // Resolve against the STABLE (presence-independent) partition so the
+        // cursor does not hop while the drawing geometry animates.
+        const segments = this.timingSegments;
+        if (segments.length === 0 || this.timingCycleWidth <= 0) return null;
+
+        // Segment i is drawn at [cum - offset, cum - offset + w); the centre
+        // marker sits at centerX. It is under the cursor when
+        // cum ≤ centerX + offset < cum + w.
+        const centerX = this.getLogicalSize().width / 2;
+        let local = (animationValue + centerX) % this.timingCycleWidth;
+        if (local < 0) local += this.timingCycleWidth;
+
+        let cumulative = 0;
+        for (const segment of segments) {
+            const width = getSegmentWidth(segment.weight);
+            if (local >= cumulative && local < cumulative + width) return segment.lot.id;
+            cumulative += width;
+        }
+        return segments[segments.length - 1].lot.id;
+    }
+
+    private getVisualOffset(): number {
+        let offset = this.animationValue % this.totalCycleWidth;
+        if (offset < 0) offset += this.totalCycleWidth;
         return offset;
     }
 
-    /**
-     * Calculates how many cycle copies are needed to cover the viewport plus margins.
-     */
-    private getCyclesNeeded(canvasWidth: number, totalCycleWidth: number): number {
-        const bufferMargin = canvasWidth; // Extra margin for smooth transitions
+    private getCyclesNeeded(canvasWidth: number): number {
+        const bufferMargin = canvasWidth;
         const totalRenderWidth = canvasWidth + 2 * bufferMargin;
-        return Math.ceil(totalRenderWidth / totalCycleWidth) + 1;
+        return Math.ceil(totalRenderWidth / this.totalCycleWidth) + 1;
     }
 
-    /**
-     * Renders one complete cycle of the strip at a given horizontal position.
-     */
     private renderOneCycle(xOffset: number, centerY: number): void {
         let currentX = xOffset;
 
         for (const segment of this.segments) {
             const segmentWidth = getSegmentWidth(segment.weight);
-            const isHighlighted = segment.lot.id === this.highlightedLotId;
-            const fillColor = isHighlighted
-                ? brightenColor(segment.lot.color || '#888', HIGHLIGHT_BRIGHTNESS)
-                : (segment.lot.color || '#888');
+            const presence = this.presenceOf(segment.lot.id);
+            const game = this.isGameHighlighted(segment.lot.id);
+            const cursor = this.isCursor(segment.lot.id);
+
+            const baseColor = segment.lot.color || '#888';
+            const fillColor = game
+                ? brightenColor(baseColor, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
+                : cursor
+                    ? brightenColor(baseColor, CURSOR_HIGHLIGHT_BRIGHTNESS)
+                    : baseColor;
 
             this.ctx.save();
-            if (isHighlighted) {
+            this.ctx.globalAlpha = presence;
+            if (game) {
                 this.ctx.shadowColor = HIGHLIGHT_SHADOW_COLOR;
-                this.ctx.shadowBlur = HIGHLIGHT_SHADOW_BLUR;
+                this.ctx.shadowBlur = HIGHLIGHT_SHADOW_BLUR * this.highlight.pulse;
             }
 
-            // Draw segment rectangle
             this.ctx.fillStyle = fillColor;
             this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, segmentWidth, BAND_HEIGHT);
             this.ctx.restore();
 
-            this.drawSegmentLabel(segment, currentX + segmentWidth / 2, centerY);
+            if (presence > 0.01) {
+                this.drawSegmentLabel(segment, currentX + segmentWidth / 2, centerY, presence);
+            }
 
             currentX += segmentWidth;
         }
     }
 
-    /**
-     * Draws the text label centered in a segment (rotated 90° counterclockwise).
-     */
-    private drawSegmentLabel(segment: Segment, textX: number, textY: number): void {
+    private drawSegmentLabel(segment: Segment, textX: number, textY: number, presence: number): void {
         this.ctx.save();
+        this.ctx.globalAlpha = presence;
         this.ctx.translate(textX, textY);
         this.ctx.rotate(-Math.PI / 2);
 
@@ -136,23 +164,18 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        // Name (truncated if needed)
         const name = segment.lot.name;
         const displayName = name.length > LABEL_MAX_CHARS
             ? name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
             : name;
 
-        this.ctx.fillText(displayName, 0, LABEL_OFFSET_Y); // Offset from rotated origin
+        this.ctx.fillText(displayName, 0, LABEL_OFFSET_Y);
         this.ctx.restore();
     }
 
-    /**
-     * Draws the center marker for strip view (pointer position).
-     */
     private drawCenterMarker(x: number, canvasHeight: number): void {
         this.ctx.save();
 
-        // Vertical dashed line through viewport
         this.ctx.beginPath();
         this.ctx.moveTo(x, 0);
         this.ctx.lineTo(x, canvasHeight);
@@ -161,7 +184,6 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.setLineDash([10, 5]);
         this.ctx.stroke();
 
-        // Arrow at top pointing down
         this.ctx.beginPath();
         this.ctx.moveTo(x - 15, 20);
         this.ctx.lineTo(x + 15, 20);
@@ -170,7 +192,6 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.fillStyle = 'gold';
         this.ctx.fill();
 
-        // Arrow at bottom pointing up
         this.ctx.beginPath();
         this.ctx.moveTo(x - 15, canvasHeight - 40);
         this.ctx.lineTo(x + 15, canvasHeight - 40);
@@ -182,11 +203,6 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.restore();
     }
 
-    /**
-     * Draws the outer decorative frame around the strip band.
-     * Mirrors the wheel's drawOuterRing in style: same padding
-     * around the visible band and the same stroke colour/width.
-     */
     private drawFrame(canvasWidth: number, centerY: number): void {
         const top = centerY - BAND_HALF_HEIGHT - FRAME_PADDING;
         const height = (BAND_HALF_HEIGHT + FRAME_PADDING) * 2;
@@ -198,13 +214,5 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.lineWidth = 4;
         this.ctx.stroke();
         this.ctx.restore();
-    }
-
-    /**
-     * Resets the renderer state.
-     */
-    reset(): void {
-        super.reset();
-        this.totalCycleWidth = 0;
     }
 }

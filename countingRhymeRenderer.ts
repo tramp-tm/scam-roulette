@@ -1,4 +1,4 @@
-import { Lot, GameMode } from './types.js';
+import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 
 /**
@@ -9,43 +9,32 @@ import { BaseRenderer } from './baseRenderer.js';
  * "counting-rhyme" highlight hops from circle to circle.
  *
  * Contract:
- *  - weights come from the shared Segment[] produced by
- *    RouletteEngine.calculateSegments() via BaseRenderer.updateSegments().
- *    This renderer never calls GameMode.calculateWeight() itself.
- *  - radius is proportional to the lot's weight *relative to the largest
- *    active weight* (w_i / max(w)), not to the raw normalized weight.
- *    The mapping is still monotone in weight; only the baseline (the
- *    heaviest lot fills the cell) differs.
+ *  - geometry comes from BaseRenderer: `segments` is the drawing partition
+ *    (presence-scaled, so radii shrink during an elimination transition) and
+ *    `timingSegments` is the STABLE partition used for highlight timing and
+ *    cursor resolution. This renderer never computes game weights itself.
+ *  - radius uses the *drawing* partition (`weight * presence`, relative to the
+ *    heaviest), so an eliminated circle shrinks as its presence goes to 0.
+ *  - the highlight index / cursor use the *timing* partition (raw weights),
+ *    which is constant across an outcome transition — the "beat" does not hop
+ *    while the geometry is animating.
  *  - the per-frame highlighted circle is derived inside render() from
- *    `currentRotation` + `segments`. `highlightedLotId` (the field set by
- *    App via IRenderer.setHighlightedLot) is NOT the driver here.
- *    The resolved index is local to computeIntensities() and is never
- *    stored on the instance.
- *  - `currentRotation` is measured in *cycles*. One unit = one full
- *    traversal of the circle ring. Circle i owns the interval
- *    [P_i, P_{i+1}) where P is the prefix sum of Segment.weight.
- *    Dwell per traversal is therefore exactly w_i · T_cycle.
+ *    `animationValue`; the game/cursor emphasis is a separate layer.
+ *  - `animationValue` is measured in *cycles*: one unit = one full traversal
+ *    of the circle ring. Circle i owns [P_i, P_{i+1}) where P is the prefix
+ *    sum of the timing weights, so dwell per traversal is w_i · T_cycle.
  *  - the engine guarantees endValue ≡ targetMid (mod 1), so the final
  *    animated frame highlights the rolled lot.
- *  - layout is computed once per updateSegments() and cached;
- *    render() never regenerates positions; the grid uses logical
- *    getBoundingClientRect() dimensions, not canvas.width / canvas.height.
  *
- * NOTE: radius and dwell are deliberately derived from *two different*
- * normalizations of the same weight — timing from raw `w` (probability),
- * radius from `w / max(w)` (relative magnitude). Do not "unify" them:
- * dividing the dwell partition by max(w) would break the Σw = 1 invariant
- * that computeIntensities() relies on.
+ * PERFORMANCE: the deterministic grid (cell permutation + jitter) depends only
+ * on the lot-id set and the canvas size, so it is cached and rebuilt only when
+ * that signature changes — NOT on every transition frame. Radius is computed
+ * per render from the current drawing weights.
  *
- * NOTE ON COSMETIC SHUFFLE: the mapping segment i → grid cell is permuted so
- * the highlight order (still segments[0..n-1], the sole owner of dwell timing)
- * is decoupled from the visual position. A small in-cell jitter is then
- * applied to each circle's center so the grid does not read as a rigid lattice.
- * BOTH the permutation and the jitter are seeded deterministically from the
- * lot ids, so the same lot set yields the same arrangement (no reshuffling
- * between Survival eliminations) while still breaking any perceived
- * correlation between list order and screen position. Math.random() is never
- * called — neither from render() nor from rebuildLayout().
+ * NOTE ON COSMETIC SHUFFLE: the segment → grid-cell mapping is permuted so the
+ * highlight order is decoupled from the visual position; a deterministic
+ * in-cell jitter is applied next. Both are seeded from the lot ids.
+ * Math.random() is never called.
  */
 
 /** Gold that matches the wheel / strip pointers. */
@@ -56,16 +45,18 @@ const HIGHLIGHT_STROKE_WIDTH = 4;
 const BASE_STROKE_COLOR = 'rgba(255, 255, 255, 0.45)';
 const BASE_STROKE_WIDTH = 2;
 
+const GAME_HIGHLIGHT_STROKE_WIDTH = 6;
+const GAME_HIGHLIGHT_GLOW_BLUR = 30;
+
 const MIN_CIRCLE_RADIUS = 14;
 const MAX_CIRCLE_RADIUS = 250;
 
 /** Fraction of the (smaller) grid cell a circle may occupy at most. */
-const CELL_FILL_RATIO =0.95;
+const CELL_FILL_RATIO = 0.95;
 
 /**
- * Crossfade window expressed as a fraction of the *current* segment.
- * Because the window scales with the segment's own length, dwell time per
- * lot stays proportional to its weight.
+ * Crossfade window expressed as a fraction of the *current* segment, so dwell
+ * time per lot stays proportional to its weight.
  */
 const TRANSITION_FRACTION = 0.2;
 
@@ -73,81 +64,91 @@ const LABEL_FONT = '16px sans-serif';
 const LABEL_MIN_RADIUS = 22;
 const LABEL_SHADOW_COLOR = 'rgba(0, 0, 0, 0.65)';
 
-interface CircleLayout {
+/** Cached grid cell (position only; radius is per-frame). */
+interface CircleCell {
     lotId: string;
     cx: number;
     cy: number;
-    radius: number;
 }
 
 export class CountingRhymeRenderer extends BaseRenderer {
-    /** Deterministic layout, rebuilt only when segments change. */
-    private layout: CircleLayout[] = [];
+    /** Cached grid cells, aligned by index with `segments`. */
+    private cells: CircleCell[] = [];
 
-    /** prefixSums[i] = sum of Segment.weight for segments[0..i-1]. */
-    private prefixSums: number[] = [];
+    /** Signature (canvas size + lot-id set) the cells were built for. */
+    private cellSignature = '';
 
-    /** cellOfSegment[i] = grid cell index where segments[i] is drawn. */
-    private cellOfSegment: number[] = [];
+    /** Max radius for the current grid (set when cells are (re)built). */
+    private effectiveMaxRadius = 0;
 
-    // ------------------------------------------------------------------
-    // Lifecycle
-    // ------------------------------------------------------------------
+    /** Prefix sums of the STABLE timing weights. */
+    private timingPrefix: number[] = [];
 
-    override updateSegments(lots: Lot[], mode: GameMode): void {
-        super.updateSegments(lots, mode);
-        this.rebuildPrefixSums();
-        this.rebuildLayout();
+    protected override onViewStateChanged(): void {
+        this.rebuildTimingPrefix();
+        this.ensureCells();
     }
 
-    override reset(): void {
-        super.reset();
-        // Also clear the cached layout so the next updateSegments() starts
-        // from a clean slate.
-        this.layout = [];
-        this.prefixSums = [];
-        this.cellOfSegment = [];
+    protected override onReset(): void {
+        this.cells = [];
+        this.cellSignature = '';
+        this.effectiveMaxRadius = 0;
+        this.timingPrefix = [];
     }
-
-    // ------------------------------------------------------------------
-    // Rendering
-    // ------------------------------------------------------------------
 
     render(): void {
         const ctx = this.ctx;
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-        if (this.layout.length === 0) return;
+        const n = Math.min(this.cells.length, this.segments.length);
+        if (n === 0) return;
 
-        // Resolve the highlighted index from currentRotation — the animation
-        // value unit here is "cycles", not radians.
-        const frac = this.normalizePosition(this.currentRotation);
+        const maxWeight = this.maxSegmentWeight();
+        const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
+
+        const frac = this.normalizePosition(this.animationValue);
         const intensities = this.computeIntensities(frac);
 
-        for (let i = 0; i < this.layout.length; i++) {
-            const circle = this.layout[i];
+        for (let i = 0; i < n; i++) {
+            const cell = this.cells[i];
             const segment = this.segments[i];
-            const intensity = intensities[i];
+            const presence = this.presenceOf(segment.lot.id);
+
+            // Radius from the DRAWING weight (presence-scaled) → shrinks during
+            // an elimination transition.
+            const weightRatio = maxWeight > 0 ? segment.weight / maxWeight : 0;
+            const radius = MIN_CIRCLE_RADIUS + weightRatio * radiusRange;
 
             // ---- filled disc ------------------------------------------
             ctx.save();
+            ctx.globalAlpha = presence;
             ctx.beginPath();
-            ctx.arc(circle.cx, circle.cy, circle.radius, 0, Math.PI * 2);
+            ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
             ctx.fillStyle = segment.lot.color || '#888888';
             ctx.fill();
             ctx.restore();
 
             // ---- outline / highlight ----------------------------------
+            const intensity = intensities[i];
+            const game = this.isGameHighlighted(segment.lot.id);
+
             ctx.save();
+            ctx.globalAlpha = presence;
             ctx.beginPath();
-            ctx.arc(circle.cx, circle.cy, circle.radius, 0, Math.PI * 2);
-            if (intensity > 0.01) {
+            ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
+
+            if (game) {
+                ctx.strokeStyle = HIGHLIGHT_COLOR;
+                ctx.lineWidth = GAME_HIGHLIGHT_STROKE_WIDTH;
+                ctx.shadowColor = HIGHLIGHT_COLOR;
+                ctx.shadowBlur = GAME_HIGHLIGHT_GLOW_BLUR * this.highlight.pulse;
+            } else if (intensity > 0.01) {
                 ctx.strokeStyle = HIGHLIGHT_COLOR;
                 ctx.lineWidth = HIGHLIGHT_STROKE_WIDTH;
                 ctx.shadowColor = HIGHLIGHT_COLOR;
                 ctx.shadowBlur = HIGHLIGHT_GLOW_BLUR * intensity;
-                ctx.globalAlpha = intensity;
+                ctx.globalAlpha = presence * intensity;
             } else {
                 ctx.strokeStyle = BASE_STROKE_COLOR;
                 ctx.lineWidth = BASE_STROKE_WIDTH;
@@ -155,47 +156,82 @@ export class CountingRhymeRenderer extends BaseRenderer {
             ctx.stroke();
             ctx.restore();
 
-            // ---- label ------------------------------------------------
-            if (circle.radius >= LABEL_MIN_RADIUS) {
-                this.drawLabel(segment.lot.name, circle);
+            if (radius >= LABEL_MIN_RADIUS && presence > 0.05) {
+                this.drawLabel(segment.lot.name, cell.cx, cell.cy, radius, presence);
             }
         }
     }
 
+    computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        // Uses the stable partition; at spin time it equals the drawing one.
+        return RouletteEngine.computeFinalCountingPosition(
+            this.timingSegments,
+            rolledLotId,
+            this.animationValue,
+            durationMs
+        );
+    }
+
+    getCursorLotId(animationValue: number): string | null {
+        const segments = this.timingSegments;
+        const n = segments.length;
+        if (n === 0 || this.timingPrefix.length < n + 1) return null;
+
+        const frac = this.normalizePosition(animationValue);
+        for (let i = 0; i < n; i++) {
+            if (frac < this.timingPrefix[i + 1]) return segments[i].lot.id;
+        }
+        return segments[n - 1].lot.id;
+    }
+
     // ------------------------------------------------------------------
-    // Layout
+    // Timing partition (stable / presence-independent)
     // ------------------------------------------------------------------
 
-    private rebuildPrefixSums(): void {
-        this.prefixSums = [0];
-        for (const s of this.segments) {
-            this.prefixSums.push(this.prefixSums[this.prefixSums.length - 1] + s.weight);
+    private rebuildTimingPrefix(): void {
+        this.timingPrefix = [0];
+        for (const s of this.timingSegments) {
+            this.timingPrefix.push(this.timingPrefix[this.timingPrefix.length - 1] + s.weight);
         }
     }
 
-    /**
-     * Deterministic grid layout, computed once per updateSegments() and
-     * cached for the whole spin. No per-frame repositioning.
-     *
-     * The segment → cell mapping is a deterministic permutation of the cells
-     * (see buildCellPermutation), and each circle's center is nudged within
-     * its cell by a deterministic jitter. computeIntensities() and render()
-     * both iterate by segment index i, so permuting cells only affects
-     * *where* segments[i] is drawn, never *when* it is highlighted.
-     *
-     * Both the permutation and the jitter are drawn from a single LCG seeded
-     * from the lot-id set, so an unchanged lot set reproduces its exact
-     * layout across refreshes — Survival eliminations do not reshuffle the
-     * surviving circles.
-     */
-    private rebuildLayout(): void {
-        this.layout = [];
+    private maxSegmentWeight(): number {
+        let max = 0;
+        for (const s of this.segments) if (s.weight > max) max = s.weight;
+        return max;
+    }
 
+    // ------------------------------------------------------------------
+    // Grid layout (cached; rebuilt only when the id set or size changes)
+    // ------------------------------------------------------------------
+
+    private ensureCells(): void {
         const n = this.segments.length;
-        if (n === 0) return;
+        if (n === 0) {
+            this.cells = [];
+            this.cellSignature = '';
+            this.effectiveMaxRadius = 0;
+            return;
+        }
 
-        // Logical CSS pixels — the backing store is dpr-scaled by BaseRenderer.
         const { width, height } = this.getLogicalSize();
+        const signature = `${Math.round(width)}x${Math.round(height)}|${this.segments.map(s => s.lot.id).join(',')}`;
+        if (signature === this.cellSignature && this.cells.length === n) return;
+
+        this.cellSignature = signature;
+        this.rebuildCells(n, width, height);
+    }
+
+    /**
+     * Deterministic grid cells for the current lot set and canvas size.
+     * The segment → cell mapping is a deterministic permutation and each
+     * circle's centre is nudged within its cell by a deterministic jitter.
+     * Both come from a single LCG seeded from the lot-id set, so an unchanged
+     * set reproduces the exact layout (Survival eliminations do not reshuffle
+     * the surviving circles).
+     */
+    private rebuildCells(n: number, width: number, height: number): void {
+        this.cells = [];
 
         const aspect = width / height;
         const cols = Math.max(1, Math.ceil(Math.sqrt(n * aspect)));
@@ -204,89 +240,41 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const cellWidth = width / cols;
         const cellHeight = height / rows;
         const cellHalf = Math.min(cellWidth, cellHeight) / 2;
-        // Single shared cap → monotonic radius mapping is preserved even
-        // when the grid is tight.
-        const effectiveMaxRadius = Math.min(
-            MAX_CIRCLE_RADIUS,
-            cellHalf * CELL_FILL_RATIO
-        );
+        this.effectiveMaxRadius = Math.min(MAX_CIRCLE_RADIUS, cellHalf * CELL_FILL_RATIO);
 
-        // Radius maps weight RELATIVE to the heaviest lot, not the raw
-        // normalized weight. Since calculateSegments() normalizes weights so
-        // that Σwᵢ = 1, using wᵢ directly would cap every circle at
-        // MIN + (1/n)·range — the largest possible radius would shrink as
-        // lots are added. Dividing by maxWeight lifts the heaviest lot to
-        // exactly effectiveMaxRadius and keeps monotonicity in weight.
-        let maxWeight = 0;
-        for (const s of this.segments) {
-            if (s.weight > maxWeight) maxWeight = s.weight;
-        }
+        const maxWeight = this.maxSegmentWeight();
         const safeMaxWeight = maxWeight > 0 ? maxWeight : 1;
-        const radiusRange = Math.max(0, effectiveMaxRadius - MIN_CIRCLE_RADIUS);
+        const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
 
-        // One deterministic seed derived from the lot-id set drives BOTH the
-        // cell permutation and the cosmetic in-cell jitter. Same lot set →
-        // same layout, so Survival eliminations do not reshuffle the grid.
         const seed = this.hashIds(this.segments.map(s => s.lot.id));
         const rand = this.makeLcg(seed);
-
-        // Shuffle which cell each segment occupies. This is cosmetic only:
-        // the highlight order is still segments[0..n-1], but the highlighted
-        // circle now appears to "hop" unpredictably across the grid. Seeded
-        // from the lot ids, so identical lot sets yield identical layouts.
-        this.cellOfSegment = this.buildCellPermutation(n, rand);
+        const cellOfSegment = this.buildCellPermutation(n, rand);
 
         for (let i = 0; i < n; i++) {
-            const cell = this.cellOfSegment[i];
+            const cell = cellOfSegment[i];
             const col = cell % cols;
             const row = Math.floor(cell / cols);
 
-            // Center a possibly-partial final row horizontally.
             const itemsInRow = row === rows - 1 ? n - row * cols : cols;
             const rowOffset = (cols - itemsInRow) / 2;
 
-            const weightRatio = this.segments[i].weight / safeMaxWeight;
-            const radius = MIN_CIRCLE_RADIUS + weightRatio * radiusRange;
+            // Jitter gaps use the radius at build time; since radii only shrink
+            // afterwards (presence ≤ 1) the circle stays inside its cell.
+            const buildRadius = MIN_CIRCLE_RADIUS + (this.segments[i].weight / safeMaxWeight) * radiusRange;
+            const gapW = Math.max(0, cellWidth - 2 * buildRadius);
+            const gapH = Math.max(0, cellHeight - 2 * buildRadius);
 
-            // Free space around the circle inside its cell, along each axis.
-            // To keep the circle strictly inside the cell, the center may
-            // move by at most HALF of that gap in either direction —
-            // otherwise the outer radius would cross the cell boundary.
-            //
-            //   cellW - 2r  → total horizontal free space
-            //   (cellW - 2r) / 2 = cellW/2 - r   ← max shift of cx
-            //
-            // `Math.max(0, …)` guards the degenerate case where the circle
-            // already fills the cell (a very dense grid); there the jitter
-            // collapses to zero and the circle stays centered.
-            const gapW = Math.max(0, cellWidth  - 2 * radius);
-            const gapH = Math.max(0, cellHeight - 2 * radius);
-
-            // Uniform in [-gapW/2, +gapW/2] × [-gapH/2, +gapH/2], but drawn
-            // from the seeded stream so the offset is a pure function of the
-            // lot-id set (no Math.random() anywhere in the layout path).
             const offsetX = (rand() - 0.5) * gapW;
             const offsetY = (rand() - 0.5) * gapH;
 
-            const cx = (col + rowOffset + 0.5) * cellWidth + offsetX;
-            const cy = (row + 0.5) * cellHeight + offsetY;
-
-            this.layout.push({
+            this.cells.push({
                 lotId: this.segments[i].lot.id,
-                cx,
-                cy,
-                radius
+                cx: (col + rowOffset + 0.5) * cellWidth + offsetX,
+                cy: (row + 0.5) * cellHeight + offsetY
             });
         }
     }
 
-    /**
-     * FNV-1a hash over the given lot ids → a 32-bit seed. Depends only on
-     * the *set* of ids (order-sensitive, but the segment order is itself a
-     * deterministic function of the lot list), so an unchanged lot set
-     * reproduces the same seed — and therefore the same layout — across
-     * refreshes. Never touches Math.random().
-     */
     private hashIds(ids: string[]): number {
         let seed = 2166136261;
         for (const s of ids) {
@@ -297,11 +285,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
         return seed >>> 0;
     }
 
-    /**
-     * Linear congruential generator seeded by hashIds(). Returns values in
-     * [0, 1). Used for both the cell permutation and the in-cell jitter, so
-     * a single seed fully determines the layout.
-     */
     private makeLcg(seed: number): () => number {
         let state = seed >>> 0;
         return () => {
@@ -310,13 +293,6 @@ export class CountingRhymeRenderer extends BaseRenderer {
         };
     }
 
-    /**
-     * Deterministic Fisher–Yates shuffle of [0, n) driven by the supplied
-     * `rand` stream. Called once per updateSegments(), never from render(),
-     * so the layout path stays off the animation hot path. The
-     * deterministic part of the game (winner selection) lives in
-     * RouletteEngine.roll().
-     */
     private buildCellPermutation(n: number, rand: () => number): number[] {
         const perm = new Array<number>(n);
         for (let i = 0; i < n; i++) perm[i] = i;
@@ -336,45 +312,35 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     /**
-     * Returns the highlight intensity per circle for a fractional cycle
-     * position. Exactly one circle is "current" at any given moment; the
-     * transition into it is smoothed over the first TRANSITION_FRACTION of
-     * its own segment, so the visual crossfade spans w_i · T_cycle · f.
-     *
-     * Uses the raw normalized Segment.weight (NOT the per-max ratio used for
-     * radius): the cycle must be partitioned by actual probabilities so that
-     * dwell time stays proportional to weight.
-     *
-     * NOTE: this method is untouched by the cosmetic cell shuffle or jitter —
-     * the highlight index is by segment index, not by grid cell, so the dwell
-     * partition and the last-frame guarantee are unaffected.
+     * Highlight intensity per circle for a fractional cycle position, using
+     * the STABLE timing partition (raw weights) so it does not shift while the
+     * drawing geometry animates. Exactly one circle is current; the transition
+     * into it is smoothed over the first TRANSITION_FRACTION of its segment.
      */
     private computeIntensities(frac: number): number[] {
-        const n = this.segments.length;
+        const segments = this.timingSegments;
+        const n = segments.length;
         const intensities = new Array<number>(n).fill(0);
-        if (n === 0) return intensities;
+        if (n === 0 || this.timingPrefix.length < n + 1) return intensities;
 
-        // Find i such that P_i <= frac < P_{i+1}.
-        let idx = n - 1; // fallback for floating-point rounding on frac ≈ 1
+        let idx = n - 1;
         for (let i = 0; i < n; i++) {
-            if (frac < this.prefixSums[i + 1]) {
+            if (frac < this.timingPrefix[i + 1]) {
                 idx = i;
                 break;
             }
         }
 
-        const start = this.prefixSums[idx];
-        const weight = this.segments[idx].weight;
+        const start = this.timingPrefix[idx];
+        const weight = segments[idx].weight;
         const local = weight > 0 ? (frac - start) / weight : 0;
 
         if (n === 1 || local >= TRANSITION_FRACTION) {
-            // Steady state — the current circle owns the whole frame.
             intensities[idx] = 1;
             return intensities;
         }
 
-        // Crossfade from the previous circle into the current one.
-        const t = local / TRANSITION_FRACTION; // 0 → 1 within the window
+        const t = local / TRANSITION_FRACTION;
         const prevIdx = (idx - 1 + n) % n;
         intensities[idx] = t;
         intensities[prevIdx] = 1 - t;
@@ -385,18 +351,15 @@ export class CountingRhymeRenderer extends BaseRenderer {
     // Label helper
     // ------------------------------------------------------------------
 
-    private drawLabel(name: string, circle: CircleLayout): void {
+    private drawLabel(name: string, cx: number, cy: number, radius: number, presence: number): void {
         const ctx = this.ctx;
-        const maxWidth = circle.radius * 1.6;
+        const maxWidth = radius * 1.6;
 
         let label = name;
         ctx.save();
         ctx.font = LABEL_FONT;
         if (ctx.measureText(label).width > maxWidth) {
-            while (
-                label.length > 1 &&
-                ctx.measureText(label + '…').width > maxWidth
-            ) {
+            while (label.length > 1 && ctx.measureText(label + '…').width > maxWidth) {
                 label = label.slice(0, -1);
             }
             label += '…';
@@ -404,14 +367,15 @@ export class CountingRhymeRenderer extends BaseRenderer {
         ctx.restore();
 
         ctx.save();
+        ctx.globalAlpha = presence;
         ctx.fillStyle = '#ffffff';
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = LABEL_SHADOW_COLOR;
         ctx.lineWidth = 3;
-        ctx.strokeText(label, circle.cx, circle.cy);
-        ctx.fillText(label, circle.cx, circle.cy);
+        ctx.strokeText(label, cx, cy);
+        ctx.fillText(label, cx, cy);
         ctx.restore();
     }
 }

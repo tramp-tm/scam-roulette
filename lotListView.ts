@@ -14,6 +14,11 @@ export interface RenderableLot {
     id?: string;
     color?: string;
     active?: boolean;
+    /**
+     * Mode-owned presentation payload (e.g. HP). Opaque to this view: it is
+     * only carried through so future mode-aware presentation can use it.
+     */
+    modeData?: Record<string, unknown>;
 }
 
 /**
@@ -21,7 +26,8 @@ export interface RenderableLot {
  */
 export interface LotListViewOptions {
     showActions?: boolean;
-    highlightId?: string | null;
+    /** Ids currently under the game highlight (winners / eliminated). */
+    highlightIds?: ReadonlySet<string>;
     editableAmount?: boolean;
     onAmountChange?: (id: string, newAmount: number) => void;
     onDelete?: (id: string) => void;
@@ -85,7 +91,7 @@ export class LotListView {
 
         const {
             showActions = false,
-            highlightId = null,
+            highlightIds,
             editableAmount = true,
             onAmountChange,
             onDelete
@@ -110,7 +116,8 @@ export class LotListView {
 
             const classNameParts: string[] = ['lot-item'];
             if (!lot.active) classNameParts.push('inactive');
-            if (lot.id === highlightId) classNameParts.push('highlighted');
+            const highlighted = !!lot.id && (highlightIds?.has(lot.id) ?? false);
+            if (highlighted) classNameParts.push('highlighted');
             li.className = classNameParts.join(' ');
 
             const colorIndicator = document.createElement('div');
@@ -149,7 +156,7 @@ export class LotListView {
             li.appendChild(lotName);
             li.appendChild(amountInput);
 
-            if (showActions && lot.id !== highlightId) {
+            if (showActions && !highlighted) {
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'lot-actions';
 

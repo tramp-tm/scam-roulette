@@ -1,5 +1,4 @@
-import { VisualizationType, VisualizationPackage } from './types.js';
-import { RouletteEngine } from './rouletteEngine.js';
+import type { VisualizationType, VisualizationPackage } from './types.js';
 import { WheelRenderer } from './wheelRenderer.js';
 import { StripRenderer } from './stripRenderer.js';
 import { CountingRhymeRenderer } from './countingRhymeRenderer.js';
@@ -8,57 +7,39 @@ import { CountingRhymeRenderer } from './countingRhymeRenderer.js';
  * Sole registry of visualization packages.
  *
  * `VISUALIZATION_PACKAGES` (+ `getVisualizationPackage`) is the single
- * authoritative source of truth for "which renderer / which final-position
- * logic corresponds to which visualization".
- */
-
-/**
- * Bundled visualization package for wheel type.
+ * authoritative source of truth for "which visualization corresponds to which
+ * type". Adding a visualization means adding one package here and nothing
+ * else — `App`, `GameSession` and the driver contain no visualization
+ * branching.
+ *
+ * Each package is a factory only: the visualization itself (its renderer)
+ * owns its internal spin math, cursor semantics and presentation. There is no
+ * shared `computeFinalPosition(targetLotId)` contract, so a visualization
+ * with a completely different animation model is free to implement its own.
  */
 const WHEEL_PACKAGE: VisualizationPackage = {
     id: 'wheel',
-    createRenderer: (canvas) => new WheelRenderer(canvas),
-    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration) => 
-        RouletteEngine.computeFinalRotation(lots, mode, targetLotId, currentPosition, duration)
+    createRenderer: (canvas) => new WheelRenderer(canvas)
 };
 
-/**
- * Bundled visualization package for strip type.
- */
 const STRIP_PACKAGE: VisualizationPackage = {
     id: 'strip',
-    createRenderer: (canvas) => new StripRenderer(canvas),
-    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration, canvasWidth) => 
-        RouletteEngine.computeFinalScrollOffset(lots, mode, targetLotId, currentPosition, duration, canvasWidth!)
+    createRenderer: (canvas) => new StripRenderer(canvas)
 };
 
-/**
- * Bundled visualization package for counting-rhyme type.
- *
- * Note: computeFinalCountingPosition intentionally takes 5 arguments (no
- * canvasWidth) — its position math lives entirely in cycle space and does
- * not depend on pixel dimensions. The optional 6th parameter is simply not
- * forwarded.
- */
 const COUNTING_RHYME_PACKAGE: VisualizationPackage = {
     id: 'counting-rhyme',
-    createRenderer: (canvas) => new CountingRhymeRenderer(canvas),
-    computeFinalPosition: (lots, mode, targetLotId, currentPosition, duration) =>
-        RouletteEngine.computeFinalCountingPosition(lots, mode, targetLotId, currentPosition, duration)
+    createRenderer: (canvas) => new CountingRhymeRenderer(canvas)
 };
 
-/**
- * Registry of all visualization packages - single source of truth.
- */
+/** Registry of all visualization packages - single source of truth. */
 export const VISUALIZATION_PACKAGES = {
     wheel: WHEEL_PACKAGE,
     strip: STRIP_PACKAGE,
     'counting-rhyme': COUNTING_RHYME_PACKAGE
 } as const;
 
-/**
- * Returns the visualization package for a given type.
- */
+/** Returns the visualization package for a given type. */
 export function getVisualizationPackage(type: VisualizationType): VisualizationPackage {
     return VISUALIZATION_PACKAGES[type];
 }

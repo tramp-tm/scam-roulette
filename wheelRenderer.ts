@@ -1,4 +1,5 @@
 import type { Segment } from './rouletteEngine.js';
+import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor } from './utils.js';
 
@@ -10,7 +11,9 @@ const SEGMENT_STROKE = '#fff';
 const SEGMENT_STROKE_WIDTH = 2;
 
 // Highlight
-const HIGHLIGHT_BRIGHTNESS = 30;
+const GAME_HIGHLIGHT_BRIGHTNESS = 30;
+const GAME_HIGHLIGHT_BOOST = 45;
+const CURSOR_HIGHLIGHT_BRIGHTNESS = 14;
 
 // Labels
 const LABEL_FONT = 'bold 14px Arial';
@@ -35,87 +38,98 @@ const INNER_RING_WIDTH = 2;
 
 /**
  * Wheel visualization renderer.
+ *
+ * Spin math (target rotation + cursor resolution) is internal to this
+ * visualization; the contract only exposes a target scalar and a cursor
+ * query.
  */
 export class WheelRenderer extends BaseRenderer {
-    constructor(canvas: HTMLCanvasElement) {
-        super(canvas);
-    }
-
-    /**
-     * Main render method - renders wheel visualization.
-     */
     render(): void {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const radius = Math.min(centerX, centerY) - WHEEL_MARGIN;
 
-        // Clear canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-        // Save context state
         this.ctx.save();
-
-        // Translate to center and apply rotation
         this.ctx.translate(centerX, centerY);
-        this.ctx.rotate(this.currentRotation);
+        this.ctx.rotate(this.animationValue);
 
-        // Draw wheel segments
         for (const segment of this.segments) {
-            const isHighlighted = segment.lot.id === this.highlightedLotId;
+            const presence = this.presenceOf(segment.lot.id);
+            const game = this.isGameHighlighted(segment.lot.id);
+            const cursor = this.isCursor(segment.lot.id);
 
             this.ctx.beginPath();
             this.ctx.moveTo(0, 0);
             this.ctx.arc(0, 0, radius, segment.startAngle, segment.endAngle);
             this.ctx.closePath();
 
-            // Fill segment
-            this.ctx.fillStyle = isHighlighted
-                ? brightenColor(segment.lot.color, HIGHLIGHT_BRIGHTNESS)
-                : segment.lot.color;
+            this.ctx.globalAlpha = presence;
+            this.ctx.fillStyle = game
+                ? brightenColor(segment.lot.color, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
+                : cursor
+                    ? brightenColor(segment.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
+                    : segment.lot.color;
             this.ctx.fill();
 
-            // Stroke segment
             this.ctx.strokeStyle = SEGMENT_STROKE;
             this.ctx.lineWidth = SEGMENT_STROKE_WIDTH;
             this.ctx.stroke();
+            this.ctx.globalAlpha = 1;
 
-            // Draw text label
             if (segment.endAngle - segment.startAngle > LABEL_MIN_ARC) {
-                this.drawWheelLabel(segment, radius);
+                this.drawWheelLabel(segment, radius, presence);
             }
         }
 
-        // Restore context
         this.ctx.restore();
 
-        // Draw pointer (fixed at top)
         this.drawPointer(centerX, centerY);
-
-        // Draw outer ring
         this.drawOuterRing(centerX, centerY, radius);
     }
 
-    /**
-     * Draws a label on the wheel segment.
-     */
-    private drawWheelLabel(segment: Segment, radius: number): void {
+    computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        return RouletteEngine.computeFinalRotation(
+            this.segments,
+            rolledLotId,
+            this.animationValue,
+            durationMs
+        );
+    }
+
+    getCursorLotId(animationValue: number): string | null {
+        // Resolve against the STABLE (presence-independent) partition so the
+        // cursor does not hop while the drawing geometry animates.
+        const segments = this.timingSegments;
+        if (segments.length === 0) return null;
+
+        // A segment at angle θ appears at θ + R. It sits under the top pointer
+        // (−π/2) when θ ≡ −π/2 − R (mod 2π).
+        const twoPi = Math.PI * 2;
+        let local = (-Math.PI / 2 - animationValue) % twoPi;
+        if (local < 0) local += twoPi;
+
+        for (const segment of segments) {
+            if (local >= segment.startAngle && local < segment.endAngle) return segment.lot.id;
+        }
+        return segments[segments.length - 1].lot.id;
+    }
+
+    private drawWheelLabel(segment: Segment, radius: number, presence: number): void {
         const midAngle = (segment.startAngle + segment.endAngle) / 2;
         const textRadius = radius * LABEL_RADIUS_RATIO;
 
         this.ctx.save();
-        this.ctx.translate(
-            Math.cos(midAngle) * textRadius,
-            Math.sin(midAngle) * textRadius
-        );
-        this.ctx.rotate(midAngle); // Text now rotated 90° CCW from original orientation
+        this.ctx.globalAlpha = presence;
+        this.ctx.translate(Math.cos(midAngle) * textRadius, Math.sin(midAngle) * textRadius);
+        this.ctx.rotate(midAngle);
 
         this.ctx.fillStyle = '#fff';
         this.ctx.font = LABEL_FONT;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        // Truncate name if too long
         const displayName = segment.lot.name.length > LABEL_MAX_CHARS
             ? segment.lot.name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
             : segment.lot.name;
@@ -124,15 +138,10 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.restore();
     }
 
-    /**
-     * Draws the pointer at the top of the wheel.
-     */
     private drawPointer(centerX: number, centerY: number): void {
         const radius = Math.min(centerX, centerY) - WHEEL_MARGIN;
 
         this.ctx.save();
-
-        // Draw pointer triangle (flipped to point DOWN toward wheel)
         this.ctx.beginPath();
         this.ctx.moveTo(centerX - POINTER_HALF_WIDTH, centerY - radius - POINTER_HEIGHT);
         this.ctx.lineTo(centerX + POINTER_HALF_WIDTH, centerY - radius - POINTER_HEIGHT);
@@ -142,17 +151,12 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.fillStyle = POINTER_COLOR;
         this.ctx.fill();
 
-        // Add glow effect
         this.ctx.shadowColor = POINTER_COLOR;
         this.ctx.shadowBlur = POINTER_SHADOW_BLUR;
         this.ctx.stroke();
-
         this.ctx.restore();
     }
 
-    /**
-     * Draws the outer decorative ring.
-     */
     private drawOuterRing(centerX: number, centerY: number, radius: number): void {
         const outerRadius = radius + OUTER_RING_OFFSET;
 
@@ -162,7 +166,6 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.lineWidth = OUTER_RING_WIDTH;
         this.ctx.stroke();
 
-        // Inner ring
         this.ctx.beginPath();
         this.ctx.arc(centerX, centerY, radius - INNER_RING_OFFSET, 0, Math.PI * 2);
         this.ctx.strokeStyle = INNER_RING_STROKE;
