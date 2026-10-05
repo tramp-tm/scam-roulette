@@ -215,3 +215,17 @@ export function getRandomPositionInRange(
     const maxOffset = span - margin;
     return Math.random() * (maxOffset - minOffset) + minOffset;
 }
+
+// ========================================
+// FORMATTING
+// ========================================
+
+/**
+ * Formats a percentage for display: an exact integer keeps no decimals
+ * ("100%", "50%"), otherwise one decimal ("42.5%", "7.1%").
+ */
+export function formatPercent(percent: number): string {
+    const rounded = Math.round(percent * 10) / 10;
+    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    return `${text}%`;
+}

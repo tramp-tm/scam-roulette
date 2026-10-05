@@ -5,10 +5,12 @@ import type {
     Lot,
     MessageDescriptor,
     Mode,
+    ModePresentationData,
     ParticipantModeState,
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
+import { formatPercent } from './utils.js';
 
 /**
  * Normal mode.
@@ -68,5 +70,31 @@ export class NormalMode implements GameMode {
         return { state, participants: [...participants], outcome };
     }
 
-    getParticipantPresentation(): undefined { return undefined; }
+    getPresentationData(
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[]
+    ): ReadonlyMap<string, ModePresentationData> {
+        // Normal never eliminates between spins, so the eventual final-win
+        // probability equals the current weighted selection probability,
+        // amount_i / Σ amount(active). Inactive lots do not contribute to the
+        // denominator and are shown as "not participating".
+        const byId = new Map(lots.map(l => [l.id, l]));
+        let total = 0;
+        for (const p of participants) {
+            if (!p.active) continue;
+            const lot = byId.get(p.lotId);
+            if (lot) total += lot.amount;
+        }
+
+        const label: MessageDescriptor = { key: 'mode.normal.extLabel' };
+        const result = new Map<string, ModePresentationData>();
+        for (const p of participants) {
+            const lot = byId.get(p.lotId);
+            const value = p.active && lot && total > 0
+                ? formatPercent((lot.amount / total) * 100)
+                : '—';
+            result.set(p.lotId, { ext: { label, value } });
+        }
+        return result;
+    }
 }

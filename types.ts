@@ -56,8 +56,29 @@ export type GameModeState = unknown;
  */
 export type ParticipantModeState = unknown;
 
-/** Mode-defined presentation payload attached to a participant. */
-export type ModePresentationData = Record<string, unknown>;
+/**
+ * Generic extra-info descriptor a GameMode can attach to a participant for the
+ * lots list's optional "ext" column. The mode owns both the meaning and the
+ * formatting; the list renders `value` verbatim and only translates `label` for
+ * the column header. Opaque to the core — it is never interpreted.
+ */
+export interface ModeExtraInfo {
+    /** Localized column header, owned by the mode. */
+    label: MessageDescriptor;
+    /** Display-ready text for this participant (e.g. "♥ 90", "73.1%", "—"). */
+    value: string;
+}
+
+/**
+ * Mode-defined presentation payload attached to a participant. Generic and
+ * opaque: the core and the visualizations never interpret it. `ext` is the
+ * optional extra-info column the lots list can display — its meaning (HP, win
+ * probability, score, rank, …) is entirely the mode's, so new modes need no
+ * change in the list.
+ */
+export interface ModePresentationData {
+    ext?: ModeExtraInfo;
+}
 
 /**
  * Session-owned participant record: identity + activity + the mode-owned
@@ -125,8 +146,8 @@ export interface TurnOutcome {
  *  - selection:    `calculateSelectionWeight()` — probability for roulette;
  *  - presentation: `getParticipantVisualValue()` — the abstract magnitude a
  *                  visualization renders as size/scale, independent of the
- *                  selection probability; plus `getParticipantPresentation()`
- *                  for extra mode-specific data (`modeData`).
+ *                  selection probability; plus `getPresentationData()` for
+ *                  extra mode-specific data (`modeData`).
  * A mode must not assume `visualValue` means weight/amount/HP to the renderer,
  * and the core must not derive one from the other.
  */
@@ -181,11 +202,18 @@ export interface GameMode {
         outcome: TurnOutcome;
     };
 
-    /** Presentation data for one participant (opaque to the core). */
-    getParticipantPresentation(
-        participant: GameParticipantState,
+    /**
+     * Presentation data for the whole session, keyed by lot id. Called once per
+     * view-state build with the full context (participants + lots), so a mode
+     * can compute set-level presentation — e.g. the eventual win probability —
+     * once instead of per participant. Opaque to the core; return an empty map
+     * when there is nothing to present.
+     */
+    getPresentationData(
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[],
         state: GameModeState
-    ): ModePresentationData | undefined;
+    ): ReadonlyMap<string, ModePresentationData>;
 }
 
 // ========================================
@@ -206,7 +234,8 @@ export interface GameMode {
  * `presence` is a visual multiplier in [0, 1] used to animate eliminations by
  * interpolating a view state (a lot leaves the view when it reaches 0).
  * `modeData` is mode-specific presentation payload the UI may render — the
- * core and the visualizations never interpret its meaning.
+ * core and the visualizations never interpret its meaning. It is produced once
+ * per view-state build by `GameMode.getPresentationData()`.
  */
 export interface RenderableParticipant {
     lot: Lot;

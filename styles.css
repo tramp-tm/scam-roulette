@@ -688,12 +688,38 @@ textarea:disabled {
     margin-bottom: 0;
 }
 
+.lots-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ========================================
+   EXT COLUMN (mode-provided extra info)
+   ======================================== */
+.ext-toggle-btn {
+    padding: 6px 12px;
+    font-size: 0.85em;
+    line-height: 1;
+}
+
+.lot-ext {
+    flex: 0 0 auto;
+    min-width: 40px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9em;
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
 /* ========================================
    LOTS LIST
    ======================================== */
 .lot-item {
     display: flex;
     align-items: center;
+    gap: 10px;
     padding: 12px;
     margin-bottom: 8px;
     background: var(--lot-bg);
@@ -746,10 +772,10 @@ textarea:disabled {
 }
 
 .lot-color-indicator {
+    flex: 0 0 auto;
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    margin-right: 12px;
 }
 
 /* Editable amount input */
@@ -772,7 +798,8 @@ textarea:disabled {
    LOT ACTIONS (Edit/Delete Buttons)
    ======================================== */
 .btn-delete {
-    padding: 6px 12px;
+    flex: 0 0 auto;
+    padding: 3px 6px;
     font-size: 0.8em;
     background: var(--accent-danger);
     color: white;

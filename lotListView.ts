@@ -1,3 +1,5 @@
+import type { ModePresentationData } from './types.js';
+
 /** Sort field options for lots list */
 export type SortField = 'name' | 'amount';
 
@@ -15,10 +17,10 @@ export interface RenderableLot {
     color?: string;
     active?: boolean;
     /**
-     * Mode-owned presentation payload (e.g. HP). Opaque to this view: it is
-     * only carried through so future mode-aware presentation can use it.
+     * Mode-owned presentation payload (e.g. the "ext" column). Opaque to this
+     * view: it is only carried through and, for `ext`, rendered verbatim.
      */
-    modeData?: Record<string, unknown>;
+    modeData?: ModePresentationData;
 }
 
 /**
@@ -37,6 +39,12 @@ export interface LotListViewOptions {
      * neither interprets it nor stores it as application/game state.
      */
     onLotHover?: (lotId: string | null) => void;
+    /**
+     * When true, render the mode-provided extra-info column for each lot
+     * (`modeData.ext.value`). Purely presentational: the value's meaning and
+     * formatting live in the current GameMode.
+     */
+    extEnabled?: boolean;
 }
 
 /**
@@ -101,7 +109,8 @@ export class LotListView {
             editableAmount = true,
             onAmountChange,
             onDelete,
-            onLotHover
+            onLotHover,
+            extEnabled = false
         } = options;
 
         // Sorting happens on a copy — the caller's array is never mutated.
@@ -171,6 +180,15 @@ export class LotListView {
             li.appendChild(lotName);
             li.appendChild(amountInput);
 
+            // Extra-info column: the value is the mode's (`modeData.ext.value`);
+            // this view only displays it and never computes/interprets it.
+            if (extEnabled) {
+                const ext = document.createElement('span');
+                ext.className = 'lot-ext';
+                ext.textContent = lot.modeData?.ext?.value ?? '';
+                li.appendChild(ext);
+            }
+
             if (showActions && !highlighted) {
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'lot-actions';
@@ -178,7 +196,6 @@ export class LotListView {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn-delete';
                 deleteBtn.textContent = '×';
-                deleteBtn.style.padding = '6px 10px';
 
                 if (lot.id && onDelete) {
                     const lotId: string = lot.id;

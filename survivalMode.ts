@@ -5,10 +5,81 @@ import type {
     Lot,
     MessageDescriptor,
     Mode,
+    ModePresentationData,
     ParticipantModeState,
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
+import { formatPercent } from './utils.js';
+
+/**
+ * Survival selection weight for an amount — the single source of the mode's
+ * selection semantics (also reused by the final-win probability below).
+ */
+function survivalSelectionWeight(amount: number): number {
+    return 1 / amount;
+}
+
+/**
+ * Practical bound for the exact final-win computation (O(2^n · n)); above it
+ * the displayed value degrades to "…" instead of hanging the UI.
+ */
+const SURVIVAL_EXACT_MAX_ACTIVE = 18;
+
+/**
+ * Exact eventual final-win (last-remaining) probabilities for the given active
+ * amounts, following the mode's real elimination semantics:
+ *
+ *   P(S, i) = 1                                if S = {i}
+ *   P(S, i) = Σ_{j ∈ S, j ≠ i} p_j(S) · P(S \ {j}, i)
+ *
+ * where p_j(S) = w_j / Σ w(S) and w = `survivalSelectionWeight(amount)`. Being
+ * selected eliminates the lot, so i's own selection contributes nothing.
+ * Deterministic and exact — memoised over subsets, never a simulation.
+ *
+ * Returns `null` when the active count exceeds the exact bound.
+ */
+function survivalWinProbabilities(amounts: readonly number[]): number[] | null {
+    const n = amounts.length;
+    if (n === 0) return [];
+    if (n === 1) return [1];
+    if (n > SURVIVAL_EXACT_MAX_ACTIVE) return null;
+
+    const w = amounts.map(survivalSelectionWeight);
+    const full = (1 << n) - 1;
+
+    // Subset weight sums, built from the lowest set bit.
+    const sum = new Float64Array(1 << n);
+    for (let mask = 1; mask <= full; mask++) {
+        const lsb = mask & -mask;
+        sum[mask] = sum[mask ^ lsb] + w[31 - Math.clz32(lsb)];
+    }
+
+    const memo = new Float64Array(1 << n);
+    const result = new Array<number>(n);
+    for (let i = 0; i < n; i++) {
+        memo.fill(NaN);
+        const self = 1 << i;
+        const last = (mask: number): number => {
+            if (mask === self) return 1;
+            const cached = memo[mask];
+            if (cached === cached) return cached; // NaN-safe memo hit
+            const total = sum[mask];
+            let acc = 0;
+            let m = mask;
+            while (m) {
+                const lsb = m & -m;
+                m ^= lsb;
+                const j = 31 - Math.clz32(lsb);
+                if (j !== i) acc += (w[j] / total) * last(mask ^ lsb);
+            }
+            memo[mask] = acc;
+            return acc;
+        };
+        result[i] = last(full);
+    }
+    return result;
+}
 
 /**
  * Survival mode (elimination).
@@ -38,13 +109,13 @@ export class SurvivalMode implements GameMode {
     onParticipantsChanged(state: GameModeState): GameModeState { return state; }
 
     calculateSelectionWeight(lot: Lot): number {
-        return 1 / lot.amount;
+        return survivalSelectionWeight(lot.amount);
     }
 
     getParticipantVisualValue(lot: Lot): number {
         // Visually equivalent to the pre-refactor behaviour: sector size was
         // the selection weight 1/amount. amount >= 0.01, so this is finite.
-        return 1 / lot.amount;
+        return survivalSelectionWeight(lot.amount);
     }
 
     processRoll(
@@ -125,5 +196,38 @@ export class SurvivalMode implements GameMode {
         };
     }
 
-    getParticipantPresentation(): undefined { return undefined; }
+    getPresentationData(
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[]
+    ): ReadonlyMap<string, ModePresentationData> {
+        // Eventual final-win probability: accounts for ALL future elimination
+        // spins, not merely the next selection. Only active lots participate.
+        const byId = new Map(lots.map(l => [l.id, l]));
+
+        const activeIds: string[] = [];
+        const amounts: number[] = [];
+        for (const p of participants) {
+            if (!p.active) continue;
+            const lot = byId.get(p.lotId);
+            if (!lot) continue;
+            activeIds.push(p.lotId);
+            amounts.push(lot.amount);
+        }
+        const indexById = new Map(activeIds.map((id, i) => [id, i]));
+        const probs = survivalWinProbabilities(amounts);
+
+        const label: MessageDescriptor = { key: 'mode.survival.extLabel' };
+        const result = new Map<string, ModePresentationData>();
+        for (const p of participants) {
+            let value = '—'; // not participating
+            if (p.active) {
+                const idx = indexById.get(p.lotId);
+                if (idx === undefined) value = '—';
+                else if (probs === null) value = '…'; // beyond the exact bound
+                else value = formatPercent(probs[idx] * 100);
+            }
+            result.set(p.lotId, { ext: { label, value } });
+        }
+        return result;
+    }
 }

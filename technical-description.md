@@ -205,7 +205,14 @@ interface MessageDescriptor {   // Отложенное локализуемое
 ```ts
 type GameModeState = unknown;          // игровое состояние, принадлежит GameMode (непрозрачно для ядра)
 type ParticipantModeState = unknown;   // состояние участника, принадлежит GameMode
-type ModePresentationData = Record<string, unknown>;
+
+interface ModeExtraInfo {              // одна ячейка ext-колонки списка лотов
+  label: MessageDescriptor;            // заголовок колонки (локализует UI)
+  value: string;                       // готовый к показу текст («♥ 90», «73.1%», «—»)
+}
+interface ModePresentationData {       // непрозрачные данные режима для UI
+  ext?: ModeExtraInfo;                 // опциональная доп. колонка списка («ext»)
+}
 
 interface GameParticipantState {       // запись участника, которой владеет GameSession
   lotId: string;
@@ -250,15 +257,18 @@ interface GameMode {
     outcome: TurnOutcome;
   };
 
-  getParticipantPresentation(participant, state): ModePresentationData | undefined;
+  getPresentationData(participants, lots, state): ReadonlyMap<string, ModePresentationData>;
 }
 ```
 
 Все переходы **чистые**: режим получает предыдущее состояние и возвращает новое, не мутируя
 входы. Режим не обращается к DOM, `App`, `VisualizationDriver` или рендерерам. Режим задаёт две
 **независимые** семантики: selection (`calculateSelectionWeight`) и presentation
-(`getParticipantVisualValue` + `getParticipantPresentation`). `visualValue` — абстрактная
+(`getParticipantVisualValue` + `getPresentationData`). `visualValue` — абстрактная
 величина, её смысл (amount / HP / score) знает только режим; визуализация его не интерпретирует.
+`getPresentationData` вызывается **один раз на сборку view-состояния** и возвращает карту
+`lotId → ModePresentationData`, поэтому режим может посчитать множественную презентацию
+(например, вероятность финальной победы) один раз, а не на каждого участника.
 
 ### 5.4 Presentation-модель
 
@@ -269,7 +279,7 @@ interface RenderableParticipant {
   selectionWeight: number;             // вероятность выбора рулеткой (НЕ размер!)
   visualValue: number;                 // визуальная величина; смысл задаёт режим
   presence: number;                    // визуальный множитель [0..1] (анимация выбывания)
-  modeData?: ModePresentationData;     // расширяемые данные режима для UI
+  modeData?: ModePresentationData;     // режимные данные для UI (ext-колонка и будущее)
 }
 
 interface GameViewState {              // снимок игры для UI и визуализаций
@@ -366,6 +376,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `visualValue = amount` (визуальный размер сектора совпадает с вероятностью);
 - `processRoll` → `finished: true`, `winners: [rolledLot.id]`, `eliminated: []`;
 - `result` = «Победитель: {{name}}». Одна игра = один спин.
+- `getPresentationData` → ext = **вероятность финальной победы** `amount_i / Σ amount(active)`
+  (в Normal нет выбываний, поэтому она равна текущей вероятности выбора). Inactive → `—`.
 
 **SurvivalMode** (выбывание)
 - `selectionWeight = 1 / amount` (больше сумма → ниже шанс выбыть);
@@ -376,6 +388,9 @@ export function getMode(modeId) { return MODES[modeId]; }
     победителем, `eliminated: []` (вырожденный случай, чтобы игра корректно завершилась);
   - иначе → продолжение, `finished: false`, `eliminated: [rolled]`;
 - `result` = «Выбыл: {{name}}», `message` = сообщение о победителе.
+- `getPresentationData` → ext = **вероятность финальной победы** — точная рекурсия по
+  подмножествам `P(S,i) = Σ_{j≠i} p_j(S)·P(S\{j},i)`, `p_j = w_j/Σw(S)`, `w = 1/amount`
+  (мемоизация, без симуляции; граница — см. §11). Inactive → `—`.
 
 **CrownDefenseMode** (HP)
 - `selectionWeight = 1` для каждого активного — вероятность не зависит от HP;
@@ -390,6 +405,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `result` = «Урон −{{damage}} (выбран: {{name}})», `message` = сообщение о победителе;
 - HP не хранится на singleton-экземпляре режима и не добавляется в `Lot`, поэтому две сессии не
   делят HP.
+- `getPresentationData` → ext = текущее HP как `♥ N` (целое). Inactive → `—`, никогда не stale HP.
 
 Все режимы владеют своим состоянием и реализуют полный контракт `GameMode`, поэтому являются
 равноправными стратегиями.
@@ -582,8 +598,10 @@ export function getMode(modeId) { return MODES[modeId]; }
   (`mouseenter`/`mouseleave`; обработчики перевешиваются при каждой перерисовке, поэтому hover
   переживает сортировку). Список сам hover не хранит и в game-состояние не переводит; `App`
   прокидывает id в `VisualizationDriver.setHover`.
-- `options.modeData` (в `RenderableLot`) переносится, но не интерпретируется — задел для
-  mode-aware отображения.
+- `options.extEnabled` — показать доп. колонку `modeData.ext.value` (текст режима выводится
+  **как есть**; список его не считает и не интерпретирует).
+- `options.modeData` (в `RenderableLot`) переносится и, для `ext`, отображается; список не
+  знает, что означает значение (HP, вероятность, балл, …).
 - `setLocked(boolean)` — блокирует поля сумм и кнопки удаления.
 
 ### 7.3 `VisualizationDriver` — граница визуализации (`visualizationDriver.ts`)
@@ -664,6 +682,7 @@ CountingRhyme — внешнее гало вокруг круга (радиус 
 | Поля сумм и удаление в списке | `!sessionLocked` |
 | Duration / Visualization / Easing | не идёт спин, игра не завершена и переход не проигрывается |
 | Сортировка | всегда |
+| Toggle `ext` | всегда (чисто презентационный, игру не трогает) |
 
 Обработчики помимо атрибута `disabled` дополнительно проверяют состояние на уровне `App`
 (guard-ы). Для селектов при отклонённом изменении восстанавливается предыдущее значение.
@@ -813,7 +832,7 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 **Новый игровой режим** (например, Crown Defense с HP):
 1. реализовать класс `GameMode` (свои `GameModeState`/`ParticipantModeState`, чистый
    `processRoll` с несколькими изменениями/победителями и `changed`, `calculateSelectionWeight`,
-   `getParticipantVisualValue`, `getParticipantPresentation`);
+   `getParticipantVisualValue`, `getPresentationData`);
 2. зарегистрировать в `MODES` (`modes.ts`) и расширить union `Mode`;
 3. добавить локализацию.
 `App`, `GameSession`, `RouletteEngine`, `VisualizationDriver` и существующие визуализации
@@ -859,6 +878,10 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
   `visualValue`/`presence`) курсор может смещаться вместе с геометрией — это ожидаемо, он
   указывает на реально нарисованный сектор. У «считалочки» тайминг от вероятности, поэтому
   стабилен.
+- **ext-колонка (Survival)**: точная вероятность финальной победы считается по подмножествам
+  (O(2^n·n), мемоизация) и вызывается один раз на сборку view-состояния (`getPresentationData`).
+  При числе активных участников больше `SURVIVAL_EXACT_MAX_ACTIVE = 18` значение деградирует до
+  `…` (симуляция сознательно не используется). Normal/Crown — дешёвые O(n).
 - **`importDialog` в `App`** уничтожается при закрытии (`destroy()`), чтобы не накапливать
   DOM-узлы и обработчики.
 - **`brightenColor`** теперь понимает `rgb()`/`hsl()`/hex (ранее подсветка `rgb()`/`hsl`-цветов

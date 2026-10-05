@@ -126,6 +126,10 @@ export class App {
     private themeSelect: HTMLSelectElement | null = null;
     private modeHelp: HTMLElement | null = null;
     private easingHelp: HTMLElement | null = null;
+    private extToggle: HTMLButtonElement | null = null;
+
+    /** UI-only: whether the mode-provided extra-info column is shown. */
+    private extEnabled = false;
 
 
     // Settings toggle element
@@ -180,6 +184,7 @@ export class App {
         this.themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
         this.modeHelp = document.getElementById('mode-help');
         this.easingHelp = document.getElementById('easing-help');
+        this.extToggle = document.getElementById('ext-toggle') as HTMLButtonElement | null;
 
         // LotListView owns the list DOM and the sorting controls. `#sort-controls`
         // sits outside `#lots-list`, so it is passed in explicitly.
@@ -191,6 +196,17 @@ export class App {
 
         // Initialize UI
         this.updateUI();
+
+        // ext column toggle — a pure presentation setting (never touches the
+        // session/mode/game state); toggling only re-renders the list.
+        if (this.extToggle) {
+            this.extToggle.addEventListener('click', () => {
+                this.extEnabled = !this.extEnabled;
+                this.applyExtToggleState();
+                this.updateUI();
+            });
+        }
+        this.applyExtToggleState();
 
         // Set initial slider and number input positions based on default duration (3s)
         if (this.durationSlider && this.durationInput) {
@@ -286,6 +302,16 @@ export class App {
         // Amount changes do not affect participation; the next view-state read
         // already reflects the mode's updated selection weight and visual value.
         this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+    }
+
+    /**
+     * Reflects the ext toggle state on the button: `btn-primary` when the extra
+     * column is shown, `btn-secondary` when it is hidden.
+     */
+    private applyExtToggleState(): void {
+        if (!this.extToggle) return;
+        this.extToggle.classList.toggle('btn-primary', this.extEnabled);
+        this.extToggle.classList.toggle('btn-secondary', !this.extEnabled);
     }
 
     /**
@@ -389,6 +415,9 @@ export class App {
             // Re-render with the new mode's selection weights / visual values.
             // Participation is deliberately preserved across a mode switch.
             this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+            // Re-render the lots list: modeData (e.g. the ext column) is
+            // mode-owned and changes with the mode.
+            this.updateUI();
             // Update result text to show new mode name if no highlight active
             this.updateResultTextWithModeName();
             this.updateModeHelpTooltip();
@@ -695,7 +724,8 @@ export class App {
             editableAmount: true,
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
             onDelete: (id) => this.deleteLot(id),
-            onLotHover: (id) => this.handleLotHover(id)
+            onLotHover: (id) => this.handleLotHover(id),
+            extEnabled: this.extEnabled
         });
 
         // Update stats. Game-session counters are read from the GameSession:

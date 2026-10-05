@@ -116,7 +116,7 @@ function highestHpAfterDamage(
  *
  * Presentation:
  *  - `visualValue = current HP` — the visualization draws HP as size;
- *  - `modeData.hp = current HP` — optional data for the UI.
+ *  - `modeData.ext = "♥ HP"` — the lots list's optional extra column.
  *
  * The mode is stateless/shared: all data lives in the passed state objects,
  * so two sessions never share HP.
@@ -257,13 +257,23 @@ export class CrownDefenseMode implements GameMode {
         return { state: nextState, participants: nextParticipants, outcome };
     }
 
-    getParticipantPresentation(
-        participant: GameParticipantState,
-        _state: GameModeState
-    ): ModePresentationData | undefined {
-        const ps = asParticipantState(participant);
-        // HP is only present once materialized (after the first spin); the
-        // visualization size never depends on this — it uses `visualValue`.
-        return typeof ps.hp === 'number' ? { hp: ps.hp } : undefined;
+    getPresentationData(
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[],
+        state: GameModeState
+    ): ReadonlyMap<string, ModePresentationData> {
+        const gs = asGameState(state);
+        const byId = new Map(lots.map(l => [l.id, l]));
+        const label: MessageDescriptor = { key: 'mode.crown-defense.extLabel' };
+        const result = new Map<string, ModePresentationData>();
+        for (const p of participants) {
+            const lot = byId.get(p.lotId);
+            // Inactive lots are "not participating" — never stale HP.
+            const value = p.active && lot
+                ? `♥ ${Math.round(effectiveHp(lot, p, gs))}`
+                : '—';
+            result.set(p.lotId, { ext: { label, value } });
+        }
+        return result;
     }
 }

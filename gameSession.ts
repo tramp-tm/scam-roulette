@@ -364,6 +364,8 @@ export class GameSession {
         state: GameModeState
     ): GameViewState {
         const byId = this.lotIndex();
+        const lots = this.getLots();
+        const presentation = this.currentMode.getPresentationData(participants, lots, state);
         const renderables: RenderableParticipant[] = [];
 
         for (const p of participants) {
@@ -379,7 +381,7 @@ export class GameSession {
                 selectionWeight,
                 visualValue: this.currentMode.getParticipantVisualValue(lot, p, state),
                 presence: p.active ? 1 : 0,
-                modeData: this.currentMode.getParticipantPresentation(p, state)
+                modeData: presentation.get(p.lotId)
             });
         }
 
