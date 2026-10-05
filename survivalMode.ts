@@ -22,9 +22,20 @@ function survivalSelectionWeight(amount: number): number {
 
 /**
  * Practical bound for the exact final-win computation (O(2^n · n)); above it
- * the displayed value degrades to "…" instead of hanging the UI.
+ * the deterministic trapezoidal quadrature is used instead (no UI hang, no
+ * "…" placeholder, no simulation).
  */
 const SURVIVAL_EXACT_MAX_ACTIVE = 18;
+
+/** Trapezoidal quadrature step count (fixed → predictable per-call load). */
+const SURVIVAL_QUADRATURE_STEPS = 1000;
+
+/**
+ * Tail constant for the integration limit: `T_max = (ln n + c) / λ_min`. The
+ * unaccounted tail mass is ≤ n·e^(−c) ≈ e^(−c) for any n, i.e. ~1.7e-5 at
+ * c = 11 — well below the one-decimal display resolution (0.1%).
+ */
+const SURVIVAL_QUADRATURE_TAIL_C = 11;
 
 /**
  * Exact eventual final-win (last-remaining) probabilities for the given active
@@ -37,13 +48,13 @@ const SURVIVAL_EXACT_MAX_ACTIVE = 18;
  * selected eliminates the lot, so i's own selection contributes nothing.
  * Deterministic and exact — memoised over subsets, never a simulation.
  *
- * Returns `null` when the active count exceeds the exact bound.
+ * Exact path of `survivalWinProbabilities`; call that dispatcher, not this
+ * directly — it is only valid while the active count stays small.
  */
-function survivalWinProbabilities(amounts: readonly number[]): number[] | null {
+function survivalWinProbabilitiesExact(amounts: readonly number[]): number[] {
     const n = amounts.length;
     if (n === 0) return [];
     if (n === 1) return [1];
-    if (n > SURVIVAL_EXACT_MAX_ACTIVE) return null;
 
     const w = amounts.map(survivalSelectionWeight);
     const full = (1 << n) - 1;
@@ -79,6 +90,93 @@ function survivalWinProbabilities(amounts: readonly number[]): number[] | null {
         result[i] = last(full);
     }
     return result;
+}
+
+/**
+ * Approximate eventual final-win probabilities for large active sets:
+ * trapezoidal quadrature of
+ *
+ *   P_i = ∫₀^∞ λ_i · e^(−λ_i·t) · ∏_{j≠i} (1 − e^(−λ_j·t)) dt
+ *
+ * with λ = `survivalSelectionWeight(amount)` = 1/amount, over
+ * `t ∈ [0, (ln n + SURVIVAL_QUADRATURE_TAIL_C) / λ_min]`. This is the
+ * exponential-race / Plackett–Luce last-place law, identical in value to the
+ * exact DP recursion above. Deterministic; the truncated tail mass never
+ * exceeds e^(−SURVIVAL_QUADRATURE_TAIL_C) for any n.
+ *
+ * The per-step product ∏_{j≠i} is built from prefix/suffix products — no
+ * division by the omitted factor and no epsilon hacks; intermediate underflow
+ * to 0 is harmless (it happens only where the true density mass is negligible).
+ */
+function survivalWinProbabilitiesQuadrature(amounts: readonly number[]): number[] {
+    const n = amounts.length;
+    if (n === 0) return [];
+    if (n === 1) return [1];
+
+    const lambda = new Float64Array(n);
+    let lambdaMin = Infinity;
+    for (let i = 0; i < n; i++) {
+        const l = survivalSelectionWeight(amounts[i]);
+        lambda[i] = l;
+        if (l < lambdaMin) lambdaMin = l;
+    }
+    // Defensive: amounts are finite and > 0 (LotManager ≥ 0.01), so λ_min is
+    // finite and positive; fall back to the symmetric answer otherwise.
+    if (!(lambdaMin > 0) || !isFinite(lambdaMin)) {
+        return amounts.map(() => 1 / n);
+    }
+
+    const tMax = (Math.log(n) + SURVIVAL_QUADRATURE_TAIL_C) / lambdaMin;
+    const steps = SURVIVAL_QUADRATURE_STEPS;
+    const dt = tMax / steps;
+
+    const ex = new Float64Array(n);   // e^(−λ_i·t)
+    const om = new Float64Array(n);   // 1 − e^(−λ_i·t)
+    const pref = new Float64Array(n);
+    const suff = new Float64Array(n);
+    const acc = new Float64Array(n);  // accumulated trapezoid integrals
+
+    for (let k = 0; k <= steps; k++) {
+        const t = k * dt;
+
+        for (let i = 0; i < n; i++) {
+            const e = Math.exp(-lambda[i] * t); // one exp per player per step
+            ex[i] = e;
+            om[i] = 1 - e;
+        }
+
+        pref[0] = om[0];
+        for (let i = 1; i < n; i++) pref[i] = pref[i - 1] * om[i];
+
+        suff[n - 1] = om[n - 1];
+        for (let i = n - 2; i >= 0; i--) suff[i] = suff[i + 1] * om[i];
+
+        const w = k === 0 || k === steps ? dt / 2 : dt; // trapezoid weights
+        for (let i = 0; i < n; i++) {
+            const others = (i > 0 ? pref[i - 1] : 1) * (i < n - 1 ? suff[i + 1] : 1);
+            acc[i] += w * lambda[i] * ex[i] * others;
+        }
+    }
+
+    let total = 0;
+    for (let i = 0; i < n; i++) total += acc[i];
+    if (!(total > 0)) return amounts.map(() => 1 / n);
+
+    const result = new Array<number>(n);
+    for (let i = 0; i < n; i++) result[i] = acc[i] / total;
+    return result;
+}
+
+/**
+ * Eventual final-win probabilities for the active amounts (sum ≈ 1), following
+ * the mode's real elimination semantics. Exact DP while the active count stays
+ * small; deterministic trapezoidal quadrature beyond the exact bound. Never a
+ * simulation.
+ */
+function survivalWinProbabilities(amounts: readonly number[]): number[] {
+    return amounts.length <= SURVIVAL_EXACT_MAX_ACTIVE
+        ? survivalWinProbabilitiesExact(amounts)
+        : survivalWinProbabilitiesQuadrature(amounts);
 }
 
 /**
@@ -222,9 +320,7 @@ export class SurvivalMode implements GameMode {
             let value = '—'; // not participating
             if (p.active) {
                 const idx = indexById.get(p.lotId);
-                if (idx === undefined) value = '—';
-                else if (probs === null) value = '…'; // beyond the exact bound
-                else value = formatPercent(probs[idx] * 100);
+                value = idx === undefined ? '—' : formatPercent(probs[idx] * 100);
             }
             result.set(p.lotId, { ext: { label, value } });
         }
