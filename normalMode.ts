@@ -10,7 +10,7 @@ import type {
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
-import { formatPercent } from './utils.js';
+import { formatPercentFloor } from './utils.js';
 
 /**
  * Normal mode.
@@ -86,14 +86,13 @@ export class NormalMode implements GameMode {
             if (lot) total += lot.amount;
         }
 
-        const label: MessageDescriptor = { key: 'mode.normal.extLabel' };
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
             const lot = byId.get(p.lotId);
             const value = p.active && lot && total > 0
-                ? formatPercent((lot.amount / total) * 100)
+                ? formatPercentFloor((lot.amount / total) * 100)
                 : '—';
-            result.set(p.lotId, { ext: { label, value } });
+            result.set(p.lotId, { ext: { value } });
         }
         return result;
     }

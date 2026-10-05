@@ -27,13 +27,23 @@ const INITIAL_HP_SCALE = 100;
 const DAMAGE_PER_SPIN = 10;
 
 /**
+ * Minimum HP a lot can hold: the lower bound of the initial HP and the
+ * smallest displayed value. A lot never starts below it, and a below-minimum
+ * (post-damage) value is shown as `BELOW_MINIMUM_HP` instead of "♥ 0".
+ */
+const MIN_HP = 1;
+
+/** Shown instead of an HP value below the minimum. */
+const BELOW_MINIMUM_HP = '< 1';
+
+/**
  * Initial HP for a lot: normalized against the session's largest `amount`.
  * `amount === maxAmount` → `INITIAL_HP_SCALE`; half the max → half of it.
- * Always positive for a positive `amount`; never divides by zero.
+ * Never divides by zero and is always at least `MIN_HP`.
  */
 function initialHp(amount: number, maxAmount: number): number {
     const reference = maxAmount > 0 ? maxAmount : 1;
-    return (amount / reference) * INITIAL_HP_SCALE;
+    return Math.round( Math.max(MIN_HP, (amount / reference) * INITIAL_HP_SCALE) );
 }
 
 /** Damage dealt by one spin. Single source of the damage value. */
@@ -116,7 +126,8 @@ function highestHpAfterDamage(
  *
  * Presentation:
  *  - `visualValue = current HP` — the visualization draws HP as size;
- *  - `modeData.ext = "♥ HP"` — the lots list's optional extra column.
+ *  - `modeData.ext = "♥ HP"` (or `"< 1 HP"` below the minimum) — the lots
+ *    list's optional extra column.
  *
  * The mode is stateless/shared: all data lives in the passed state objects,
  * so two sessions never share HP.
@@ -141,10 +152,24 @@ export class CrownDefenseMode implements GameMode {
         return participant;
     }
 
-    onParticipantsChanged(state: GameModeState): GameModeState {
-        // maxAmount is the game-start reference and stays fixed; a participant
-        // added before the first spin derives its HP from the current amount.
-        return state;
+    onParticipantsChanged(
+        _state: GameModeState,
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[]
+    ): GameModeState {
+        // The HP normalization reference is the largest amount among the
+        // current participants. Recomputing it here keeps every participant's
+        // (lazily derived) initial HP consistent when the set changes before
+        // the first spin — e.g. adding a lot with a larger amount rescales the
+        // rest. Once a spin has locked the session, participant changes are
+        // rejected, so no materialized HP is ever reinterpreted.
+        const byId = new Map(lots.map(l => [l.id, l]));
+        let maxAmount = 0;
+        for (const p of participants) {
+            const lot = byId.get(p.lotId);
+            if (lot && lot.amount > maxAmount) maxAmount = lot.amount;
+        }
+        return { maxAmount };
     }
 
     calculateSelectionWeight(): number {
@@ -264,15 +289,16 @@ export class CrownDefenseMode implements GameMode {
     ): ReadonlyMap<string, ModePresentationData> {
         const gs = asGameState(state);
         const byId = new Map(lots.map(l => [l.id, l]));
-        const label: MessageDescriptor = { key: 'mode.crown-defense.extLabel' };
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
             const lot = byId.get(p.lotId);
             // Inactive lots are "not participating" — never stale HP.
-            const value = p.active && lot
-                ? `♥ ${Math.round(effectiveHp(lot, p, gs))}`
-                : '—';
-            result.set(p.lotId, { ext: { label, value } });
+            let value = '—';
+            if (p.active && lot) {
+                const hp = effectiveHp(lot, p, gs);
+                value = hp < MIN_HP ?  `♥ ${BELOW_MINIMUM_HP}`: `♥ ${Math.round(hp)}`;
+            }
+            result.set(p.lotId, { ext: { value } });
         }
         return result;
     }

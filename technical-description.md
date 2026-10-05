@@ -210,7 +210,6 @@ type GameModeState = unknown;          // игровое состояние, п�
 type ParticipantModeState = unknown;   // состояние участника, принадлежит GameMode
 
 interface ModeExtraInfo {              // одна ячейка ext-колонки списка лотов
-  label: MessageDescriptor;            // заголовок колонки (локализует UI)
   value: string;                       // готовый к показу текст («♥ 90», «73.1%», «—»)
 }
 interface ModePresentationData {       // непрозрачные данные режима для UI
@@ -248,7 +247,7 @@ interface GameMode {
 
   createGameState(lots: readonly Lot[]): GameModeState;
   createParticipantState(lot: Lot): ParticipantModeState;
-  onParticipantsChanged(state, participants): GameModeState;
+  onParticipantsChanged(state, participants, lots): GameModeState;
 
   calculateSelectionWeight(lot, participant, state): number;   // вероятность выбора рулеткой
 
@@ -380,7 +379,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `processRoll` → `finished: true`, `winners: [rolledLot.id]`, `eliminated: []`;
 - `result` = «Победитель: {{name}}». Одна игра = один спин.
 - `getPresentationData` → ext = **вероятность финальной победы** `amount_i / Σ amount(active)`
-  (в Normal нет выбываний, поэтому она равна текущей вероятности выбора). Inactive → `—`.
+  (в Normal нет выбываний, поэтому она равна текущей вероятности выбора); при значении ниже
+  разрешения формата (< 0.1%) — `< 0.1%`. Inactive → `—`.
 
 **SurvivalMode** (выбывание)
 - `selectionWeight = 1 / amount` (больше сумма → ниже шанс выбыть);
@@ -395,14 +395,18 @@ export function getMode(modeId) { return MODES[modeId]; }
   подмножествам `P(S,i) = Σ_{j≠i} p_j(S)·P(S\{j},i)`, `p_j = w_j/Σw(S)`, `w = 1/amount`
   (мемоизация) при числе активных ≤ `SURVIVAL_EXACT_MAX_ACTIVE` (18); свыше — детерминированная
   квадратура трапеций `P_i = ∫ λ_i·e^(−λ_i·t)·∏_{j≠i}(1 − e^(−λ_j·t)) dt`, `λ = 1/amount`,
-  предел `T_max = (ln N + 11)/λ_min`, 1000 шагов (без симуляции). Inactive → `—`.
+  предел `T_max = (ln N + 11)/λ_min`, 1000 шагов (без симуляции). При вероятности < 0.1% —
+  `< 0.1%`. Inactive → `—`.
 
 **CrownDefenseMode** (HP)
 - `selectionWeight = 1` для каждого активного — вероятность не зависит от HP;
 - `visualValue = текущее HP` — размер на экране определяется HP, а не вероятностью;
-- состояние: `GameModeState = { maxAmount }` (референс нормализации HP на старте игры),
+- состояние: `GameModeState = { maxAmount }` (референс нормализации HP),
   `ParticipantModeState = { hp }` (HP участника). До первого спина HP детерминированно выводится
-  из `amount / maxAmount * 100`; первый `processRoll` материализует его;
+  из `amount / maxAmount * 100`, но не ниже `MIN_HP = 1`; первый `processRoll` материализует его.
+  Смена состава участников до первого спина (`onParticipantsChanged`) пересчитывает `maxAmount`
+  как максимум `amount` среди текущих участников, поэтому добавление лота с большей суммой
+  пересчитывает стартовый HP всех остальных;
 - `processRoll`: разыгранный участник урона не получает; все остальные **активные** получают
   фиксированный урон (10 HP), кламп в 0 — урон считается по состоянию ДО этого хода (без
   последовательной зависимости между участниками); участники с HP 0 выбывают; один оставшийся —
@@ -410,7 +414,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `result` = «Урон −{{damage}} (выбран: {{name}})», `message` = сообщение о победителе;
 - HP не хранится на singleton-экземпляре режима и не добавляется в `Lot`, поэтому две сессии не
   делят HP.
-- `getPresentationData` → ext = текущее HP как `♥ N` (целое). Inactive → `—`, никогда не stale HP.
+- `getPresentationData` → ext = текущее HP как `♥ N` (целое); при HP < `MIN_HP` — `< 1 HP`.
+  Inactive → `—`, никогда не stale HP.
 
 Все режимы владеют своим состоянием и реализуют полный контракт `GameMode`, поэтому являются
 равноправными стратегиями.
@@ -543,6 +548,8 @@ export function getMode(modeId) { return MODES[modeId]; }
   сегмента с отступом от краёв.
 - `formatPercent(p)` — проценты для UI: целое без дробной части («100%», «50%»), иначе одна
   цифра («42.5%», «7.1%»). Режимы используют её для ext-колонки.
+- `formatPercentFloor(p)` — как `formatPercent`, но при `p < 0.1` возвращает `< 0.1%`: шанс ниже
+  разрешения формата не показывается как «0%».
 
 ### 6.7 Настройки времени, языка и темы
 

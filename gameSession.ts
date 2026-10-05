@@ -166,21 +166,21 @@ export class GameSession {
     addLot(lot: Lot): void {
         if (this.sessionLocked) return;
         this.participants = [...this.participants, this.newParticipant(lot)];
-        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants);
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
     }
 
     /** Removes a lot from participation. Rejected while locked. */
     removeLot(lotId: string): void {
         if (this.sessionLocked) return;
         this.participants = this.participants.filter(p => p.lotId !== lotId);
-        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants);
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
     }
 
     /** Empties participation. Rejected while locked. */
     clearLots(): void {
         if (this.sessionLocked) return;
         this.participants = [];
-        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants);
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
     }
 
     /**
@@ -201,7 +201,7 @@ export class GameSession {
             return { lotId: lot.id, active, modeState };
         });
 
-        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants);
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
     }
 
     /**
@@ -238,7 +238,7 @@ export class GameSession {
             };
         });
         this.modeState = this.currentMode.createGameState(this.getLots());
-        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants);
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
     }
 
     // ---------------------------------------------------------------

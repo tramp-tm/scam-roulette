@@ -299,8 +299,10 @@ export class App {
         // GameSession-boundary rejection.
         if (this.gameSession.isSessionLocked) return;
         this.lotManager.updateLot(id, { amount: newAmount });
-        // Amount changes do not affect participation; the next view-state read
-        // already reflects the mode's updated selection weight and visual value.
+        // An amount change does not affect participation, but it does change the
+        // mode's view data (selection weight, visual value, the ext column), so
+        // both the list and the visualization must be re-rendered.
+        this.updateUI();
         this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 

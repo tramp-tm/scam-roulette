@@ -10,7 +10,7 @@ import type {
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
-import { formatPercent } from './utils.js';
+import { formatPercentFloor } from './utils.js';
 
 /**
  * Survival selection weight for an amount — the single source of the mode's
@@ -314,15 +314,14 @@ export class SurvivalMode implements GameMode {
         const indexById = new Map(activeIds.map((id, i) => [id, i]));
         const probs = survivalWinProbabilities(amounts);
 
-        const label: MessageDescriptor = { key: 'mode.survival.extLabel' };
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
             let value = '—'; // not participating
             if (p.active) {
                 const idx = indexById.get(p.lotId);
-                value = idx === undefined ? '—' : formatPercent(probs[idx] * 100);
+                value = idx === undefined ? '—' : formatPercentFloor(probs[idx] * 100);
             }
-            result.set(p.lotId, { ext: { label, value } });
+            result.set(p.lotId, { ext: { value } });
         }
         return result;
     }

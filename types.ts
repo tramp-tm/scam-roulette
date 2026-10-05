@@ -59,12 +59,10 @@ export type ParticipantModeState = unknown;
 /**
  * Generic extra-info descriptor a GameMode can attach to a participant for the
  * lots list's optional "ext" column. The mode owns both the meaning and the
- * formatting; the list renders `value` verbatim and only translates `label` for
- * the column header. Opaque to the core — it is never interpreted.
+ * formatting; the list renders `value` verbatim. Opaque to the core — it is
+ * never interpreted.
  */
 export interface ModeExtraInfo {
-    /** Localized column header, owned by the mode. */
-    label: MessageDescriptor;
     /** Display-ready text for this participant (e.g. "♥ 90", "73.1%", "—"). */
     value: string;
 }
@@ -162,10 +160,15 @@ export interface GameMode {
     /** Create the mode-specific state for a participant joining the game. */
     createParticipantState(lot: Lot): ParticipantModeState;
 
-    /** Recompute game-level state after the participant set changed. Pure. */
+    /**
+     * Recompute game-level state after the participant set changed. Receives
+     * the current global lots so a mode can re-derive lot-based state (e.g. a
+     * normalization reference built from amounts). Pure.
+     */
     onParticipantsChanged(
         state: GameModeState,
-        participants: readonly GameParticipantState[]
+        participants: readonly GameParticipantState[],
+        lots: readonly Lot[]
     ): GameModeState;
 
     /**

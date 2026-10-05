@@ -229,3 +229,21 @@ export function formatPercent(percent: number): string {
     const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
     return `${text}%`;
 }
+
+/**
+ * Smallest positive percentage `formatPercent` can render (it keeps one
+ * decimal place); anything below it would collapse to the misleading "0%".
+ */
+const MIN_DISPLAYABLE_PERCENT = 0.1;
+
+/** Shown instead of a percentage below the displayable minimum. */
+const BELOW_MINIMUM_PERCENT = '< 0.1%';
+
+/**
+ * Like `formatPercent`, but never renders a below-resolution probability as
+ * "0%": values under `MIN_DISPLAYABLE_PERCENT` become the "< 0.1%" marker, so
+ * a non-zero chance is never shown as impossible.
+ */
+export function formatPercentFloor(percent: number): string {
+    return percent < MIN_DISPLAYABLE_PERCENT ? BELOW_MINIMUM_PERCENT : formatPercent(percent);
+}
