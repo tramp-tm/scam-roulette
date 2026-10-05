@@ -31,6 +31,12 @@ export interface LotListViewOptions {
     editableAmount?: boolean;
     onAmountChange?: (id: string, newAmount: number) => void;
     onDelete?: (id: string) => void;
+    /**
+     * Reports the transient hover state as a stable lot id (or `null` when the
+     * pointer leaves a row). The caller decides what to do with it; the view
+     * neither interprets it nor stores it as application/game state.
+     */
+    onLotHover?: (lotId: string | null) => void;
 }
 
 /**
@@ -94,7 +100,8 @@ export class LotListView {
             highlightIds,
             editableAmount = true,
             onAmountChange,
-            onDelete
+            onDelete,
+            onLotHover
         } = options;
 
         // Sorting happens on a copy — the caller's array is never mutated.
@@ -119,6 +126,14 @@ export class LotListView {
             const highlighted = !!lot.id && (highlightIds?.has(lot.id) ?? false);
             if (highlighted) classNameParts.push('highlighted');
             li.className = classNameParts.join(' ');
+
+            // Hover is surfaced by stable `lot.id` (never an index/position), so
+            // it survives the rebuild that sorting performs.
+            if (lot.id && onLotHover) {
+                const lotId: string = lot.id;
+                li.addEventListener('mouseenter', () => onLotHover(lotId));
+                li.addEventListener('mouseleave', () => onLotHover(null));
+            }
 
             const colorIndicator = document.createElement('div');
             colorIndicator.className = 'lot-color-indicator';

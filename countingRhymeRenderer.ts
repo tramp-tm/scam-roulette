@@ -13,6 +13,9 @@ import { normalizeToFractions } from './utils.js';
  *    `selectionWeight` partition (the roulette probability), which is why the
  *    dwell time per circle is proportional to its chance.
  *
+ * Hover (`setHover`, lots-list interaction) draws an additive outer halo: it
+ * changes no radius/timing/cursor and composes with the game-result stroke.
+ *
  * Contract:
  *  - `animationValue` is measured in *cycles* (one unit = one full traversal of
  *    the circle ring). `beatPrefix` partitions [0,1) by the selection weights,
@@ -41,6 +44,12 @@ const GAME_HIGHLIGHT_GLOW_BLUR = 30;
 
 const MIN_CIRCLE_RADIUS = 14;
 const MAX_CIRCLE_RADIUS = 250;
+
+// Hover (lots-list interaction) — additive outer halo, distinct from the gold game highlight
+const HOVER_COLOR = '#7fd4ff';
+const HOVER_STROKE_WIDTH = 3;
+const HOVER_GLOW_BLUR = 18;
+const HOVER_RING_OFFSET = 6;
 
 const CELL_FILL_RATIO = 0.95;
 
@@ -144,6 +153,21 @@ export class CountingRhymeRenderer extends BaseRenderer {
             }
             ctx.stroke();
             ctx.restore();
+
+            // Hover adds an outer halo; it leaves the circle radius untouched and
+            // composes with the game-result stroke.
+            if (this.isHovered(p.lot.id)) {
+                ctx.save();
+                ctx.globalAlpha = presence;
+                ctx.beginPath();
+                ctx.arc(cell.cx, cell.cy, radius + HOVER_RING_OFFSET, 0, Math.PI * 2);
+                ctx.strokeStyle = HOVER_COLOR;
+                ctx.lineWidth = HOVER_STROKE_WIDTH;
+                ctx.shadowColor = HOVER_COLOR;
+                ctx.shadowBlur = HOVER_GLOW_BLUR;
+                ctx.stroke();
+                ctx.restore();
+            }
 
             if (radius >= LABEL_MIN_RADIUS && presence > 0.05) {
                 this.drawLabel(p.lot.name, cell.cx, cell.cy, radius, presence);

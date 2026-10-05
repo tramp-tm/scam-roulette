@@ -16,6 +16,14 @@ const GAME_HIGHLIGHT_BRIGHTNESS = 30;
 const GAME_HIGHLIGHT_BOOST = 45;
 const CURSOR_HIGHLIGHT_BRIGHTNESS = 14;
 
+// Hover (lots-list interaction) — additive overlay drawn on top of the sectors,
+// distinct from the gold game highlight
+const HOVER_COLOR = '#7fd4ff';
+const HOVER_FILL_COLOR = 'rgba(127, 212, 255, 0.25)';
+const HOVER_STROKE_WIDTH = 4;
+const HOVER_GLOW_BLUR = 18;
+const HOVER_FILL_GLOW_BLUR = 26;
+
 // Labels
 const LABEL_FONT = 'bold 14px Arial';
 const LABEL_RADIUS_RATIO = 0.7;
@@ -51,6 +59,11 @@ interface WheelSector {
  * Sector angular size comes from the participant's `visualValue` (scaled by
  * `presence`), NOT from `selectionWeight`. The spin target and the cursor are
  * resolved against this wheel-local geometry.
+ *
+ * Hover (`setHover`, lots-list interaction) draws a translucent glow fill plus
+ * a crisp outline over the hovered sector, on top of every other sector, so
+ * neighbouring borders cannot cover any of its edges. Additive — it never
+ * replaces the game highlight.
  */
 export class WheelRenderer extends BaseRenderer {
     private sectors: WheelSector[] = [];
@@ -112,6 +125,37 @@ export class WheelRenderer extends BaseRenderer {
             if (sector.endAngle - sector.startAngle > LABEL_MIN_ARC) {
                 this.drawWheelLabel(sector, radius, presence);
             }
+        }
+
+        // Hover is drawn last, on top of every sector, so a neighbouring
+        // sector's border cannot cover any of its edges: a translucent glow
+        // fill plus a crisp outline over the full sector (both radii + arc).
+        const hovered = this.sectors.find(s => this.isHovered(s.lot.id));
+        if (hovered) {
+            // Translucent glow fill.
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.arc(0, 0, radius, hovered.startAngle, hovered.endAngle);
+            this.ctx.closePath();
+            this.ctx.save();
+            this.ctx.fillStyle = HOVER_FILL_COLOR;
+            this.ctx.shadowColor = HOVER_COLOR;
+            this.ctx.shadowBlur = HOVER_FILL_GLOW_BLUR;
+            this.ctx.fill();
+            this.ctx.restore();
+
+            // Crisp outline over the whole sector.
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.arc(0, 0, radius, hovered.startAngle, hovered.endAngle);
+            this.ctx.closePath();
+            this.ctx.save();
+            this.ctx.strokeStyle = HOVER_COLOR;
+            this.ctx.lineWidth = HOVER_STROKE_WIDTH;
+            this.ctx.shadowColor = HOVER_COLOR;
+            this.ctx.shadowBlur = HOVER_GLOW_BLUR;
+            this.ctx.stroke();
+            this.ctx.restore();
         }
 
         this.ctx.restore();

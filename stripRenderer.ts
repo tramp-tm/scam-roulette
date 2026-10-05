@@ -23,6 +23,11 @@ const CURSOR_HIGHLIGHT_BRIGHTNESS = 18;
 const HIGHLIGHT_SHADOW_COLOR = 'rgba(255, 215, 0, 0.8)';
 const HIGHLIGHT_SHADOW_BLUR = 15;
 
+// Hover (lots-list interaction) — additive overlay, distinct from the gold game highlight
+const HOVER_COLOR = '#7fd4ff';
+const HOVER_STROKE_WIDTH = 3;
+const HOVER_GLOW_BLUR = 16;
+
 /** Strip-specific band geometry. Widths/offsets live here — never in the
  *  shared participant/presentation contract. */
 interface StripBand {
@@ -37,6 +42,10 @@ interface StripBand {
  * Band width comes from the participant's `visualValue` (scaled by `presence`),
  * NOT from `selectionWeight`. The spin target and the cursor are resolved
  * against this strip-local geometry.
+ *
+ * Hover (`setHover`, lots-list interaction) draws an additive outline around
+ * the hovered lot's band, so it composes with — and never replaces — the game
+ * highlight (and never alters band width or ordering).
  */
 export class StripRenderer extends BaseRenderer {
     private bands: StripBand[] = [];
@@ -153,6 +162,19 @@ export class StripRenderer extends BaseRenderer {
             this.ctx.fillStyle = fillColor;
             this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
             this.ctx.restore();
+
+            // Hover is an additive outline over the band; it composes with the
+            // game fill/glow rather than replacing it.
+            if (this.isHovered(band.lot.id)) {
+                this.ctx.save();
+                this.ctx.globalAlpha = presence;
+                this.ctx.strokeStyle = HOVER_COLOR;
+                this.ctx.lineWidth = HOVER_STROKE_WIDTH;
+                this.ctx.shadowColor = HOVER_COLOR;
+                this.ctx.shadowBlur = HOVER_GLOW_BLUR;
+                this.ctx.strokeRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
+                this.ctx.restore();
+            }
 
             if (presence > 0.01) {
                 this.drawBandLabel(band, currentX + band.width / 2, centerY, presence);

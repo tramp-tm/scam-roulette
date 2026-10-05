@@ -306,7 +306,8 @@ view-состояния (см. §7.4).
 
 ```ts
 interface IRenderer {                  // визуализация; чисто визуальная, правил не знает
-  setViewState(view: GameViewState, highlight: HighlightState): void;  // единственный вход подсветки
+  setViewState(view: GameViewState, highlight: HighlightState): void;  // game-подсветка (победители/выбывшие)
+  setHover(lotId: string | null): void; // hover-подсветка из списка лотов (stable lot.id; null — снять)
   render(): void;
   reset(): void;
 
@@ -577,6 +578,10 @@ export function getMode(modeId) { return MODES[modeId]; }
   строки получают классы `inactive` / `highlighted`; для каждого лота — индикатор цвета, имя,
   поле суммы, кнопка удаления (кроме подсвеченных).
 - `options.highlightIds: ReadonlySet<string>` — набор game-highlight (победители/выбывшие).
+- `options.onLotHover(lotId | null)` — hover строки сообщается наружу по stable `lot.id`
+  (`mouseenter`/`mouseleave`; обработчики перевешиваются при каждой перерисовке, поэтому hover
+  переживает сортировку). Список сам hover не хранит и в game-состояние не переводит; `App`
+  прокидывает id в `VisualizationDriver.setHover`.
 - `options.modeData` (в `RenderableLot`) переносится, но не интерпретируется — задел для
   mode-aware отображения.
 - `setLocked(boolean)` — блокирует поля сумм и кнопки удаления.
@@ -587,8 +592,11 @@ export function getMode(modeId) { return MODES[modeId]; }
 жизненным циклом:
 
 - `setVisualization(type, view, highlight)` — построить новый рендерер, показать снимок;
+  перенести текущую hover-подсветку на новый рендерер (по stable `lot.id`);
 - `refresh(view, highlight)` — показать снимок и перерисовать;
 - `render()` — перерисовать без пересчёта (смена темы);
+- `setHover(lotId | null)` — транзиентная hover-подсветка из списка лотов; чисто презентационная:
+  перерисовывает кадр, не трогая view-состояние, анимацию и игровое состояние;
 - `spinTo({view, highlight, targetLotId, durationMs, easing, onComplete})` — запросить у
   визуализации целевой скаляр (`computeSpinTarget`), вести `AnimationController`; на каждом
   кадре только `setAnimationValue` + `render` (курсор рендерер вычисляет сам);
@@ -596,7 +604,7 @@ export function getMode(modeId) { return MODES[modeId]; }
   view-состояние `before → after` (presence выбывших 1 → 0) через переиспользуемый
   интерполятор (без пересборки структур на кадр), рампить `pulse` game-подсветки; финальный
   кадр фиксирует стабильный `after`;
-- `reset(view, highlight)` — остановить анимацию, сбросить рендерер, показать снимок;
+- `reset(view, highlight)` — остановить анимацию, сбросить рендерер (и hover), показать снимок;
 - `getCursorLotId()` — read-only запрос текущего лота под курсором (для UI); сам курсор внутрь
   визуализации не передаётся.
 
@@ -633,6 +641,15 @@ export function getMode(modeId) { return MODES[modeId]; }
 **независимо** и не затирают друг друга. Курсор рендерер вычисляет сам из `animationValue`
 (`getCursorLotId`) и мемоизирует на кадр; `highlight.pulse` плавно вводит game-акцент во время
 перехода. Все рендереры учитывают `presence` (альфа + сжатие) для анимации выбывания.
+
+Hover (наведение в списке лотов) — **третий, независимый** канал подсветки (`setHover`,
+identity — stable `lot.id`). Он рисуется **аддитивно**, поэтому сосуществует с game-подсветкой
+и курсором, не заменяя их: Wheel — полупрозрачная glow-заливка (`rgba(127,212,255,0.25)`) плюс
+голубая обводка (`#7fd4ff`) всего сектора, рисуется **поверх всех секторов**, чтобы соседние
+бордюры не перекрывали края; Strip — обводка полосы (без изменения ширины/порядка);
+CountingRhyme — внешнее гало вокруг круга (радиус не меняется). Hover не влияет на геометрию,
+веса, таргет/анимацию и игровое состояние; неизвестный или неактивный id просто ничего не
+подсвечивает.
 
 ### 7.5 Правила блокировки UI
 

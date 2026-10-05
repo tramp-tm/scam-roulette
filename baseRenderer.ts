@@ -21,6 +21,10 @@ import type {
  *                       dwell/target), never for drawing size;
  *  - `presence`       — [0,1] visibility multiplier for elimination animation;
  *  - `modeData`       — opaque mode payload the renderer may display.
+ *
+ * It also carries the transient hover highlight (`hoverLotId`, a stable lot
+ * id fed through `setHover`), kept separate from the game highlight so both
+ * can be composed when they target the same Lot Representation.
  */
 export abstract class BaseRenderer implements IRenderer {
     protected readonly canvas: HTMLCanvasElement;
@@ -29,6 +33,9 @@ export abstract class BaseRenderer implements IRenderer {
     protected participants: RenderableParticipant[] = [];
     protected highlight: HighlightState = { game: new Set(), pulse: 1 };
     protected animationValue = 0;
+
+    /** Transient hover highlight (lots-list interaction); see `setHover`. */
+    protected hoverLotId: string | null = null;
 
     private presenceByLotId = new Map<string, number>();
 
@@ -61,6 +68,15 @@ export abstract class BaseRenderer implements IRenderer {
         this.onViewStateChanged();
     }
 
+    /**
+     * Stores the transient hover highlight. Identity is the stable lot id; the
+     * concrete renderer decides the visual treatment and composes it with the
+     * game highlight. Stored only — the driver asks for a redraw.
+     */
+    setHover(lotId: string | null): void {
+        this.hoverLotId = lotId;
+    }
+
     // ------------------------------------------------------------------
     // Lifecycle / animation scalar
     // ------------------------------------------------------------------
@@ -78,6 +94,7 @@ export abstract class BaseRenderer implements IRenderer {
         this.presenceByLotId.clear();
         this.highlight = { game: new Set(), pulse: 1 };
         this.animationValue = 0;
+        this.hoverLotId = null;
         this.cursorForValue = null;
         this.cursorLotId = null;
         this.onReset();
@@ -128,6 +145,11 @@ export abstract class BaseRenderer implements IRenderer {
     /** Whether the game highlight covers this lot (winners/eliminated). */
     protected isGameHighlighted(lotId: string): boolean {
         return this.highlight.game.has(lotId);
+    }
+
+    /** Whether this lot is under the transient hover highlight (lots list). */
+    protected isHovered(lotId: string): boolean {
+        return this.hoverLotId === lotId;
     }
 
     /**

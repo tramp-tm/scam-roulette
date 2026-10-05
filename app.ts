@@ -89,6 +89,13 @@ export class App {
     /** True while the post-spin outcome transition is playing. */
     private outcomeInProgress = false;
 
+    /**
+     * Transient hover from the lots list: the lot id the pointer is over, or
+     * null. Purely presentational — mirrored into the visualization driver,
+     * never part of game state.
+     */
+    private hoveredLotId: string | null = null;
+
     private importDialog: ImportDialog | null = null;
 
     // DOM elements
@@ -279,6 +286,18 @@ export class App {
         // Amount changes do not affect participation; the next view-state read
         // already reflects the mode's updated selection weight and visual value.
         this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+    }
+
+    /**
+     * Transient hover from the lots list. Purely visual: it never touches
+     * participation, mode state, selection weights or the animation, and it is
+     * not gated by the session lock — it only tells the visualization driver
+     * which Lot Representation to emphasise, by stable lot id.
+     */
+    private handleLotHover(lotId: string | null): void {
+        if (this.hoveredLotId === lotId) return;
+        this.hoveredLotId = lotId;
+        this.visualizationDriver.setHover(lotId);
     }
 
     /**
@@ -642,6 +661,8 @@ export class App {
         // Clear the game highlight; the cursor is owned by the visualization.
         this.gameHighlight = new Set();
         this.outcomeInProgress = false;
+        // Drop the transient hover; driver.reset() also clears it in the renderer.
+        this.hoveredLotId = null;
 
         // Reset the visualization (stops any animation, resets the renderer,
         // shows the now-reset view). The whole sequence is synchronous, so a
@@ -673,7 +694,8 @@ export class App {
             highlightIds: this.gameHighlight,
             editableAmount: true,
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
-            onDelete: (id) => this.deleteLot(id)
+            onDelete: (id) => this.deleteLot(id),
+            onLotHover: (id) => this.handleLotHover(id)
         });
 
         // Update stats. Game-session counters are read from the GameSession:

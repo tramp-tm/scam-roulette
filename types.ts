@@ -274,6 +274,11 @@ export interface SelectionCandidate {
  * used for its own cursor emphasis. `getCursorLotId()` is a read-only external
  * query (for the UI); the cursor is never pushed back in through
  * `setViewState`.
+ *
+ * Highlight has two independent channels that compose at draw time:
+ *  - the game highlight (winners / eliminated), fed via `setViewState`;
+ *  - the transient hover highlight (lots-list interaction), fed via `setHover`.
+ * Neither mutates the other.
  */
 export interface IRenderer {
     /**
@@ -287,6 +292,16 @@ export interface IRenderer {
      * (see CountingRhymeRenderer's grid cache).
      */
     setViewState(view: GameViewState, highlight: HighlightState): void;
+
+    /**
+     * Set the transient hover highlight to a lot id, or `null` to clear it.
+     * Identity is the stable `lot.id`; the renderer resolves it against its own
+     * Lot Representation (sector / band / circle) and picks the visual
+     * treatment. Hover composes with — and never replaces — the game highlight
+     * fed via `setViewState`: it changes no geometry, weight or animation
+     * state, and an unknown/absent id simply highlights nothing.
+     */
+    setHover(lotId: string | null): void;
 
     /** Draw the current frame. */
     render(): void;

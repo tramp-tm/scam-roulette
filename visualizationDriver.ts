@@ -58,6 +58,12 @@ export class VisualizationDriver {
     private readonly animationController: AnimationController;
 
     /**
+     * Last hover id set through `setHover`, mirrored so it can be re-applied
+     * when the renderer is swapped. Never reaches game state.
+     */
+    private hoveredLotId: string | null = null;
+
+    /**
      * @param canvas                The canvas the renderer draws into.
      * @param initialVisualization  The visualization type selected at startup.
      *
@@ -84,6 +90,9 @@ export class VisualizationDriver {
         this.visualizationType = type;
         this.renderer = getVisualizationPackage(type).createRenderer(this.canvas);
         this.renderer.setViewState(view, highlight);
+        // Re-apply the hover highlight so a visualization swap cannot drop it
+        // (identity is the stable lot id, so this can never hit an unrelated lot).
+        this.renderer.setHover(this.hoveredLotId);
         this.renderer.render();
     }
 
@@ -95,6 +104,19 @@ export class VisualizationDriver {
 
     /** Redraws the current frame without changing state (theme change). */
     render(): void {
+        this.renderer.render();
+    }
+
+    /**
+     * Sets the transient hover highlight (a stable lot id, or `null` to clear).
+     * Purely presentational: it only re-renders the current frame and never
+     * touches the view state, animation or game state. It composes with — and
+     * never replaces — the game highlight, and works in every visualization.
+     */
+    setHover(lotId: string | null): void {
+        if (this.hoveredLotId === lotId) return;
+        this.hoveredLotId = lotId;
+        this.renderer.setHover(lotId);
         this.renderer.render();
     }
 
@@ -170,6 +192,7 @@ export class VisualizationDriver {
      */
     reset(view: GameViewState, highlight: HighlightState): void {
         this.animationController.stop();
+        this.hoveredLotId = null;
         this.renderer.reset();
         this.renderer.setViewState(view, highlight);
         this.renderer.render();
