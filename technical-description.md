@@ -14,7 +14,10 @@
 >  - контракт визуализации — жизненный цикл, а не «координата рулетки»;
 >  - `selectionWeight` (вероятность выбора) и `visualValue` (визуальный размер) разделены;
 >  - геометрия (углы/ширины/сетка) — внутренняя для каждой визуализации, общего `Segment` нет;
->  - подсветка разделена: game-набор задаётся игрой, cursor вычисляется самой визуализацией.
+>  - подсветка разделена: game-набор задаётся игрой, cursor вычисляется самой визуализацией;
+>  - hover из списка лотов — отдельный аддитивный канал подсветки (`setHover`, по stable `lot.id`);
+>  - данные режима для UI обобщены (`modeData.ext`): список выводит готовый текст, а смысл и
+>    формат задаёт режим (HP, вероятность финальной победы, …);
 >  - добавлен режим **Crown Defense** (`selectionWeight = 1`, `visualValue = HP`) — первое
 >    доказательство расширяемости: без правок core и визуализаций.
 > Поведение `Normal` и `Survival` сохранено 1:1.
@@ -153,12 +156,12 @@ Renderer
 | `animation.ts` | Easing-функции и `AnimationController` (requestAnimationFrame) |
 | `visualizationDriver.ts` | Жизненный цикл визуализации: view state, spin, outcome transition, reset, cursor |
 | `visualizationStrategy.ts` | Реестр `VisualizationPackage` (тип → фабрика рендерера) |
-| `baseRenderer.ts` | Абстрактный базовый рендерер (High-DPI, сегменты, highlight, presence) |
+| `baseRenderer.ts` | Абстрактный базовый рендерер (презентация, High-DPI, highlight, hover, presence) |
 | `wheelRenderer.ts` | Рендерер «колесо» |
 | `stripRenderer.ts` | Рендерер «лента» (бесконечная прокрутка) |
 | `countingRhymeRenderer.ts` | Рендерер «считалочка» (круги с подсветкой) |
-| `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, highlight-набор) |
-| `utils.ts` | Цвета (генерация/осветление), геометрия ленты, отображение длительности |
+| `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, highlight-набор, hover, ext-колонка) |
+| `utils.ts` | Цвета (генерация/осветление), геометрия ленты, длительность, формат процентов |
 | `i18n.ts` | Инициализация i18next, перевод DOM, синхронизация `lang`, хелпер `t` |
 | `csvParser.ts` | Разбор CSV-текста в `ParsedLot[]` (через Papa Parse) |
 | `importStrategies.ts` | Стратегии импорта `REPLACE` / `MERGE` |
@@ -186,7 +189,7 @@ interface Lot {                 // Только постоянные данны�
 }
 
 interface Settings {            // Настройки приложения (тема и язык намеренно не входят)
-  modeId: Mode;                 // 'normal' | 'survival'
+  modeId: Mode;                 // 'normal' | 'survival' | 'crown-defense'
   visualization: VisualizationType; // 'wheel' | 'strip' | 'counting-rhyme'
   animationDuration: number;    // мс
 }
@@ -536,6 +539,8 @@ export function getMode(modeId) { return MODES[modeId]; }
   `DURATION_MAP` до 300 с; `sliderToDuration` / `durationToSlider`.
 - `getRandomPositionInRange(span, edgeMarginPercent, maxEdgeMargin)` — случайная точка внутри
   сегмента с отступом от краёв.
+- `formatPercent(p)` — проценты для UI: целое без дробной части («100%», «50%»), иначе одна
+  цифра («42.5%», «7.1%»). Режимы используют её для ext-колонки.
 
 ### 6.7 Настройки времени, языка и темы
 
@@ -560,7 +565,9 @@ export function getMode(modeId) { return MODES[modeId]; }
 и не знает структуру `modeState`.
 
 Ключевые ссылки: `lotManager`, `gameSession`, `visualizationDriver`, `lotListView`, `settings`,
-`easingFunction`, `gameHighlight: Set<string>` (game-подсветка, принадлежит `App`).
+`easingFunction`, `gameHighlight: Set<string>` (game-подсветка, принадлежит `App`),
+`hoveredLotId` (транзиентный hover), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер
+ext-колонки).
 
 Основные операции:
 - `addLot()` — guard `isSessionLocked`; `LotManager.addLot` (ошибка → `ErrorDialog`);
@@ -577,9 +584,16 @@ export function getMode(modeId) { return MODES[modeId]; }
   текст и UI.
 - `deleteLot` / `handleClearLots` / `openImportDialog` / `handleImportConflict` /
   `executeImport` — guard-ы + согласованные операции над `LotManager` и `GameSession` (§6.5).
+- `handleLotHover(id)` — hover строки списка: `visualizationDriver.setHover(id)`; чисто визуально
+  и не зависит от блокировок.
+- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot` + `refresh`.
+- Тумблер `ext` (`#ext-toggle`, кнопка `↔️` в шапке списка) — переключает `extEnabled`, класс
+  `btn-primary`/`btn-secondary` (`applyExtToggleState()`) и вызывает `updateUI()`; доступен всегда.
+- Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refresh` и `updateUI()`
+  (список перерисовывается, т.к. `modeData`/ext зависят от режима).
 - `updateUI()` — строит `RenderableLot[]` из `gameSession.viewState`, вызывает `LotListView.render`
-  с `highlightIds = this.gameHighlight`, обновляет статистику (total из `LotManager`, active из
-  `GameSession`), затем `updateControlsState()`.
+  с `highlightIds = this.gameHighlight` и `extEnabled`, обновляет статистику (total из
+  `LotManager`, active из `GameSession`), затем `updateControlsState()`.
 - `updateControlsState()` — переносит блокировки в `disabled` (см. §7.5).
 
 `App` не вычисляет курсор визуализации сам — за него это делает рендерер (§7.3, §7.4).
@@ -592,7 +606,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 - `render(lots: RenderableLot[], options)` — полная перерисовка, сортировка на копии;
   строки получают классы `inactive` / `highlighted`; для каждого лота — индикатор цвета, имя,
-  поле суммы, кнопка удаления (кроме подсвеченных).
+  поле суммы, (при `extEnabled`) ячейка ext-колонки, кнопка удаления (кроме подсвеченных).
 - `options.highlightIds: ReadonlySet<string>` — набор game-highlight (победители/выбывшие).
 - `options.onLotHover(lotId | null)` — hover строки сообщается наружу по stable `lot.id`
   (`mouseenter`/`mouseleave`; обработчики перевешиваются при каждой перерисовке, поэтому hover
@@ -882,6 +896,10 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
   (O(2^n·n), мемоизация) и вызывается один раз на сборку view-состояния (`getPresentationData`).
   При числе активных участников больше `SURVIVAL_EXACT_MAX_ACTIVE = 18` значение деградирует до
   `…` (симуляция сознательно не используется). Normal/Crown — дешёвые O(n).
+- **ext-колонка (UI)**: тумблер — кнопка `↔️` в шапке списка (`btn-primary` ON / `btn-secondary`
+  OFF), доступен всегда. Переключение не меняет ширину блока Lots: колонка укладывается в уже
+  существующую ширину строки, а в строке добавления нет искусственного «спейсера» — правые
+  элементы (×, ➕) прижаты к краю растянутым полем имени.
 - **`importDialog` в `App`** уничтожается при закрытии (`destroy()`), чтобы не накапливать
   DOM-узлы и обработчики.
 - **`brightenColor`** теперь понимает `rgb()`/`hsl()`/hex (ранее подсветка `rgb()`/`hsl`-цветов
