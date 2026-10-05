@@ -1,9 +1,9 @@
-import type { Segment } from './rouletteEngine.js';
+import type { Lot } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
-import { brightenColor, getSegmentWidth } from './utils.js';
+import { brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
 
-// Segment band geometry
+// Band geometry
 const BAND_HEIGHT = 160;
 const BAND_HALF_HEIGHT = BAND_HEIGHT / 2;
 
@@ -23,33 +23,45 @@ const CURSOR_HIGHLIGHT_BRIGHTNESS = 18;
 const HIGHLIGHT_SHADOW_COLOR = 'rgba(255, 215, 0, 0.8)';
 const HIGHLIGHT_SHADOW_BLUR = 15;
 
+/** Strip-specific band geometry. Widths/offsets live here — never in the
+ *  shared participant/presentation contract. */
+interface StripBand {
+    lot: Lot;
+    startInCycle: number;
+    width: number;
+}
+
 /**
  * Strip (ribbon) visualization renderer.
  *
- * Spin math (target scroll offset + cursor resolution) is internal to this
- * visualization.
+ * Band width comes from the participant's `visualValue` (scaled by `presence`),
+ * NOT from `selectionWeight`. The spin target and the cursor are resolved
+ * against this strip-local geometry.
  */
 export class StripRenderer extends BaseRenderer {
-    /** Cached sum of getSegmentWidth() over one full cycle (drawing geometry). */
+    private bands: StripBand[] = [];
     private totalCycleWidth = 0;
 
-    /** Same sum over the stable timing partition (for cursor resolution). */
-    private timingCycleWidth = 0;
-
     protected override onViewStateChanged(): void {
-        this.totalCycleWidth = this.segments.reduce(
-            (sum, s) => sum + getSegmentWidth(s.weight),
-            0
-        );
-        this.timingCycleWidth = this.timingSegments.reduce(
-            (sum, s) => sum + getSegmentWidth(s.weight),
-            0
-        );
+        const parts = this.drawableParticipants().map(p => ({
+            lot: p.lot,
+            value: p.visualValue * p.presence
+        }));
+        const fractions = normalizeToFractions(parts.map(p => p.value));
+
+        let x = 0;
+        this.bands = parts.map((p, i) => {
+            const width = getStripBandWidth(fractions[i]);
+            const band: StripBand = { lot: p.lot, startInCycle: x, width };
+            x += width;
+            return band;
+        });
+        this.totalCycleWidth = x;
     }
 
     protected override onReset(): void {
+        this.bands = [];
         this.totalCycleWidth = 0;
-        this.timingCycleWidth = 0;
     }
 
     render(): void {
@@ -58,7 +70,7 @@ export class StripRenderer extends BaseRenderer {
 
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-        if (this.segments.length === 0 || this.totalCycleWidth === 0) return;
+        if (this.bands.length === 0 || this.totalCycleWidth === 0) return;
 
         const visualScrollOffset = this.getVisualOffset();
         const cyclesNeeded = this.getCyclesNeeded(canvasWidth);
@@ -75,9 +87,12 @@ export class StripRenderer extends BaseRenderer {
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        const band = this.bands.find(b => b.lot.id === rolledLotId);
+        if (!band) return this.animationValue;
         return RouletteEngine.computeFinalScrollOffset(
-            this.segments,
-            rolledLotId,
+            band.startInCycle,
+            band.width,
+            this.totalCycleWidth,
             this.animationValue,
             durationMs,
             this.getLogicalSize().width
@@ -85,25 +100,20 @@ export class StripRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // Resolve against the STABLE (presence-independent) partition so the
-        // cursor does not hop while the drawing geometry animates.
-        const segments = this.timingSegments;
-        if (segments.length === 0 || this.timingCycleWidth <= 0) return null;
+        // The cursor follows the drawn (visualValue-based) geometry: the band
+        // under the centre marker.
+        if (this.bands.length === 0 || this.totalCycleWidth <= 0) return null;
 
-        // Segment i is drawn at [cum - offset, cum - offset + w); the centre
-        // marker sits at centerX. It is under the cursor when
-        // cum ≤ centerX + offset < cum + w.
         const centerX = this.getLogicalSize().width / 2;
-        let local = (animationValue + centerX) % this.timingCycleWidth;
-        if (local < 0) local += this.timingCycleWidth;
+        let local = (animationValue + centerX) % this.totalCycleWidth;
+        if (local < 0) local += this.totalCycleWidth;
 
-        let cumulative = 0;
-        for (const segment of segments) {
-            const width = getSegmentWidth(segment.weight);
-            if (local >= cumulative && local < cumulative + width) return segment.lot.id;
-            cumulative += width;
+        for (const band of this.bands) {
+            if (local >= band.startInCycle && local < band.startInCycle + band.width) {
+                return band.lot.id;
+            }
         }
-        return segments[segments.length - 1].lot.id;
+        return this.bands[this.bands.length - 1].lot.id;
     }
 
     private getVisualOffset(): number {
@@ -119,20 +129,19 @@ export class StripRenderer extends BaseRenderer {
     }
 
     private renderOneCycle(xOffset: number, centerY: number): void {
-        let currentX = xOffset;
+        for (const band of this.bands) {
+            const presence = this.presenceOf(band.lot.id);
+            const game = this.isGameHighlighted(band.lot.id);
+            const cursor = this.isCursor(band.lot.id);
 
-        for (const segment of this.segments) {
-            const segmentWidth = getSegmentWidth(segment.weight);
-            const presence = this.presenceOf(segment.lot.id);
-            const game = this.isGameHighlighted(segment.lot.id);
-            const cursor = this.isCursor(segment.lot.id);
-
-            const baseColor = segment.lot.color || '#888';
+            const baseColor = band.lot.color || '#888';
             const fillColor = game
                 ? brightenColor(baseColor, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
                 : cursor
                     ? brightenColor(baseColor, CURSOR_HIGHLIGHT_BRIGHTNESS)
                     : baseColor;
+
+            const currentX = xOffset + band.startInCycle;
 
             this.ctx.save();
             this.ctx.globalAlpha = presence;
@@ -142,18 +151,16 @@ export class StripRenderer extends BaseRenderer {
             }
 
             this.ctx.fillStyle = fillColor;
-            this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, segmentWidth, BAND_HEIGHT);
+            this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
             this.ctx.restore();
 
             if (presence > 0.01) {
-                this.drawSegmentLabel(segment, currentX + segmentWidth / 2, centerY, presence);
+                this.drawBandLabel(band, currentX + band.width / 2, centerY, presence);
             }
-
-            currentX += segmentWidth;
         }
     }
 
-    private drawSegmentLabel(segment: Segment, textX: number, textY: number, presence: number): void {
+    private drawBandLabel(band: StripBand, textX: number, textY: number, presence: number): void {
         this.ctx.save();
         this.ctx.globalAlpha = presence;
         this.ctx.translate(textX, textY);
@@ -164,7 +171,7 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        const name = segment.lot.name;
+        const name = band.lot.name;
         const displayName = name.length > LABEL_MAX_CHARS
             ? name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
             : name;

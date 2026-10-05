@@ -14,7 +14,7 @@ import { t } from './i18n.js';
  * Normal mode.
  *
  * Rules:
- *  - weight = `amount` (higher amount → higher chance to win);
+ *  - selectionWeight = `amount` (higher amount → higher chance to win);
  *  - one spin ends the game;
  *  - the rolled lot is the winner;
  *  - nobody is eliminated.
@@ -34,7 +34,13 @@ export class NormalMode implements GameMode {
 
     onParticipantsChanged(state: GameModeState): GameModeState { return state; }
 
-    calculateWeight(lot: Lot): number {
+    calculateSelectionWeight(lot: Lot): number {
+        return lot.amount;
+    }
+
+    getParticipantVisualValue(lot: Lot): number {
+        // Visually equivalent to the pre-refactor behaviour (sector size was
+        // derived from the selection weight). amount >= 0.01, so this is > 0.
         return lot.amount;
     }
 

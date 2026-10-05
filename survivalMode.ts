@@ -14,7 +14,7 @@ import { t } from './i18n.js';
  * Survival mode (elimination).
  *
  * Rules:
- *  - weight = `1 / amount` (higher amount → lower chance to be eliminated);
+ *  - selectionWeight = `1 / amount` (higher amount → lower chance to be eliminated);
  *  - each spin eliminates the rolled lot;
  *  - the winner is decided from the state AFTER removing the rolled lot, so
  *    the last lot standing is never spun again;
@@ -37,7 +37,13 @@ export class SurvivalMode implements GameMode {
 
     onParticipantsChanged(state: GameModeState): GameModeState { return state; }
 
-    calculateWeight(lot: Lot): number {
+    calculateSelectionWeight(lot: Lot): number {
+        return 1 / lot.amount;
+    }
+
+    getParticipantVisualValue(lot: Lot): number {
+        // Visually equivalent to the pre-refactor behaviour: sector size was
+        // the selection weight 1/amount. amount >= 0.01, so this is finite.
         return 1 / lot.amount;
     }
 

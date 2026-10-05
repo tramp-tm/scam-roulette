@@ -6,9 +6,9 @@ import type {
     Lot,
     Mode,
     RenderableParticipant,
+    SelectionCandidate,
     TurnOutcome,
-    VisualizationTransition,
-    WeightedLot
+    VisualizationTransition
 } from './types.js';
 import { getMode } from './modes.js';
 import { RouletteEngine } from './rouletteEngine.js';
@@ -150,9 +150,9 @@ export class GameSession {
     }
 
     /**
-     * Immutable presentation snapshot of the current stable state. Weights
-     * and per-participant presentation data are computed by the mode; the
-     * core never interprets them.
+     * Immutable presentation snapshot of the current stable state. Selection
+     * weights and per-participant presentation values/data are computed by the
+     * mode; the core never interprets them.
      */
     get viewState(): GameViewState {
         return this.buildViewState(this.participants, this.modeState);
@@ -263,18 +263,21 @@ export class GameSession {
         }
 
         const byId = this.lotIndex();
-        const candidates: { participant: GameParticipantState; lot: Lot; weight: number }[] = [];
+        const candidates: { participant: GameParticipantState; lot: Lot; selectionWeight: number }[] = [];
         for (const p of activeParticipants) {
             const lot = byId.get(p.lotId);
             if (!lot) continue;
             candidates.push({
                 participant: p,
                 lot,
-                weight: this.currentMode.calculateWeight(lot, p, this.modeState)
+                selectionWeight: this.currentMode.calculateSelectionWeight(lot, p, this.modeState)
             });
         }
 
-        const entries: WeightedLot[] = candidates.map(c => ({ lot: c.lot, weight: c.weight }));
+        const entries: SelectionCandidate[] = candidates.map(c => ({
+            lot: c.lot,
+            selectionWeight: c.selectionWeight
+        }));
         const rolled = RouletteEngine.rollWeighted(entries);
         if (!rolled) return { ok: false, reason: 'noValidWeights' };
 
@@ -367,11 +370,14 @@ export class GameSession {
             const lot = byId.get(p.lotId);
             if (!lot) continue;
 
-            const weight = p.active ? this.currentMode.calculateWeight(lot, p, state) : 0;
+            const selectionWeight = p.active
+                ? this.currentMode.calculateSelectionWeight(lot, p, state)
+                : 0;
             renderables.push({
                 lot,
                 active: p.active,
-                weight,
+                selectionWeight,
+                visualValue: this.currentMode.getParticipantVisualValue(lot, p, state),
                 presence: p.active ? 1 : 0,
                 modeData: this.currentMode.getParticipantPresentation(p, state)
             });

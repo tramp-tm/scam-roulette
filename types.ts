@@ -14,7 +14,7 @@ export interface Lot {
     color: string;
 }
 
-export type Mode = 'normal' | 'survival';
+export type Mode = 'normal' | 'survival' | 'crown-defense';
 
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
@@ -77,9 +77,9 @@ export interface TurnEvent {
 }
 
 /**
- * Generalized result of one turn (spin). Supersedes the former
- * `winner + deactivate[]` shape: winners / eliminated / changed are all
- * ordinary lists — there are no hidden special cases.
+ * Generalized result of one turn (spin). `winners` / `eliminated` / `changed`
+ * are all ordinary lists — a single winner or a single elimination is simply
+ * a list of length one, so there are no hidden special-case fields.
  */
 export interface TurnOutcome {
     /** The lot that was decided for this turn. */
@@ -119,6 +119,16 @@ export interface TurnOutcome {
  * In particular `participants` / `state` may be a snapshot the session still
  * references as the turn's "before" image. Return new objects for anything
  * that changed.
+ *
+ * SELECTION vs PRESENTATION
+ * The mode defines two independent, explicitly separated semantics:
+ *  - selection:    `calculateSelectionWeight()` — probability for roulette;
+ *  - presentation: `getParticipantVisualValue()` — the abstract magnitude a
+ *                  visualization renders as size/scale, independent of the
+ *                  selection probability; plus `getParticipantPresentation()`
+ *                  for extra mode-specific data (`modeData`).
+ * A mode must not assume `visualValue` means weight/amount/HP to the renderer,
+ * and the core must not derive one from the other.
  */
 export interface GameMode {
     readonly id: Mode;
@@ -137,8 +147,22 @@ export interface GameMode {
         participants: readonly GameParticipantState[]
     ): GameModeState;
 
-    /** Weight of a participant for the next spin (mode-specific meaning). */
-    calculateWeight(
+    /**
+     * SELECTION weight: how likely this participant is to be rolled by the
+     * roulette mechanics. Drives selection only — never visual size.
+     */
+    calculateSelectionWeight(
+        lot: Lot,
+        participant: GameParticipantState,
+        state: GameModeState
+    ): number;
+
+    /**
+     * VISUAL magnitude for this participant, used by visualizations for
+     * size/scale. Independent of `calculateSelectionWeight`; the mode defines
+     * its own meaning (amount, score, HP, …) and renderers never assume it.
+     */
+    getParticipantVisualValue(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState
@@ -171,16 +195,24 @@ export interface GameMode {
 /**
  * One participant as the presentation layer sees it.
  *
- * `weight` is the mode-owned spin weight; `presence` is a visual multiplier
- * in [0, 1] used to animate eliminations by interpolating a view state
- * (a visualization builds geometry from `weight * presence`). `modeData` is
- * mode-specific presentation payload the UI / visualization may render —
- * the core and the visualizations never interpret its meaning.
+ * Two INDEPENDENT magnitudes:
+ *  - `selectionWeight` — probability weight used by roulette selection. It
+ *    never determines visual size.
+ *  - `visualValue` — abstract presentation magnitude the visualization turns
+ *    into a size/scale. The mode defines its meaning (amount, score, HP, …);
+ *    renderers must never assume it means weight, amount or HP. Changing it
+ *    does not change the selection probability, and vice versa.
+ *
+ * `presence` is a visual multiplier in [0, 1] used to animate eliminations by
+ * interpolating a view state (a lot leaves the view when it reaches 0).
+ * `modeData` is mode-specific presentation payload the UI may render — the
+ * core and the visualizations never interpret its meaning.
  */
 export interface RenderableParticipant {
     lot: Lot;
     active: boolean;
-    weight: number;
+    selectionWeight: number;
+    visualValue: number;
     presence: number;
     modeData?: ModePresentationData;
 }
@@ -219,10 +251,14 @@ export interface VisualizationTransition {
 // ENGINE
 // ========================================
 
-/** A lot paired with its (mode-computed) weight for one spin. */
-export interface WeightedLot {
+/**
+ * A candidate for roulette selection: a lot paired with its mode-computed
+ * SELECTION weight (the probability of being rolled). Used only by the
+ * selection mechanics — never for visual sizing.
+ */
+export interface SelectionCandidate {
     lot: Lot;
-    weight: number;
+    selectionWeight: number;
 }
 
 // ========================================
@@ -243,8 +279,12 @@ export interface IRenderer {
     /**
      * Adopt a presentation snapshot + highlight state. This is the only way
      * highlight state is fed in; the visualization manages its own cursor
-     * internally. Recomputes geometry (segments and any cached layout), so it
-     * is not meant to be called on every animation frame.
+     * internally.
+     *
+     * Called once for a spin, but once PER FRAME during an outcome transition
+     * (with an interpolated snapshot), so `onViewStateChanged` must stay cheap:
+     * rebuild derived geometry, but cache heavy layout keyed on its inputs
+     * (see CountingRhymeRenderer's grid cache).
      */
     setViewState(view: GameViewState, highlight: HighlightState): void;
 

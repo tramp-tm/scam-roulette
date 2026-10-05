@@ -92,19 +92,32 @@ export function brightenColor(color: string, percent: number): string {
 // STRIP GEOMETRY
 // ========================================
 
-/** Minimum width (px) of a strip segment, regardless of weight */
-export const MIN_SEGMENT_WIDTH = 60;
+/** Minimum width (px) of a strip band, regardless of its visual fraction. */
+export const MIN_BAND_WIDTH = 60;
 
-/** Multiplier applied to a segment's normalized weight to get its width */
-export const SEGMENT_WIDTH_SCALE = 400;
+/** Multiplier applied to a band's normalized visual fraction to get its width. */
+export const BAND_WIDTH_SCALE = 400;
 
 /**
- * Computes the rendered width of a strip segment from its normalized weight.
- * This is the single source of truth shared by StripRenderer (drawing) and
- * RouletteEngine.computeFinalScrollOffset (scroll math) — they must never drift.
+ * Rendered width (px) of a strip band from its normalized visual fraction
+ * (visualValue / Σ visualValue). Strip-specific visual geometry — it is NOT a
+ * shared roulette contract and is not used by RouletteEngine.
  */
-export function getSegmentWidth(weight: number): number {
-    return Math.max(MIN_SEGMENT_WIDTH, weight * SEGMENT_WIDTH_SCALE);
+export function getStripBandWidth(fraction: number): number {
+    return Math.max(MIN_BAND_WIDTH, fraction * BAND_WIDTH_SCALE);
+}
+
+/**
+ * Normalizes a list of non-negative magnitudes so they sum to 1 (fractions).
+ * Non-positive entries map to 0. Neutral helper used by renderers to turn a
+ * magnitude distribution into geometry; it carries no participant semantics
+ * and no roulette geometry.
+ */
+export function normalizeToFractions(values: readonly number[]): number[] {
+    let total = 0;
+    for (const v of values) if (v > 0) total += v;
+    if (!(total > 0)) return values.map(() => 0);
+    return values.map(v => (v > 0 ? v / total : 0));
 }
 
 // ========================================

@@ -277,7 +277,7 @@ export class App {
         if (this.gameSession.isSessionLocked) return;
         this.lotManager.updateLot(id, { amount: newAmount });
         // Amount changes do not affect participation; the next view-state read
-        // already reflects the updated weight.
+        // already reflects the mode's updated selection weight and visual value.
         this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
     }
 
@@ -367,8 +367,8 @@ export class App {
             this.gameSession.setMode(newModeId);
             this.settings.modeId = newModeId;
 
-            // Re-render with the new mode's weight calculation. Participation is
-            // deliberately preserved across a mode switch.
+            // Re-render with the new mode's selection weights / visual values.
+            // Participation is deliberately preserved across a mode switch.
             this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
             // Update result text to show new mode name if no highlight active
             this.updateResultTextWithModeName();
@@ -729,8 +729,8 @@ export class App {
         this.lotListView.setLocked(sessionLevelLocked);
 
         // Spin-time configuration (duration, visualization, easing) — available
-        // between spins of an unfinished game (planA.md §5); disabled while
-        // the spin-time lock is held or once the game has finished.
+        // between spins of an unfinished game; disabled while the spin-time
+        // lock is held or once the game has finished.
         if (this.durationSlider) this.durationSlider.disabled = spinTimeLocked;
         if (this.durationInput) this.durationInput.disabled = spinTimeLocked;
         if (this.visualizationSelect) this.visualizationSelect.disabled = spinTimeLocked;

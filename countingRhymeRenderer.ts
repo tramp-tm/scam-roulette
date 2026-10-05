@@ -1,43 +1,34 @@
+import type { RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
+import { normalizeToFractions } from './utils.js';
 
 /**
  * CountingRhymeRenderer
  * ---------------------
- * Each active lot is drawn as a circle whose radius reflects its weight
- * *relative to the heaviest active lot*. During animation the
- * "counting-rhyme" highlight hops from circle to circle.
+ * Each drawn lot is a circle. Two independent quantities drive it:
+ *  - the circle RADIUS comes from the participant's `visualValue` (scaled by
+ *    `presence`) — the abstract presentation magnitude, NOT the probability;
+ *  - the highlight "beat" / cursor / spin target come from the participant's
+ *    `selectionWeight` partition (the roulette probability), which is why the
+ *    dwell time per circle is proportional to its chance.
  *
  * Contract:
- *  - geometry comes from BaseRenderer: `segments` is the drawing partition
- *    (presence-scaled, so radii shrink during an elimination transition) and
- *    `timingSegments` is the STABLE partition used for highlight timing and
- *    cursor resolution. This renderer never computes game weights itself.
- *  - radius uses the *drawing* partition (`weight * presence`, relative to the
- *    heaviest), so an eliminated circle shrinks as its presence goes to 0.
- *  - the highlight index / cursor use the *timing* partition (raw weights),
- *    which is constant across an outcome transition — the "beat" does not hop
- *    while the geometry is animating.
- *  - the per-frame highlighted circle is derived inside render() from
- *    `animationValue`; the game/cursor emphasis is a separate layer.
- *  - `animationValue` is measured in *cycles*: one unit = one full traversal
- *    of the circle ring. Circle i owns [P_i, P_{i+1}) where P is the prefix
- *    sum of the timing weights, so dwell per traversal is w_i · T_cycle.
- *  - the engine guarantees endValue ≡ targetMid (mod 1), so the final
- *    animated frame highlights the rolled lot.
+ *  - `animationValue` is measured in *cycles* (one unit = one full traversal of
+ *    the circle ring). `beatPrefix` partitions [0,1) by the selection weights,
+ *    so circle i owns [P_i, P_{i+1}) of a traversal.
+ *  - the engine guarantees endValue ≡ targetMid (mod 1), so the final animated
+ *    frame highlights the rolled lot.
  *
  * PERFORMANCE: the deterministic grid (cell permutation + jitter) depends only
- * on the lot-id set and the canvas size, so it is cached and rebuilt only when
- * that signature changes — NOT on every transition frame. Radius is computed
- * per render from the current drawing weights.
+ * on the drawn lot-id set and the canvas size, so it is cached and rebuilt only
+ * when that signature changes — NOT on every transition frame. Radius is
+ * computed per render from the current `visualValue * presence`.
  *
- * NOTE ON COSMETIC SHUFFLE: the segment → grid-cell mapping is permuted so the
- * highlight order is decoupled from the visual position; a deterministic
- * in-cell jitter is applied next. Both are seeded from the lot ids.
- * Math.random() is never called.
+ * NOTE: the segment → grid-cell mapping is a deterministic permutation (FNV-1a
+ * seeded LCG); `Math.random()` is never called.
  */
 
-/** Gold that matches the wheel / strip pointers. */
 const HIGHLIGHT_COLOR = 'gold';
 const HIGHLIGHT_GLOW_BLUR = 24;
 const HIGHLIGHT_STROKE_WIDTH = 4;
@@ -51,20 +42,15 @@ const GAME_HIGHLIGHT_GLOW_BLUR = 30;
 const MIN_CIRCLE_RADIUS = 14;
 const MAX_CIRCLE_RADIUS = 250;
 
-/** Fraction of the (smaller) grid cell a circle may occupy at most. */
 const CELL_FILL_RATIO = 0.95;
 
-/**
- * Crossfade window expressed as a fraction of the *current* segment, so dwell
- * time per lot stays proportional to its weight.
- */
+/** Crossfade window as a fraction of the current beat segment. */
 const TRANSITION_FRACTION = 0.2;
 
 const LABEL_FONT = '16px sans-serif';
 const LABEL_MIN_RADIUS = 22;
 const LABEL_SHADOW_COLOR = 'rgba(0, 0, 0, 0.65)';
 
-/** Cached grid cell (position only; radius is per-frame). */
 interface CircleCell {
     lotId: string;
     cx: number;
@@ -72,28 +58,33 @@ interface CircleCell {
 }
 
 export class CountingRhymeRenderer extends BaseRenderer {
-    /** Cached grid cells, aligned by index with `segments`. */
+    /** Drawn participants (visual geometry), rebuilt on view-state change. */
+    private circles: RenderableParticipant[] = [];
+
+    /** Cached grid cells, aligned by index with `circles`. */
     private cells: CircleCell[] = [];
-
-    /** Signature (canvas size + lot-id set) the cells were built for. */
-    private cellSignature = '';
-
-    /** Max radius for the current grid (set when cells are (re)built). */
+    private lastCellIds: string[] = [];
+    private lastWidth = 0;
+    private lastHeight = 0;
     private effectiveMaxRadius = 0;
 
-    /** Prefix sums of the STABLE timing weights. */
-    private timingPrefix: number[] = [];
+    /** Prefix sums of the selection-weight (beat) partition. */
+    private beatPrefix: number[] = [];
 
     protected override onViewStateChanged(): void {
-        this.rebuildTimingPrefix();
+        this.circles = this.drawableParticipants();
+        this.rebuildBeat();
         this.ensureCells();
     }
 
     protected override onReset(): void {
+        this.circles = [];
         this.cells = [];
-        this.cellSignature = '';
+        this.lastCellIds = [];
+        this.lastWidth = 0;
+        this.lastHeight = 0;
         this.effectiveMaxRadius = 0;
-        this.timingPrefix = [];
+        this.beatPrefix = [];
     }
 
     render(): void {
@@ -101,43 +92,41 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-        const n = Math.min(this.cells.length, this.segments.length);
+        const n = Math.min(this.cells.length, this.circles.length);
         if (n === 0) return;
 
-        const maxWeight = this.maxSegmentWeight();
+        let maxVisual = 0;
+        for (const p of this.circles) {
+            const v = p.visualValue * p.presence;
+            if (v > maxVisual) maxVisual = v;
+        }
         const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
-
         const frac = this.normalizePosition(this.animationValue);
         const intensities = this.computeIntensities(frac);
 
         for (let i = 0; i < n; i++) {
+            const p = this.circles[i];
             const cell = this.cells[i];
-            const segment = this.segments[i];
-            const presence = this.presenceOf(segment.lot.id);
+            const presence = p.presence;
 
-            // Radius from the DRAWING weight (presence-scaled) → shrinks during
-            // an elimination transition.
-            const weightRatio = maxWeight > 0 ? segment.weight / maxWeight : 0;
-            const radius = MIN_CIRCLE_RADIUS + weightRatio * radiusRange;
+            const visuals = p.visualValue * p.presence;
+            const radius = MIN_CIRCLE_RADIUS + (maxVisual > 0 ? visuals / maxVisual : 0) * radiusRange;
 
-            // ---- filled disc ------------------------------------------
             ctx.save();
             ctx.globalAlpha = presence;
             ctx.beginPath();
             ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
-            ctx.fillStyle = segment.lot.color || '#888888';
+            ctx.fillStyle = p.lot.color || '#888888';
             ctx.fill();
             ctx.restore();
 
-            // ---- outline / highlight ----------------------------------
             const intensity = intensities[i];
-            const game = this.isGameHighlighted(segment.lot.id);
+            const game = this.isGameHighlighted(p.lot.id);
 
             ctx.save();
             ctx.globalAlpha = presence;
             ctx.beginPath();
             ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
-
             if (game) {
                 ctx.strokeStyle = HIGHLIGHT_COLOR;
                 ctx.lineWidth = GAME_HIGHLIGHT_STROKE_WIDTH;
@@ -157,48 +146,89 @@ export class CountingRhymeRenderer extends BaseRenderer {
             ctx.restore();
 
             if (radius >= LABEL_MIN_RADIUS && presence > 0.05) {
-                this.drawLabel(segment.lot.name, cell.cx, cell.cy, radius, presence);
+                this.drawLabel(p.lot.name, cell.cx, cell.cy, radius, presence);
             }
         }
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
-        // Uses the stable partition; at spin time it equals the drawing one.
+        const idx = this.circles.findIndex(p => p.lot.id === rolledLotId);
+        if (idx < 0 || this.beatPrefix.length < idx + 2) return this.animationValue;
+
+        const start = this.beatPrefix[idx];
+        const weight = this.beatPrefix[idx + 1] - start;
+        const targetMid = start + weight / 2;
+
         return RouletteEngine.computeFinalCountingPosition(
-            this.timingSegments,
-            rolledLotId,
+            targetMid,
             this.animationValue,
             durationMs
         );
     }
 
     getCursorLotId(animationValue: number): string | null {
-        const segments = this.timingSegments;
-        const n = segments.length;
-        if (n === 0 || this.timingPrefix.length < n + 1) return null;
+        const n = this.circles.length;
+        if (n === 0 || this.beatPrefix.length < n + 1) return null;
 
         const frac = this.normalizePosition(animationValue);
         for (let i = 0; i < n; i++) {
-            if (frac < this.timingPrefix[i + 1]) return segments[i].lot.id;
+            if (frac < this.beatPrefix[i + 1]) return this.circles[i].lot.id;
         }
-        return segments[n - 1].lot.id;
+        return this.circles[n - 1].lot.id;
     }
 
     // ------------------------------------------------------------------
-    // Timing partition (stable / presence-independent)
+    // Beat partition (selection weights)
     // ------------------------------------------------------------------
 
-    private rebuildTimingPrefix(): void {
-        this.timingPrefix = [0];
-        for (const s of this.timingSegments) {
-            this.timingPrefix.push(this.timingPrefix[this.timingPrefix.length - 1] + s.weight);
+    private rebuildBeat(): void {
+        const n = this.circles.length;
+        if (n === 0) {
+            this.beatPrefix = [];
+            return;
+        }
+
+        const weights = this.circles.map(p => (p.selectionWeight > 0 ? p.selectionWeight : 0));
+        let fractions = normalizeToFractions(weights);
+        if (fractions.every(f => f === 0)) {
+            // No selection weights at all — fall back to a uniform beat so the
+            // highlight still cycles deterministically.
+            fractions = this.circles.map(() => 1 / n);
+        }
+
+        this.beatPrefix = [0];
+        for (const f of fractions) {
+            this.beatPrefix.push(this.beatPrefix[this.beatPrefix.length - 1] + f);
         }
     }
 
-    private maxSegmentWeight(): number {
-        let max = 0;
-        for (const s of this.segments) if (s.weight > max) max = s.weight;
-        return max;
+    private computeIntensities(frac: number): number[] {
+        const n = this.circles.length;
+        const intensities = new Array<number>(n).fill(0);
+        if (n === 0 || this.beatPrefix.length < n + 1) return intensities;
+
+        let idx = n - 1;
+        for (let i = 0; i < n; i++) {
+            if (frac < this.beatPrefix[i + 1]) {
+                idx = i;
+                break;
+            }
+        }
+
+        const start = this.beatPrefix[idx];
+        const weight = this.beatPrefix[idx + 1] - start;
+        const local = weight > 0 ? (frac - start) / weight : 0;
+
+        if (n === 1 || local >= TRANSITION_FRACTION) {
+            intensities[idx] = 1;
+            return intensities;
+        }
+
+        const t = local / TRANSITION_FRACTION;
+        const prevIdx = (idx - 1 + n) % n;
+        intensities[idx] = t;
+        intensities[prevIdx] = 1 - t;
+        return intensities;
     }
 
     // ------------------------------------------------------------------
@@ -206,30 +236,31 @@ export class CountingRhymeRenderer extends BaseRenderer {
     // ------------------------------------------------------------------
 
     private ensureCells(): void {
-        const n = this.segments.length;
+        const n = this.circles.length;
+        const { width, height } = this.getLogicalSize();
+        const rw = Math.round(width);
+        const rh = Math.round(height);
+
+        const sameSet = this.lastCellIds.length === n
+            && this.circles.every((p, i) => p.lot.id === this.lastCellIds[i]);
+
         if (n === 0) {
             this.cells = [];
-            this.cellSignature = '';
+            this.lastCellIds = [];
+            this.lastWidth = rw;
+            this.lastHeight = rh;
             this.effectiveMaxRadius = 0;
             return;
         }
 
-        const { width, height } = this.getLogicalSize();
-        const signature = `${Math.round(width)}x${Math.round(height)}|${this.segments.map(s => s.lot.id).join(',')}`;
-        if (signature === this.cellSignature && this.cells.length === n) return;
+        if (sameSet && rw === this.lastWidth && rh === this.lastHeight) return;
 
-        this.cellSignature = signature;
+        this.lastWidth = rw;
+        this.lastHeight = rh;
+        this.lastCellIds = this.circles.map(p => p.lot.id);
         this.rebuildCells(n, width, height);
     }
 
-    /**
-     * Deterministic grid cells for the current lot set and canvas size.
-     * The segment → cell mapping is a deterministic permutation and each
-     * circle's centre is nudged within its cell by a deterministic jitter.
-     * Both come from a single LCG seeded from the lot-id set, so an unchanged
-     * set reproduces the exact layout (Survival eliminations do not reshuffle
-     * the surviving circles).
-     */
     private rebuildCells(n: number, width: number, height: number): void {
         this.cells = [];
 
@@ -242,11 +273,15 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const cellHalf = Math.min(cellWidth, cellHeight) / 2;
         this.effectiveMaxRadius = Math.min(MAX_CIRCLE_RADIUS, cellHalf * CELL_FILL_RATIO);
 
-        const maxWeight = this.maxSegmentWeight();
-        const safeMaxWeight = maxWeight > 0 ? maxWeight : 1;
+        let maxVisual = 0;
+        for (const p of this.circles) {
+            const v = p.visualValue * p.presence;
+            if (v > maxVisual) maxVisual = v;
+        }
+        const safeMax = maxVisual > 0 ? maxVisual : 1;
         const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
 
-        const seed = this.hashIds(this.segments.map(s => s.lot.id));
+        const seed = this.hashIds(this.circles.map(p => p.lot.id));
         const rand = this.makeLcg(seed);
         const cellOfSegment = this.buildCellPermutation(n, rand);
 
@@ -258,9 +293,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const itemsInRow = row === rows - 1 ? n - row * cols : cols;
             const rowOffset = (cols - itemsInRow) / 2;
 
-            // Jitter gaps use the radius at build time; since radii only shrink
-            // afterwards (presence ≤ 1) the circle stays inside its cell.
-            const buildRadius = MIN_CIRCLE_RADIUS + (this.segments[i].weight / safeMaxWeight) * radiusRange;
+            const buildRadius = MIN_CIRCLE_RADIUS
+                + (this.circles[i].visualValue * this.circles[i].presence / safeMax) * radiusRange;
             const gapW = Math.max(0, cellWidth - 2 * buildRadius);
             const gapH = Math.max(0, cellHeight - 2 * buildRadius);
 
@@ -268,7 +302,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const offsetY = (rand() - 0.5) * gapH;
 
             this.cells.push({
-                lotId: this.segments[i].lot.id,
+                lotId: this.circles[i].lot.id,
                 cx: (col + rowOffset + 0.5) * cellWidth + offsetX,
                 cy: (row + 0.5) * cellHeight + offsetY
             });
@@ -303,53 +337,9 @@ export class CountingRhymeRenderer extends BaseRenderer {
         return perm;
     }
 
-    // ------------------------------------------------------------------
-    // Position → highlight (counting-rhyme mechanics)
-    // ------------------------------------------------------------------
-
     private normalizePosition(position: number): number {
         return ((position % 1) + 1) % 1;
     }
-
-    /**
-     * Highlight intensity per circle for a fractional cycle position, using
-     * the STABLE timing partition (raw weights) so it does not shift while the
-     * drawing geometry animates. Exactly one circle is current; the transition
-     * into it is smoothed over the first TRANSITION_FRACTION of its segment.
-     */
-    private computeIntensities(frac: number): number[] {
-        const segments = this.timingSegments;
-        const n = segments.length;
-        const intensities = new Array<number>(n).fill(0);
-        if (n === 0 || this.timingPrefix.length < n + 1) return intensities;
-
-        let idx = n - 1;
-        for (let i = 0; i < n; i++) {
-            if (frac < this.timingPrefix[i + 1]) {
-                idx = i;
-                break;
-            }
-        }
-
-        const start = this.timingPrefix[idx];
-        const weight = segments[idx].weight;
-        const local = weight > 0 ? (frac - start) / weight : 0;
-
-        if (n === 1 || local >= TRANSITION_FRACTION) {
-            intensities[idx] = 1;
-            return intensities;
-        }
-
-        const t = local / TRANSITION_FRACTION;
-        const prevIdx = (idx - 1 + n) % n;
-        intensities[idx] = t;
-        intensities[prevIdx] = 1 - t;
-        return intensities;
-    }
-
-    // ------------------------------------------------------------------
-    // Label helper
-    // ------------------------------------------------------------------
 
     private drawLabel(name: string, cx: number, cy: number, radius: number, presence: number): void {
         const ctx = this.ctx;

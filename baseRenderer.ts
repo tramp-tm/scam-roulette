@@ -2,46 +2,37 @@ import type {
     GameViewState,
     HighlightState,
     IRenderer,
-    RenderableParticipant,
-    WeightedLot
+    RenderableParticipant
 } from './types.js';
-import { RouletteEngine } from './rouletteEngine.js';
-import type { Segment } from './rouletteEngine.js';
 
 /**
  * Shared base for all canvas renderers (visualizations).
  *
- * Owns the presentation + highlight state and the shared lifecycle. Concrete
- * renderers implement `render()` and `computeSpinTarget()` and may hook
- * `onViewStateChanged()` / `onReset()` to rebuild their cached geometry.
+ * Owns the presentation model + highlight state and the shared lifecycle, and
+ * provides the drawing helpers. It does NOT build any geometry: each concrete
+ * renderer derives its OWN geometry (wheel angles, strip bands, counting-rhyme
+ * cells) from the presentation model in `onViewStateChanged()`. There is no
+ * shared `Segment`/angle type crossing visualizations.
  *
- * Two segment partitions are kept in parallel, in the same participant order:
- *
- *  - `segments` — the DRAWING geometry. Built from `weight * presence`, so a
- *    participant whose `presence` animates 1 → 0 shrinks its sector while the
- *    others grow (normalization) — the outcome transition falls out of view
- *    interpolation.
- *  - `timingSegments` — a STABLE partition built from the raw `weight`
- *    (presence-independent). Used for cursor / timing resolution, so the
- *    cursor does not hop while the drawing geometry is animating during a
- *    transition.
- *
- * Only the base class builds geometry; concrete renderers never compute game
- * weights themselves.
+ * Presentation facts the renderers work from (all per participant):
+ *  - `visualValue`    — the magnitude a renderer turns into size/scale;
+ *  - `selectionWeight`— the roulette probability; used only where a renderer
+ *                       needs the selection partition (e.g. the counting-rhyme
+ *                       dwell/target), never for drawing size;
+ *  - `presence`       — [0,1] visibility multiplier for elimination animation;
+ *  - `modeData`       — opaque mode payload the renderer may display.
  */
 export abstract class BaseRenderer implements IRenderer {
     protected readonly canvas: HTMLCanvasElement;
     protected readonly ctx: CanvasRenderingContext2D;
 
     protected participants: RenderableParticipant[] = [];
-    protected segments: Segment[] = [];
-    protected timingSegments: Segment[] = [];
     protected highlight: HighlightState = { game: new Set(), pulse: 1 };
     protected animationValue = 0;
 
     private presenceByLotId = new Map<string, number>();
 
-    /** Per-frame memo for cursor resolution (avoids O(n) scans per segment). */
+    /** Per-frame memo for cursor resolution (avoids O(n) scans per element). */
     private cursorForValue: number | null = null;
     private cursorLotId: string | null = null;
 
@@ -63,24 +54,10 @@ export abstract class BaseRenderer implements IRenderer {
         this.highlight = highlight;
 
         this.presenceByLotId.clear();
-        const drawingEntries: WeightedLot[] = [];
-        const timingEntries: WeightedLot[] = [];
-
         for (const p of this.participants) {
             this.presenceByLotId.set(p.lot.id, p.presence);
-            if (p.presence <= 0) continue;
-
-            if (p.weight > 0) {
-                timingEntries.push({ lot: p.lot, weight: p.weight });
-            }
-            const effectiveWeight = p.weight * p.presence;
-            if (effectiveWeight > 0) {
-                drawingEntries.push({ lot: p.lot, weight: effectiveWeight });
-            }
         }
 
-        this.segments = RouletteEngine.calculateSegments(drawingEntries);
-        this.timingSegments = RouletteEngine.calculateSegments(timingEntries);
         this.onViewStateChanged();
     }
 
@@ -98,8 +75,6 @@ export abstract class BaseRenderer implements IRenderer {
 
     reset(): void {
         this.participants = [];
-        this.segments = [];
-        this.timingSegments = [];
         this.presenceByLotId.clear();
         this.highlight = { game: new Set(), pulse: 1 };
         this.animationValue = 0;
@@ -117,15 +92,32 @@ export abstract class BaseRenderer implements IRenderer {
     // Hooks for concrete renderers
     // ------------------------------------------------------------------
 
-    /** Called after geometry was recomputed; rebuild cached layout here. */
+    /** Called after the presentation model changed; rebuild geometry here. */
     protected onViewStateChanged(): void {}
 
     /** Called after `reset()` cleared the shared state. */
     protected onReset(): void {}
 
     // ------------------------------------------------------------------
-    // Shared helpers for drawing
+    // Helpers for concrete renderers
     // ------------------------------------------------------------------
+
+    /**
+     * Participants that should be drawn: visible (`presence > 0`) and with a
+     * positive visual magnitude. The renderer maps `visualValue * presence`
+     * to its own geometry.
+     */
+    protected drawableParticipants(): RenderableParticipant[] {
+        return this.participants.filter(p => p.presence > 0 && p.visualValue > 0);
+    }
+
+    /**
+     * Participants that take part in the roulette/cursor partition
+     * (`selectionWeight > 0`), independent of `visualValue`.
+     */
+    protected selectableParticipants(): RenderableParticipant[] {
+        return this.participants.filter(p => p.presence > 0 && p.selectionWeight > 0);
+    }
 
     /** Visual presence in [0, 1] for a lot (1 when unknown). */
     protected presenceOf(lotId: string): number {

@@ -1,14 +1,15 @@
-import type { Segment } from './rouletteEngine.js';
+import type { Lot } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
-import { brightenColor } from './utils.js';
+import { brightenColor, normalizeToFractions } from './utils.js';
 
 // Wheel geometry
 const WHEEL_MARGIN = 30;
+const TAU = Math.PI * 2;
 
-// Segment strokes
-const SEGMENT_STROKE = '#fff';
-const SEGMENT_STROKE_WIDTH = 2;
+// Sector strokes
+const SECTOR_STROKE = '#fff';
+const SECTOR_STROKE_WIDTH = 2;
 
 // Highlight
 const GAME_HIGHLIGHT_BRIGHTNESS = 30;
@@ -36,14 +37,44 @@ const INNER_RING_STROKE = 'rgba(255, 255, 255, 0.1)';
 const OUTER_RING_WIDTH = 4;
 const INNER_RING_WIDTH = 2;
 
+/** Wheel-specific sector geometry. Angles live here — never in the shared
+ *  participant/presentation contract. */
+interface WheelSector {
+    lot: Lot;
+    startAngle: number;
+    endAngle: number;
+}
+
 /**
  * Wheel visualization renderer.
  *
- * Spin math (target rotation + cursor resolution) is internal to this
- * visualization; the contract only exposes a target scalar and a cursor
- * query.
+ * Sector angular size comes from the participant's `visualValue` (scaled by
+ * `presence`), NOT from `selectionWeight`. The spin target and the cursor are
+ * resolved against this wheel-local geometry.
  */
 export class WheelRenderer extends BaseRenderer {
+    private sectors: WheelSector[] = [];
+
+    protected override onViewStateChanged(): void {
+        const parts = this.drawableParticipants().map(p => ({
+            lot: p.lot,
+            value: p.visualValue * p.presence
+        }));
+        const fractions = normalizeToFractions(parts.map(p => p.value));
+
+        let cumulative = 0;
+        this.sectors = parts.map((p, i) => {
+            const startAngle = cumulative * TAU;
+            cumulative += fractions[i];
+            const endAngle = cumulative * TAU;
+            return { lot: p.lot, startAngle, endAngle };
+        });
+    }
+
+    protected override onReset(): void {
+        this.sectors = [];
+    }
+
     render(): void {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerX = canvasWidth / 2;
@@ -55,31 +86,31 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.translate(centerX, centerY);
         this.ctx.rotate(this.animationValue);
 
-        for (const segment of this.segments) {
-            const presence = this.presenceOf(segment.lot.id);
-            const game = this.isGameHighlighted(segment.lot.id);
-            const cursor = this.isCursor(segment.lot.id);
+        for (const sector of this.sectors) {
+            const presence = this.presenceOf(sector.lot.id);
+            const game = this.isGameHighlighted(sector.lot.id);
+            const cursor = this.isCursor(sector.lot.id);
 
             this.ctx.beginPath();
             this.ctx.moveTo(0, 0);
-            this.ctx.arc(0, 0, radius, segment.startAngle, segment.endAngle);
+            this.ctx.arc(0, 0, radius, sector.startAngle, sector.endAngle);
             this.ctx.closePath();
 
             this.ctx.globalAlpha = presence;
             this.ctx.fillStyle = game
-                ? brightenColor(segment.lot.color, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
+                ? brightenColor(sector.lot.color, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
                 : cursor
-                    ? brightenColor(segment.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
-                    : segment.lot.color;
+                    ? brightenColor(sector.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
+                    : sector.lot.color;
             this.ctx.fill();
 
-            this.ctx.strokeStyle = SEGMENT_STROKE;
-            this.ctx.lineWidth = SEGMENT_STROKE_WIDTH;
+            this.ctx.strokeStyle = SECTOR_STROKE;
+            this.ctx.lineWidth = SECTOR_STROKE_WIDTH;
             this.ctx.stroke();
             this.ctx.globalAlpha = 1;
 
-            if (segment.endAngle - segment.startAngle > LABEL_MIN_ARC) {
-                this.drawWheelLabel(segment, radius, presence);
+            if (sector.endAngle - sector.startAngle > LABEL_MIN_ARC) {
+                this.drawWheelLabel(sector, radius, presence);
             }
         }
 
@@ -90,34 +121,34 @@ export class WheelRenderer extends BaseRenderer {
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        const sector = this.sectors.find(s => s.lot.id === rolledLotId);
+        if (!sector) return this.animationValue;
         return RouletteEngine.computeFinalRotation(
-            this.segments,
-            rolledLotId,
+            sector.startAngle,
+            sector.endAngle,
             this.animationValue,
             durationMs
         );
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // Resolve against the STABLE (presence-independent) partition so the
-        // cursor does not hop while the drawing geometry animates.
-        const segments = this.timingSegments;
-        if (segments.length === 0) return null;
+        // The cursor follows the drawn (visualValue-based) geometry: the sector
+        // whose drawn arc sits under the top pointer.
+        if (this.sectors.length === 0) return null;
 
-        // A segment at angle θ appears at θ + R. It sits under the top pointer
+        // A sector at angle θ appears at θ + R. It sits under the top pointer
         // (−π/2) when θ ≡ −π/2 − R (mod 2π).
-        const twoPi = Math.PI * 2;
-        let local = (-Math.PI / 2 - animationValue) % twoPi;
-        if (local < 0) local += twoPi;
+        let local = (-Math.PI / 2 - animationValue) % TAU;
+        if (local < 0) local += TAU;
 
-        for (const segment of segments) {
-            if (local >= segment.startAngle && local < segment.endAngle) return segment.lot.id;
+        for (const sector of this.sectors) {
+            if (local >= sector.startAngle && local < sector.endAngle) return sector.lot.id;
         }
-        return segments[segments.length - 1].lot.id;
+        return this.sectors[this.sectors.length - 1].lot.id;
     }
 
-    private drawWheelLabel(segment: Segment, radius: number, presence: number): void {
-        const midAngle = (segment.startAngle + segment.endAngle) / 2;
+    private drawWheelLabel(sector: WheelSector, radius: number, presence: number): void {
+        const midAngle = (sector.startAngle + sector.endAngle) / 2;
         const textRadius = radius * LABEL_RADIUS_RATIO;
 
         this.ctx.save();
@@ -130,9 +161,9 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        const displayName = segment.lot.name.length > LABEL_MAX_CHARS
-            ? segment.lot.name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
-            : segment.lot.name;
+        const displayName = sector.lot.name.length > LABEL_MAX_CHARS
+            ? sector.lot.name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
+            : sector.lot.name;
 
         this.ctx.fillText(displayName, 0, 0);
         this.ctx.restore();
