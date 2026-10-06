@@ -16,14 +16,16 @@ const LABEL_OFFSET_Y = -12;
 const LABEL_MAX_CHARS = 15;
 const LABEL_TRUNCATED_CHARS = 13;
 
-// Highlight glow
-const GAME_HIGHLIGHT_BRIGHTNESS = 40;
-const GAME_HIGHLIGHT_BOOST = 45;
+// Cursor highlight
 const CURSOR_HIGHLIGHT_BRIGHTNESS = 18;
-const HIGHLIGHT_SHADOW_COLOR = 'rgba(255, 215, 0, 0.8)';
-const HIGHLIGHT_SHADOW_BLUR = 15;
 
-// Hover (lots-list interaction) — additive overlay, distinct from the gold game highlight
+// Lot accents — additive outline in the accent colour, inset into the band so
+// the hover outline (drawn on the band edge) never covers it. Band width,
+// order and geometry are untouched.
+const ACCENT_INSET = 2;
+const ACCENT_GLOW_BLUR = 16;
+
+// Hover (lots-list interaction) — additive overlay, distinct from the lot accents
 const HOVER_COLOR = '#7fd4ff';
 const HOVER_STROKE_WIDTH = 3;
 const HOVER_GLOW_BLUR = 16;
@@ -44,8 +46,8 @@ interface StripBand {
  * against this strip-local geometry.
  *
  * Hover (`setHover`, lots-list interaction) draws an additive outline around
- * the hovered lot's band, so it composes with — and never replaces — the game
- * highlight (and never alters band width or ordering).
+ * the hovered lot's band, so it composes with — and never replaces — the lot
+ * accents or the cursor (and never alters band width or ordering).
  */
 export class StripRenderer extends BaseRenderer {
     private bands: StripBand[] = [];
@@ -140,31 +142,42 @@ export class StripRenderer extends BaseRenderer {
     private renderOneCycle(xOffset: number, centerY: number): void {
         for (const band of this.bands) {
             const presence = this.presenceOf(band.lot.id);
-            const game = this.isGameHighlighted(band.lot.id);
             const cursor = this.isCursor(band.lot.id);
 
             const baseColor = band.lot.color || '#888';
-            const fillColor = game
-                ? brightenColor(baseColor, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
-                : cursor
-                    ? brightenColor(baseColor, CURSOR_HIGHLIGHT_BRIGHTNESS)
-                    : baseColor;
+            const fillColor = cursor
+                ? brightenColor(baseColor, CURSOR_HIGHLIGHT_BRIGHTNESS)
+                : baseColor;
 
             const currentX = xOffset + band.startInCycle;
 
             this.ctx.save();
             this.ctx.globalAlpha = presence;
-            if (game) {
-                this.ctx.shadowColor = HIGHLIGHT_SHADOW_COLOR;
-                this.ctx.shadowBlur = HIGHLIGHT_SHADOW_BLUR * this.highlight.pulse;
-            }
-
             this.ctx.fillStyle = fillColor;
             this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
             this.ctx.restore();
 
+            // Lot accent: an additive outline in the accent colour, inset so the
+            // hover outline (on the band edge) never covers it. No geometry change.
+            const accent = this.accentVisual(band.lot.id);
+            if (accent && accent.alpha > 0) {
+                this.ctx.save();
+                this.ctx.globalAlpha = presence * accent.alpha;
+                this.ctx.strokeStyle = accent.color;
+                this.ctx.lineWidth = accent.strokeWidth;
+                this.ctx.shadowColor = accent.color;
+                this.ctx.shadowBlur = ACCENT_GLOW_BLUR;
+                this.ctx.strokeRect(
+                    currentX + ACCENT_INSET,
+                    centerY - BAND_HALF_HEIGHT + ACCENT_INSET,
+                    band.width - 2 * ACCENT_INSET,
+                    BAND_HEIGHT - 2 * ACCENT_INSET
+                );
+                this.ctx.restore();
+            }
+
             // Hover is an additive outline over the band; it composes with the
-            // game fill/glow rather than replacing it.
+            // accent outline rather than replacing it.
             if (this.isHovered(band.lot.id)) {
                 this.ctx.save();
                 this.ctx.globalAlpha = presence;

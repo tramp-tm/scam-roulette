@@ -1,6 +1,8 @@
 import type {
+    AccentKind,
+    AccentTarget,
     GameViewState,
-    HighlightState,
+    LotAccent,
     RenderableParticipant,
     TurnOutcome
 } from './types.js';
@@ -82,19 +84,49 @@ export function createViewInterpolator(
 }
 
 /**
- * Game highlight for a completed turn:
- *  - if the game finished → the winners;
- *  - otherwise → the eliminated participants (the rolled lot, in Survival).
+ * Default accents for a turn's outcome: winners → `good`, eliminated → `bad`,
+ * applied INDEPENDENTLY — a closing turn that both crowns a winner and drops a
+ * loser shows both. Should a lot ever appear in both lists, `good` wins (the
+ * winners are applied last).
  */
-export function gameHighlightForOutcome(outcome: TurnOutcome): Set<string> {
-    if (outcome.finished) return new Set(outcome.winners);
-    return new Set(outcome.eliminated);
+export function defaultAccentsForOutcome(outcome: TurnOutcome): Map<string, LotAccent> {
+    const accents = new Map<string, LotAccent>();
+    for (const id of outcome.eliminated) accents.set(id, { kind: 'bad' });
+    for (const id of outcome.winners) accents.set(id, { kind: 'good' });
+    return accents;
 }
 
 /**
- * Convenience factory for a highlight state. `pulse` scales the game
- * highlight emphasis during an outcome transition (default 1 = stable).
+ * Merges the mode-owned accents (`modeData.accent`) over the outcome defaults.
+ * A mode accent for the same lot wins (at most one accent per lot); the mode
+ * may also accent lots the outcome never mentioned.
  */
-export function makeHighlight(game: ReadonlySet<string>, pulse: number = 1): HighlightState {
-    return { game, pulse };
+export function composeAccents(
+    base: ReadonlyMap<string, LotAccent>,
+    view: GameViewState
+): Map<string, LotAccent> {
+    const composed = new Map<string, LotAccent>(base);
+    for (const p of view.participants) {
+        const accent = p.modeData?.accent;
+        if (accent) composed.set(p.lot.id, accent);
+    }
+    return composed;
+}
+
+/**
+ * Flattens the composed accents into the lotId → kind map a single surface
+ * consumes, dropping the accents that do not target it. An accent without
+ * `targets` applies to both surfaces.
+ */
+export function accentsFor(
+    composed: ReadonlyMap<string, LotAccent>,
+    target: AccentTarget
+): Map<string, AccentKind> {
+    const result = new Map<string, AccentKind>();
+    for (const [lotId, accent] of composed) {
+        if (!accent.targets || accent.targets.includes(target)) {
+            result.set(lotId, accent.kind);
+        }
+    }
+    return result;
 }

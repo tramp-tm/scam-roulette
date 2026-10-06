@@ -1,10 +1,10 @@
 import { AnimationController } from './animation.js';
 import type { EasingFunction } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
-import { createViewInterpolator, makeHighlight } from './presentation.js';
+import { createViewInterpolator } from './presentation.js';
 import type {
+    AccentState,
     GameViewState,
-    HighlightState,
     IRenderer,
     VisualizationTransition,
     VisualizationType
@@ -13,7 +13,7 @@ import type {
 /** Parameters for a main spin animation. */
 export interface SpinParams {
     view: GameViewState;
-    highlight: HighlightState;
+    accents: AccentState;
     targetLotId: string;
     durationMs: number;
     easing: EasingFunction;
@@ -23,7 +23,7 @@ export interface SpinParams {
 /** Parameters for a post-spin outcome transition animation. */
 export interface OutcomeParams {
     transition: VisualizationTransition;
-    highlight: HighlightState;
+    accents: AccentState;
     durationMs: number;
     easing: EasingFunction;
     onComplete?: () => void;
@@ -48,7 +48,7 @@ export interface OutcomeParams {
  *
  * What this class deliberately does NOT own:
  *   - active lots / mode / game rules / participation — those are GameSession's;
- *   - game highlight decision — that is `App`'s (derived from the outcome);
+ *   - accent decisions — those are `App`'s (outcome defaults ⊕ mode accents);
  *   - the user settings — `App` passes duration / easing per call.
  */
 export class VisualizationDriver {
@@ -85,11 +85,11 @@ export class VisualizationDriver {
      * Replaces the renderer for a new visualization type and shows the current
      * presentation snapshot. Used by the `visualizationSelect` change handler.
      */
-    setVisualization(type: VisualizationType, view: GameViewState, highlight: HighlightState): void {
+    setVisualization(type: VisualizationType, view: GameViewState, accents: AccentState): void {
         this.animationController.stop();
         this.visualizationType = type;
         this.renderer = getVisualizationPackage(type).createRenderer(this.canvas);
-        this.renderer.setViewState(view, highlight);
+        this.renderer.setViewState(view, accents);
         // Re-apply the hover highlight so a visualization swap cannot drop it
         // (identity is the stable lot id, so this can never hit an unrelated lot).
         this.renderer.setHover(this.hoveredLotId);
@@ -97,8 +97,8 @@ export class VisualizationDriver {
     }
 
     /** Shows a presentation snapshot and redraws. */
-    refresh(view: GameViewState, highlight: HighlightState): void {
-        this.renderer.setViewState(view, highlight);
+    refresh(view: GameViewState, accents: AccentState): void {
+        this.renderer.setViewState(view, accents);
         this.renderer.render();
     }
 
@@ -111,7 +111,7 @@ export class VisualizationDriver {
      * Sets the transient hover highlight (a stable lot id, or `null` to clear).
      * Purely presentational: it only re-renders the current frame and never
      * touches the view state, animation or game state. It composes with — and
-     * never replaces — the game highlight, and works in every visualization.
+     * never replaces — the lot accents, and works in every visualization.
      */
     setHover(lotId: string | null): void {
         if (this.hoveredLotId === lotId) return;
@@ -124,13 +124,13 @@ export class VisualizationDriver {
      * Runs one spin animation to the given target lot. The target scalar is
      * computed by the visualization itself (roulette math is internal) and the
      * cursor is resolved internally too — the driver only advances the scalar
-     * and asks the renderer to draw. Highlight state is set once, before the
+     * and asks the renderer to draw. Accent state is set once, before the
      * spin, and is unchanged during it.
      */
     spinTo(params: SpinParams): void {
         this.animationController.stop();
 
-        this.renderer.setViewState(params.view, params.highlight);
+        this.renderer.setViewState(params.view, params.accents);
 
         const startValue = this.renderer.getAnimationValue();
         const endValue = this.renderer.computeSpinTarget(params.targetLotId, params.durationMs);
@@ -153,8 +153,8 @@ export class VisualizationDriver {
     /**
      * Runs the post-spin outcome transition: interpolates the presentation
      * snapshot from `before` to `after` (eliminated participants' presence
-     * goes to 0 and the rest grow), ramping the game highlight emphasis in via
-     * `pulse`. The final frame adopts the stable `after` snapshot.
+     * goes to 0 and the rest grow), ramping the accent emphasis in via `pulse`.
+     * The final frame adopts the stable `after` snapshot.
      *
      * The interpolator is built once and reused across frames, so no
      * ViewState structures are reallocated per frame.
@@ -172,12 +172,12 @@ export class VisualizationDriver {
             onUpdate: (easedProgress) => {
                 this.renderer.setViewState(
                     interpolate(easedProgress),
-                    makeHighlight(params.highlight.game, easedProgress)
+                    { accents: params.accents.accents, pulse: easedProgress }
                 );
                 this.renderer.render();
             },
             onComplete: () => {
-                this.renderer.setViewState(params.transition.after, params.highlight);
+                this.renderer.setViewState(params.transition.after, params.accents);
                 this.renderer.render();
                 params.onComplete?.();
             }
@@ -190,11 +190,11 @@ export class VisualizationDriver {
      * Stops any running animation, resets the renderer and shows the given
      * snapshot. Used by `App.reset()`.
      */
-    reset(view: GameViewState, highlight: HighlightState): void {
+    reset(view: GameViewState, accents: AccentState): void {
         this.animationController.stop();
         this.hoveredLotId = null;
         this.renderer.reset();
-        this.renderer.setViewState(view, highlight);
+        this.renderer.setViewState(view, accents);
         this.renderer.render();
     }
 

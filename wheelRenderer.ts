@@ -11,13 +11,18 @@ const TAU = Math.PI * 2;
 const SECTOR_STROKE = '#fff';
 const SECTOR_STROKE_WIDTH = 2;
 
-// Highlight
-const GAME_HIGHLIGHT_BRIGHTNESS = 30;
-const GAME_HIGHLIGHT_BOOST = 45;
+// Cursor highlight
 const CURSOR_HIGHLIGHT_BRIGHTNESS = 14;
 
+// Lot accents — additive overlay drawn on top of every sector (like hover):
+// a translucent glow fill plus a crisp outline in the accent colour. Geometry
+// (angles/radius) is untouched.
+const ACCENT_FILL_ALPHA = 0.22;
+const ACCENT_GLOW_BLUR = 18;
+const ACCENT_FILL_GLOW_BLUR = 26;
+
 // Hover (lots-list interaction) — additive overlay drawn on top of the sectors,
-// distinct from the gold game highlight
+// distinct from the lot accents
 const HOVER_COLOR = '#7fd4ff';
 const HOVER_FILL_COLOR = 'rgba(127, 212, 255, 0.25)';
 const HOVER_STROKE_WIDTH = 4;
@@ -62,8 +67,8 @@ interface WheelSector {
  *
  * Hover (`setHover`, lots-list interaction) draws a translucent glow fill plus
  * a crisp outline over the hovered sector, on top of every other sector, so
- * neighbouring borders cannot cover any of its edges. Additive — it never
- * replaces the game highlight.
+ * neighbouring borders cannot cover any of its edges. Lot accents are drawn the
+ * same way: additive overlays that never replace hover or the cursor.
  */
 export class WheelRenderer extends BaseRenderer {
     private sectors: WheelSector[] = [];
@@ -101,7 +106,6 @@ export class WheelRenderer extends BaseRenderer {
 
         for (const sector of this.sectors) {
             const presence = this.presenceOf(sector.lot.id);
-            const game = this.isGameHighlighted(sector.lot.id);
             const cursor = this.isCursor(sector.lot.id);
 
             this.ctx.beginPath();
@@ -110,11 +114,9 @@ export class WheelRenderer extends BaseRenderer {
             this.ctx.closePath();
 
             this.ctx.globalAlpha = presence;
-            this.ctx.fillStyle = game
-                ? brightenColor(sector.lot.color, GAME_HIGHLIGHT_BRIGHTNESS + GAME_HIGHLIGHT_BOOST * this.highlight.pulse)
-                : cursor
-                    ? brightenColor(sector.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
-                    : sector.lot.color;
+            this.ctx.fillStyle = cursor
+                ? brightenColor(sector.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
+                : sector.lot.color;
             this.ctx.fill();
 
             this.ctx.strokeStyle = SECTOR_STROKE;
@@ -125,6 +127,33 @@ export class WheelRenderer extends BaseRenderer {
             if (sector.endAngle - sector.startAngle > LABEL_MIN_ARC) {
                 this.drawWheelLabel(sector, radius, presence);
             }
+        }
+
+        // Lot accents: overlay on top of every sector (as hover below), so a
+        // neighbouring sector's border or label cannot cover them. Only a fill
+        // tint + outline are added — the sector geometry is never touched.
+        for (const sector of this.sectors) {
+            const accent = this.accentVisual(sector.lot.id);
+            if (!accent || accent.alpha <= 0) continue;
+            const alpha = this.presenceOf(sector.lot.id) * accent.alpha;
+
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.arc(0, 0, radius, sector.startAngle, sector.endAngle);
+            this.ctx.closePath();
+            this.ctx.globalAlpha = alpha * ACCENT_FILL_ALPHA;
+            this.ctx.fillStyle = accent.color;
+            this.ctx.shadowColor = accent.color;
+            this.ctx.shadowBlur = ACCENT_FILL_GLOW_BLUR;
+            this.ctx.fill();
+
+            this.ctx.globalAlpha = alpha;
+            this.ctx.strokeStyle = accent.color;
+            this.ctx.lineWidth = accent.strokeWidth;
+            this.ctx.shadowBlur = ACCENT_GLOW_BLUR;
+            this.ctx.stroke();
+            this.ctx.restore();
         }
 
         // Hover is drawn last, on top of every sector, so a neighbouring

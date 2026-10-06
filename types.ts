@@ -14,7 +14,14 @@ export interface Lot {
     color: string;
 }
 
-export type Mode = 'normal' | 'survival' | 'crown-defense';
+export type Mode =
+    | 'normal'
+    | 'survival'
+    | 'crown-defense-half-test'
+    | 'weakest-link'
+    | 'weakest-link-amount'
+    | 'king-of-the-hill'
+    | 'king-of-the-hill-amount';
 
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
@@ -68,14 +75,36 @@ export interface ModeExtraInfo {
 }
 
 /**
+ * Standard accent palette. A single vocabulary shared by modes, the lots list
+ * and the visualizations — the meaning of each kind is documented here but is
+ * never interpreted by the list or the renderers (they only draw it).
+ */
+export type AccentKind = 'accent' | 'good' | 'bad' | 'info' | 'warning';
+
+/** Where a lot accent is surfaced. */
+export type AccentTarget = 'list' | 'visualization';
+
+/**
+ * A lot's accent: exactly ONE kind per lot; `targets` selects where it is
+ * shown and defaults to both surfaces. A lot without an `accent` has none.
+ */
+export interface LotAccent {
+    kind: AccentKind;
+    targets?: readonly AccentTarget[];
+}
+
+/**
  * Mode-defined presentation payload attached to a participant. Generic and
  * opaque: the core and the visualizations never interpret it. `ext` is the
  * optional extra-info column the lots list can display — its meaning (HP, win
  * probability, score, rank, …) is entirely the mode's, so new modes need no
- * change in the list.
+ * change in the list. `accent` is the mode-owned accent for this lot (at most
+ * one); it overrides the outcome-derived default for the same lot.
  */
 export interface ModePresentationData {
     ext?: ModeExtraInfo;
+    /** Mode-owned accent for this participant (at most one). */
+    accent?: LotAccent;
 }
 
 /**
@@ -256,18 +285,18 @@ export interface GameViewState {
 }
 
 /**
- * Highlight state driven by the game: `game` is the set of lots emphasised
- * because of game state / outcome (winners, eliminated, …); `pulse` scales
- * that emphasis (0..1) so an outcome transition can fade it in — the stable
- * state uses 1.
+ * Accents the visualization must draw, already filtered to the `visualization`
+ * target (a flat lotId → kind map: "at most one accent per lot" is expressed
+ * by the shape). `pulse` scales the accent emphasis (0..1) so an outcome
+ * transition can fade it in — the stable state uses 1.
  *
  * The visualization's *cursor* is deliberately NOT part of this state. It is
  * derived by the visualization itself from its own animation scalar (see
  * `IRenderer.getCursorLotId`) and only exposed read-only — it never round-trips
- * through the driver, so game and cursor highlights cannot overwrite each other.
+ * through the driver, so accents and cursor cannot overwrite each other.
  */
-export interface HighlightState {
-    game: ReadonlySet<string>;
+export interface AccentState {
+    accents: ReadonlyMap<string, AccentKind>;
     pulse: number;
 }
 
@@ -299,7 +328,7 @@ export interface SelectionCandidate {
 
 /**
  * A visualization: purely visual. It receives the presentation model and
- * highlight state, and internally owns its own spin math and cursor. It
+ * accent state, and internally owns its own spin math and cursor. It
  * never knows game rules and never mutates game state.
  *
  * Cursor: derived inside the visualization from its own animation scalar and
@@ -307,31 +336,30 @@ export interface SelectionCandidate {
  * query (for the UI); the cursor is never pushed back in through
  * `setViewState`.
  *
- * Highlight has two independent channels that compose at draw time:
- *  - the game highlight (winners / eliminated), fed via `setViewState`;
+ * Emphasis has two independent channels that compose at draw time:
+ *  - the lot accents fed via `setViewState` (a lotId → AccentKind map);
  *  - the transient hover highlight (lots-list interaction), fed via `setHover`.
  * Neither mutates the other.
  */
 export interface IRenderer {
     /**
-     * Adopt a presentation snapshot + highlight state. This is the only way
-     * highlight state is fed in; the visualization manages its own cursor
-     * internally.
+     * Adopt a presentation snapshot + accent state. This is the only way
+     * accents are fed in; the visualization manages its own cursor internally.
      *
      * Called once for a spin, but once PER FRAME during an outcome transition
      * (with an interpolated snapshot), so `onViewStateChanged` must stay cheap:
      * rebuild derived geometry, but cache heavy layout keyed on its inputs
      * (see CountingRhymeRenderer's grid cache).
      */
-    setViewState(view: GameViewState, highlight: HighlightState): void;
+    setViewState(view: GameViewState, accents: AccentState): void;
 
     /**
      * Set the transient hover highlight to a lot id, or `null` to clear it.
      * Identity is the stable `lot.id`; the renderer resolves it against its own
      * Lot Representation (sector / band / circle) and picks the visual
-     * treatment. Hover composes with — and never replaces — the game highlight
-     * fed via `setViewState`: it changes no geometry, weight or animation
-     * state, and an unknown/absent id simply highlights nothing.
+     * treatment. Hover composes with — and never replaces — the accents fed via
+     * `setViewState`: it changes no geometry, weight or animation state, and an
+     * unknown/absent id simply highlights nothing.
      */
     setHover(lotId: string | null): void;
 

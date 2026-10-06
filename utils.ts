@@ -120,6 +120,42 @@ export function normalizeToFractions(values: readonly number[]): number[] {
     return values.map(v => (v > 0 ? v / total : 0));
 }
 
+/**
+ * Min–max normalization (min–max scaling): linearly rescales `values` from
+ * their own range onto `[minValue, maxValue]`:
+ *
+ *   x' = (x - min(A)) / (max(A) - min(A)) · (maxValue - minValue) + minValue
+ *
+ * Optimized over the literal three-array form: `min` and `max` are found in a
+ * single pass, the output is produced in a second pass, there are no
+ * intermediate `B[]`/`C[]` arrays, and the division by the range is folded into
+ * one per-element scale+offset pair. The source array is never modified.
+ *
+ * Degenerate case `max(A) === min(A)` (all values equal, or a single element)
+ * would divide by zero; following the standard min–max scaler behaviour, every
+ * result is then the lower bound `minValue`.
+ */
+export function normalizeToRange(
+    values: readonly number[],
+    minValue: number,
+    maxValue: number
+): number[] {
+    if (values.length === 0) return [];
+
+    let min = Infinity;
+    let max = -Infinity;
+    for (const v of values) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+    }
+
+    const range = max - min;
+    if (!(range > 0)) return values.map(() => minValue);
+
+    const scale = (maxValue - minValue) / range;
+    return values.map(v => (v - min) * scale + minValue);
+}
+
 // ========================================
 // DURATION SLIDER MAPPING
 // ========================================

@@ -1,4 +1,4 @@
-import type { ModePresentationData } from './types.js';
+import type { AccentKind, ModePresentationData } from './types.js';
 
 /** Sort field options for lots list */
 export type SortField = 'name' | 'amount';
@@ -28,8 +28,12 @@ export interface RenderableLot {
  */
 export interface LotListViewOptions {
     showActions?: boolean;
-    /** Ids currently under the game highlight (winners / eliminated). */
-    highlightIds?: ReadonlySet<string>;
+    /**
+     * Accent per lot id (already filtered to the `list` target). Purely
+     * presentational: the view maps each kind to a CSS class and never
+     * interprets its meaning.
+     */
+    accents?: ReadonlyMap<string, AccentKind>;
     editableAmount?: boolean;
     onAmountChange?: (id: string, newAmount: number) => void;
     onDelete?: (id: string) => void;
@@ -105,7 +109,7 @@ export class LotListView {
 
         const {
             showActions = false,
-            highlightIds,
+            accents,
             editableAmount = true,
             onAmountChange,
             onDelete,
@@ -132,8 +136,10 @@ export class LotListView {
 
             const classNameParts: string[] = ['lot-item'];
             if (!lot.active) classNameParts.push('inactive');
-            const highlighted = !!lot.id && (highlightIds?.has(lot.id) ?? false);
-            if (highlighted) classNameParts.push('highlighted');
+            // Accent is looked up by stable `lot.id`; the kind becomes a CSS
+            // class verbatim (`accent-good`, …).
+            const accent = lot.id ? accents?.get(lot.id) : undefined;
+            if (accent) classNameParts.push(`accent-${accent}`);
             li.className = classNameParts.join(' ');
 
             // Hover is surfaced by stable `lot.id` (never an index/position), so
@@ -189,7 +195,11 @@ export class LotListView {
                 li.appendChild(ext);
             }
 
-            if (showActions && !highlighted) {
+            // Actions are always rendered when the list shows them; an accent is
+            // purely visual and must never remove controls. Locking (spin in
+            // progress / finished game) is expressed by `applyLockState()` as a
+            // `disabled` state, not by hiding the button.
+            if (showActions) {
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'lot-actions';
 

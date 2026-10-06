@@ -8,8 +8,13 @@ import { LotListView } from './lotListView.js';
 import type { RenderableLot } from './lotListView.js';
 import { GameSession } from './gameSession.js';
 import type { FinishSpinResult, PrepareSpinFailureReason } from './gameSession.js';
-import type { HighlightState, Mode, Settings, VisualizationType } from './types.js';
-import { gameHighlightForOutcome, makeHighlight, OUTCOME_TRANSITION_DURATION_MS } from './presentation.js';
+import type { AccentKind, AccentState, GameViewState, LotAccent, Mode, Settings, VisualizationType } from './types.js';
+import {
+    accentsFor,
+    composeAccents,
+    defaultAccentsForOutcome,
+    OUTCOME_TRANSITION_DURATION_MS
+} from './presentation.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
 import type { ImportStrategy } from './importStrategies.js';
 import type { ParsedLot } from './csvParser.js';
@@ -80,11 +85,12 @@ export class App {
     }
 
     /**
-     * Game highlight (winners / eliminated), owned by `App` and derived from
-     * the last outcome. The cursor highlight is owned by the visualization and
-     * never mixed into this set.
+     * Outcome-derived accents (winners / eliminated) of the last turn, owned by
+     * `App`. Mode-owned accents come from the current view (`modeData.accent`)
+     * and are merged over these when an accent map is resolved. The
+     * visualization's cursor is owned by the renderer and never mixed in here.
      */
-    private gameHighlight: Set<string> = new Set();
+    private outcomeAccents: Map<string, LotAccent> = new Map();
 
     /** True while the post-spin outcome transition is playing. */
     private outcomeInProgress = false;
@@ -259,19 +265,37 @@ export class App {
     }
 
     /**
-     * Current highlight state: the game highlight set. The visualization's
-     * cursor is derived by the renderer itself and is not part of this state.
+     * Accent state for the visualization: the outcome accents of the last turn
+     * with the mode-owned accents of the current view merged over them,
+     * filtered to the `visualization` target.
      */
-    private highlight(): HighlightState {
-        return makeHighlight(this.gameHighlight);
+    private accentState(): AccentState {
+        return { accents: this.resolveAccents(this.gameSession.viewState).visualization, pulse: 1 };
     }
 
     /**
-     * Updates result text to show current mode name when no game highlight is
-     * active.
+     * Resolves the accent map for both surfaces. Composition is
+     * outcome defaults ⊕ mode accents (`modeData.accent`, which win per lot),
+     * then a per-target filter. `base` defaults to the stored outcome accents;
+     * it is overridden when a turn's accents must be resolved before they are
+     * stored.
+     */
+    private resolveAccents(
+        view: GameViewState,
+        base: ReadonlyMap<string, LotAccent> = this.outcomeAccents
+    ): { list: Map<string, AccentKind>; visualization: Map<string, AccentKind> } {
+        const composed = composeAccents(base, view);
+        return {
+            list: accentsFor(composed, 'list'),
+            visualization: accentsFor(composed, 'visualization')
+        };
+    }
+
+    /**
+     * Updates result text to show current mode name when no accent is active.
      */
     private updateResultTextWithModeName(): void {
-        if (this.resultText && this.gameHighlight.size === 0) {
+        if (this.resultText && this.outcomeAccents.size === 0) {
             this.resultText.textContent = this.mode.name;
         }
     }
@@ -303,7 +327,7 @@ export class App {
         // mode's view data (selection weight, visual value, the ext column), so
         // both the list and the visualization must be re-rendered.
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
     }
 
     /**
@@ -416,7 +440,7 @@ export class App {
 
             // Re-render with the new mode's selection weights / visual values.
             // Participation is deliberately preserved across a mode switch.
-            this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+            this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
             // Re-render the lots list: modeData (e.g. the ext column) is
             // mode-owned and changes with the mode.
             this.updateUI();
@@ -443,7 +467,7 @@ export class App {
             this.visualizationDriver.setVisualization(
                 this.settings.visualization,
                 this.gameSession.viewState,
-                this.highlight()
+                this.accentState()
             );
         });
 
@@ -587,7 +611,7 @@ export class App {
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
     }
 
     private spin(): void {
@@ -608,7 +632,7 @@ export class App {
         // App says *what* to animate; the driver/visualization decide *how*.
         this.visualizationDriver.spinTo({
             view: this.gameSession.viewState,
-            highlight: this.highlight(),
+            accents: this.accentState(),
             targetLotId: prepared.lot.id,
             durationMs: this.settings.animationDuration,
             easing: this.easingFunction,
@@ -654,8 +678,14 @@ export class App {
             this.resultText.textContent = t(outcome.result.key, outcome.result.params);
         }
 
-        const gameHighlight = gameHighlightForOutcome(outcome);
-        const finalHighlight = makeHighlight(gameHighlight);
+        // Accents of this turn: the outcome defaults (this stage reproduces the
+        // previous behaviour 1:1) with the mode's own accents from the post-turn
+        // view merged over them, filtered to the visualization surface.
+        const finalAccents = defaultAccentsForOutcome(outcome);
+        const finalAccentState: AccentState = {
+            accents: this.resolveAccents(after, finalAccents).visualization,
+            pulse: 1
+        };
 
         // Reflect the finished/locked state right away, and gate Spin until the
         // outcome transition has settled.
@@ -663,17 +693,17 @@ export class App {
         this.updateControlsState();
 
         // Animate the state transition (eliminated participants shrink out,
-        // the game highlight ramps in), then adopt the stable snapshot.
+        // the accents ramp in), then adopt the stable snapshot.
         this.visualizationDriver.animateOutcome({
             transition,
-            highlight: finalHighlight,
+            accents: finalAccentState,
             durationMs: OUTCOME_TRANSITION_DURATION_MS,
             easing: this.easingFunction,
             onComplete: () => {
                 this.outcomeInProgress = false;
-                this.gameHighlight = gameHighlight;
+                this.outcomeAccents = finalAccents;
                 this.updateUI();
-                this.visualizationDriver.refresh(after, finalHighlight);
+                this.visualizationDriver.refresh(after, finalAccentState);
 
                 if (outcome.message) {
                     const message = outcome.message;
@@ -689,8 +719,9 @@ export class App {
         // mode state is recreated, and every lifecycle lock is released.
         this.gameSession.reset();
 
-        // Clear the game highlight; the cursor is owned by the visualization.
-        this.gameHighlight = new Set();
+        // Clear the outcome accents; mode accents come from the view and the
+        // cursor is owned by the visualization.
+        this.outcomeAccents = new Map();
         this.outcomeInProgress = false;
         // Drop the transient hover; driver.reset() also clears it in the renderer.
         this.hoveredLotId = null;
@@ -698,7 +729,7 @@ export class App {
         // Reset the visualization (stops any animation, resets the renderer,
         // shows the now-reset view). The whole sequence is synchronous, so a
         // late `onComplete` cannot replay a stale spin.
-        this.visualizationDriver.reset(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.reset(this.gameSession.viewState, this.accentState());
 
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
@@ -722,7 +753,7 @@ export class App {
 
         this.lotListView.render(renderables, {
             showActions: true,
-            highlightIds: this.gameHighlight,
+            accents: this.resolveAccents(view).list,
             editableAmount: true,
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
             onDelete: (id) => this.deleteLot(id),
@@ -808,12 +839,12 @@ export class App {
         this.lotManager.deleteLot(id);
         this.gameSession.removeLot(id);
 
-        // Clear highlight if the deleted lot was highlighted
-        this.gameHighlight.delete(id);
+        // Drop the deleted lot's outcome accent if it had one
+        this.outcomeAccents.delete(id);
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
     }
 
     /** Handles clearing all lots */
@@ -839,15 +870,15 @@ export class App {
         this.lotManager.clearAll();
         this.gameSession.clearLots();
 
-        // Reset highlight and result display
-        this.gameHighlight = new Set();
+        // Reset accents and result display
+        this.outcomeAccents = new Map();
         if (this.resultText) {
             this.updateResultTextWithModeName();
         }
 
         // Update UI and renderer
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
     }
 
     /** Opens the import dialog */
@@ -911,7 +942,7 @@ export class App {
 
         // Update UI and renderer after import completes
         this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.highlight());
+        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
 
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {

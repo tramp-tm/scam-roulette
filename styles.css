@@ -36,6 +36,8 @@
     --accent-danger-dark: #c0392b;
     --accent-success: #2ecc71;
     --accent-success-dark: #27ae60;
+    --accent-info: #3498db;
+    --accent-warning: #f1c40f;
     --accent-glow: rgba(243, 156, 18, 0.4);
     --accent-glow-soft: rgba(243, 156, 18, 0.3);
     --highlight-bg: rgba(243, 156, 18, 0.2);
@@ -89,6 +91,8 @@
     --accent-danger-dark: #962d22;
     --accent-success: #1e8449;
     --accent-success-dark: #145a32;
+    --accent-info: #2980b9;
+    --accent-warning: #b9770e;
     --accent-glow: rgba(211, 84, 0, 0.2);
     --accent-glow-soft: rgba(211, 84, 0, 0.1);
     --highlight-bg: rgba(211, 84, 0, 0.12);
@@ -142,6 +146,8 @@
     --accent-danger-dark: #ff6b81;
     --accent-success: #00ff88;
     --accent-success-dark: #2ecc71;
+    --accent-info: #00b4d8;
+    --accent-warning: #ffd166;
     --accent-glow: rgba(0, 255, 136, 0.35);
     --accent-glow-soft: rgba(0, 255, 136, 0.2);
     --highlight-bg: rgba(0, 255, 136, 0.15);
@@ -195,6 +201,8 @@
     --accent-danger-dark: #ab545c;
     --accent-success: #a3be8c; /* Пастельный оливково-зеленый */
     --accent-success-dark: #8fbcbb;
+    --accent-info: #81a1c1;
+    --accent-warning: #ebcb8b;
     --accent-glow: rgba(136, 192, 208, 0.2);
     --accent-glow-soft: rgba(136, 192, 208, 0.1);
     --highlight-bg: rgba(136, 192, 208, 0.12);
@@ -248,6 +256,8 @@
     --accent-danger-dark: #e55353;
     --accent-success: #57cc99; /* Приглушенный мятно-зеленый */
     --accent-success-dark: #3db885;
+    --accent-info: #8ab4d8;
+    --accent-warning: #d4b16a;
     --accent-glow: rgba(255, 255, 255, 0.25); /* Аккуратное белое свечение */
     --accent-glow-soft: rgba(255, 255, 255, 0.12);
     --highlight-bg: rgba(255, 255, 255, 0.1);
@@ -304,6 +314,8 @@
     --accent-danger-dark: #b91c1c;
     --accent-success: #10b981;
     --accent-success-dark: #047857;
+    --accent-info: #22d3ee;
+    --accent-warning: #fbbf24;
     --accent-glow: rgba(236, 72, 153, 0.45);
     --accent-glow-soft: rgba(147, 51, 234, 0.4);
     --highlight-bg: rgba(236, 72, 153, 0.15);
@@ -357,6 +369,8 @@
     --accent-danger-dark: #a14b53;
     --accent-success: #a3be8c;
     --accent-success-dark: #8fa87a;
+    --accent-info: #7fa8b8;
+    --accent-warning: #d9b382;
     --accent-glow: rgba(163, 190, 140, 0.25);
     --accent-glow-soft: rgba(208, 135, 112, 0.2);
     --highlight-bg: rgba(208, 135, 112, 0.15); /* Мягкий янтарный для выделения */
@@ -735,9 +749,31 @@ textarea:disabled {
     opacity: 0.5;
 }
 
-.lot-item.highlighted {
+/* Lot accents: one visual per kind, orthogonal to `.inactive`
+   (an accented row can also be `.inactive`, e.g. an eliminated lot). */
+.lot-item.accent-accent {
     border: 2px solid var(--accent);
     background: var(--highlight-bg);
+}
+
+.lot-item.accent-good {
+    border: 2px solid var(--accent-success);
+    background: color-mix(in srgb, var(--accent-success) 18%, transparent);
+}
+
+.lot-item.accent-bad {
+    border: 2px solid var(--accent-danger);
+    background: color-mix(in srgb, var(--accent-danger) 18%, transparent);
+}
+
+.lot-item.accent-info {
+    border: 2px solid var(--accent-info);
+    background: color-mix(in srgb, var(--accent-info) 18%, transparent);
+}
+
+.lot-item.accent-warning {
+    border: 2px solid var(--accent-warning);
+    background: color-mix(in srgb, var(--accent-warning) 18%, transparent);
 }
 
 /* Add row styling */

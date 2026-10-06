@@ -14,7 +14,9 @@
 >  - контракт визуализации — жизненный цикл, а не «координата рулетки»;
 >  - `selectionWeight` (вероятность выбора) и `visualValue` (визуальный размер) разделены;
 >  - геометрия (углы/ширины/сетка) — внутренняя для каждой визуализации, общего `Segment` нет;
->  - подсветка разделена: game-набор задаётся игрой, cursor вычисляется самой визуализацией;
+>  - акценты лотов: единая палитра (`AccentKind`), автор смысла — режим (`modeData.accent`),
+>    композиция и раздача — `App` (акценты исхода ⊕ режимные, фильтр по цели); курсор
+>    вычисляется самой визуализацией;
 >  - hover из списка лотов — отдельный аддитивный канал подсветки (`setHover`, по stable `lot.id`);
 >  - данные режима для UI обобщены (`modeData.ext`): список выводит готовый текст, а смысл и
 >    формат задаёт режим (HP, вероятность финальной победы, …);
@@ -30,7 +32,8 @@
 
 - вести список «лотов» (участников/призов) — имя, сумма, цвет;
 - импортировать лоты из CSV-текста или из Google Sheets по ссылке;
-- выбирать один из трёх игровых режимов (**Normal** / **Survival** / **Crown Defense**);
+- выбирать игровой режим (**Normal**, **Survival**, **Crown Defense**, три его тестовых варианта
+  и **Слабое звено**, **Царь горы**);
 - выбирать одну из трёх визуализаций (**Wheel** / **Strip** / **Counting Rhyme**);
 - запускать «спин» — анимацию, которая заканчивается уже заранее определённым победителем
   (взвешенный случайный выбор), после чего проигрывается переход состояния (например,
@@ -88,7 +91,7 @@ cp node_modules/papaparse/papaparse.min.js dist/
                             ▼
                      Renderer (Wheel / Strip / CountingRhyme)  ──▶ BaseRenderer
 
-   GameSession ──▶ GameMode (Normal/Survival/CrownDefense)     — правила и их состояние
+   GameSession ──▶ GameMode (реестр MODES)                     — правила и их состояние
                 ──▶ RouletteEngine (взвешенный выбор, геометрия) — mode-agnostic
                 ──▶ LotManager (глобальные лоты)                 — mode-agnostic
 
@@ -145,22 +148,27 @@ Renderer
 |---|---|
 | `app.ts` | Контроллер `App`: инициализация, обработка событий UI, оркестрация домена и визуализации |
 | `types.ts` | Общие типы и контракты домена, режима и визуализации |
-| `presentation.ts` | Presentation-хелперы: интерполяция view-состояния, game-highlight, длительность перехода |
+| `presentation.ts` | Presentation-хелперы: интерполяция view-состояния, акценты лотов (дефолты исхода, композиция с режимными, фильтр по цели), длительность перехода |
 | `lotManager.ts` | Глобальная коллекция лотов (CRUD, валидация, лимит) |
 | `gameSession.ts` | Состояние текущей игры: участие, состояние режима, блокировки, спин-цикл, переход |
 | `modes.ts` | Реестр режимов (`MODES`, `getMode`) |
 | `normalMode.ts` | Режим Normal: правила, состояние, presentation |
 | `survivalMode.ts` | Режим Survival: правила, состояние, presentation |
 | `crownDefenseMode.ts` | Режим Crown Defense: HP-состояние, фиксированный урон, равный selection |
+| `crownDefenseHalfTestMode.ts` | Тестовый вариант: HP = amount, урон = ½ HP выпавшего |
+| `crownDefense10mTestMode.ts` | Тестовый вариант: HP = amount, урон = 10% от среднего HP |
+| `crownDefenseAmountTestMode.ts` | Тестовый вариант: HP = amount, урон = 10% от макс. HP |
+| `weakestLinkMode.ts` | Режим «Слабое звено»: HP = нормализация amount в [1..100], урон = min(HP активных) |
+| `kingOfTheHillMode.ts` | Режим «Царь горы»: HP = нормализация amount в [1..100], царь = макс. HP, выпавший бьёт царя своим HP |
 | `rouletteEngine.ts` | Взвешенный выбор по selection-весам; спин-таргет по геометрии рендерера |
 | `animation.ts` | Easing-функции и `AnimationController` (requestAnimationFrame) |
 | `visualizationDriver.ts` | Жизненный цикл визуализации: view state, spin, outcome transition, reset, cursor |
 | `visualizationStrategy.ts` | Реестр `VisualizationPackage` (тип → фабрика рендерера) |
-| `baseRenderer.ts` | Абстрактный базовый рендерер (презентация, High-DPI, highlight, hover, presence) |
+| `baseRenderer.ts` | Абстрактный базовый рендерер (презентация, High-DPI, акценты, hover, presence) |
 | `wheelRenderer.ts` | Рендерер «колесо» |
 | `stripRenderer.ts` | Рендерер «лента» (бесконечная прокрутка) |
 | `countingRhymeRenderer.ts` | Рендерер «считалочка» (круги с подсветкой) |
-| `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, highlight-набор, hover, ext-колонка) |
+| `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, акценты (CSS-классы), hover, ext-колонка) |
 | `utils.ts` | Цвета (генерация/осветление), геометрия ленты, длительность, формат процентов |
 | `i18n.ts` | Инициализация i18next, перевод DOM, синхронизация `lang`, хелпер `t` |
 | `csvParser.ts` | Разбор CSV-текста в `ParsedLot[]` (через Papa Parse) |
@@ -189,7 +197,7 @@ interface Lot {                 // Только постоянные данны�
 }
 
 interface Settings {            // Настройки приложения (тема и язык намеренно не входят)
-  modeId: Mode;                 // 'normal' | 'survival' | 'crown-defense'
+  modeId: Mode;                 // id режима из реестра MODES
   visualization: VisualizationType; // 'wheel' | 'strip' | 'counting-rhyme'
   animationDuration: number;    // мс
 }
@@ -214,6 +222,7 @@ interface ModeExtraInfo {              // одна ячейка ext-колонк
 }
 interface ModePresentationData {       // непрозрачные данные режима для UI
   ext?: ModeExtraInfo;                 // опциональная доп. колонка списка («ext»)
+  accent?: LotAccent;                  // акцент лота, которым владеет режим (не более одного)
 }
 
 interface GameParticipantState {       // запись участника, которой владеет GameSession
@@ -281,7 +290,7 @@ interface RenderableParticipant {
   selectionWeight: number;             // вероятность выбора рулеткой (НЕ размер!)
   visualValue: number;                 // визуальная величина; смысл задаёт режим
   presence: number;                    // визуальный множитель [0..1] (анимация выбывания)
-  modeData?: ModePresentationData;     // режимные данные для UI (ext-колонка и будущее)
+  modeData?: ModePresentationData;     // режимные данные для UI (ext-колонка, accent)
 }
 
 interface GameViewState {              // снимок игры для UI и визуализаций
@@ -294,9 +303,17 @@ interface SelectionCandidate {         // вход RouletteEngine.rollWeighted
   selectionWeight: number;
 }
 
-interface HighlightState {             // подсветка, управляемая игрой
-  game: ReadonlySet<string>;           // победители / выбывшие (от игры)
-  pulse: number;                       // масштаб game-подсветки во время перехода (0..1)
+type AccentKind = 'accent' | 'good' | 'bad' | 'info' | 'warning';  // стандартная палитра
+type AccentTarget = 'list' | 'visualization';                      // где показывается акцент
+
+interface LotAccent {                  // акцент лота: ровно один kind (не более одного на лот)
+  kind: AccentKind;
+  targets?: readonly AccentTarget[];   // по умолчанию — обе поверхности
+}
+
+interface AccentState {                // акценты для визуализации
+  accents: ReadonlyMap<string, AccentKind>;  // lotId → kind (уже отфильтровано по цели)
+  pulse: number;                       // масштаб акцента во время перехода (0..1)
 }
 
 interface VisualizationTransition {    // контекст перехода одного хода
@@ -314,11 +331,43 @@ interface VisualizationTransition {    // контекст перехода од
 `presence: 1 → 0` сжимается, а остальные растут — переход выбывания получается из интерполяции
 view-состояния (см. §7.4).
 
+### Акценты лотов
+
+Акцент — стандартизованный презентационный признак лота (палитра `AccentKind`), который
+**не влияет** ни на правила, ни на веса, ни на геометрию, и у лота одновременно **не более
+одного**. Владелец смысла — режим: он декларативно возвращает `accent` в составе
+`modeData` (`ModePresentationData.accent`) и пересчитывает его на каждой сборке view, поэтому
+отдельного накопительного состояния и императивного «сброса» акцентов не требуется.
+Базовые акценты исхода (`defaultAccentsForOutcome`) задаёт `App`: победители → `good` и
+выбывшие → `bad` применяются **независимо** (в завершающем ходе — оба одновременно), при
+конфликте побеждает `good`. Режимный акцент **перекрывает** базовый для того же лота.
+Композиция и раздача по поверхностям — в `App`
+(`defaultAccentsForOutcome` → `composeAccents` → `accentsFor('list' | 'visualization')`);
+`LotAccent.targets` выбирает, показывать ли акцент в списке и/или в визуализации. Потребители —
+`LotListView` (CSS-класс `accent-<kind>`) и рендереры (canvas-средство по виду): оба лишь
+отображают вид акцента и не интерпретируют его смысл. Сброс — следствие модели: список
+полностью перерисовывается на каждом `render()`, а визуализация получает полную карту акцентов
+на каждый `setViewState`.
+
+#### Палитра: вид → список (CSS) / визуализация (canvas)
+
+| kind | смысл | CSS (список) | canvas | типовое применение |
+|---|---|---|---|---|
+| `accent` | «главный сейчас» | `--accent` + `--highlight-bg` | `#f39c12` | царь в «Царе горы» |
+| `good` | положительный результат | `--accent-success` + `color-mix(… 18%, transparent)` | `#2ecc71` | победитель |
+| `bad` | отрицательный результат | `--accent-danger` + `color-mix(… 18%, transparent)` | `#e74c3c` | выбывший |
+| `info` | нейтральная информация | `--accent-info` + `color-mix(… 18%, transparent)` | `#3498db` | получил урон («Слабое звено») |
+| `warning` | предупреждение | `--accent-warning` + `color-mix(… 18%, transparent)` | `#f1c40f` | пока не используется (вид зарегистрирован) |
+
+`--accent-info` / `--accent-warning` заданы во **всех 7 темах**. Canvas-палитра — фиксированные
+hex (`ACCENT_VISUAL` в `baseRenderer.ts`), как и остальные canvas-цвета. Классы списка
+ортогональны `.lot-item.inactive`: акцентированная строка может быть и неактивной.
+
 ### 5.5 Контракт визуализации
 
 ```ts
 interface IRenderer {                  // визуализация; чисто визуальная, правил не знает
-  setViewState(view: GameViewState, highlight: HighlightState): void;  // game-подсветка (победители/выбывшие)
+  setViewState(view: GameViewState, accents: AccentState): void;  // акценты лотов (lotId → kind), уже отфильтрованы по цели
   setHover(lotId: string | null): void; // hover-подсветка из списка лотов (stable lot.id; null — снять)
   render(): void;
   reset(): void;
@@ -365,7 +414,11 @@ interface VisualizationPackage {       // реестр: только фабри�
 export const MODES = {
     normal: new NormalMode(),
     survival: new SurvivalMode(),
-    'crown-defense': new CrownDefenseMode()
+    'crown-defense-half-test': new CrownDefenseHalfTestMode(),
+    'weakest-link': new WeakestLinkMode(),
+    'weakest-link-amount': new WeakestLinkAmountMode(),
+    'king-of-the-hill': new KingOfTheHillMode(),
+    'king-of-the-hill-amount': new KingOfTheHillAmountMode()
 };
 export function getMode(modeId) { return MODES[modeId]; }
 ```
@@ -398,24 +451,76 @@ export function getMode(modeId) { return MODES[modeId]; }
   предел `T_max = (ln N + 11)/λ_min`, 1000 шагов (без симуляции). При вероятности < 0.1% —
   `< 0.1%`. Inactive → `—`.
 
-**CrownDefenseMode** (HP)
+**CrownDefenseHalfTestMode** («Защита короны: половина урона»)
 - `selectionWeight = 1` для каждого активного — вероятность не зависит от HP;
-- `visualValue = текущее HP` — размер на экране определяется HP, а не вероятностью;
-- состояние: `GameModeState = { maxAmount }` (референс нормализации HP),
-  `ParticipantModeState = { hp }` (HP участника). До первого спина HP детерминированно выводится
-  из `amount / maxAmount * 100`, но не ниже `MIN_HP = 1`; первый `processRoll` материализует его.
-  Смена состава участников до первого спина (`onParticipantsChanged`) пересчитывает `maxAmount`
-  как максимум `amount` среди текущих участников, поэтому добавление лота с большей суммой
-  пересчитывает стартовый HP всех остальных;
+- `visualValue = текущее HP`; `GameModeState = {}` — HP выводится прямо из `amount`, состояние не
+  нужно;
+- начальный HP = `amount` (без нормализации и floor); смена состава до первого спина ничего не
+  пересчитывает — HP каждого лота не зависит от остальных;
 - `processRoll`: разыгранный участник урона не получает; все остальные **активные** получают
-  фиксированный урон (10 HP), кламп в 0 — урон считается по состоянию ДО этого хода (без
-  последовательной зависимости между участниками); участники с HP 0 выбывают; один оставшийся —
-  победитель; несколько выбываний за один спин корректны;
+  `ceil(HP выпавшего / 2)`, округлённый вверх до 0,01; кламп в 0; выбывание при HP ≤ 0; один
+  оставшийся — победитель; несколько выбываний за один спин корректны;
 - `result` = «Урон −{{damage}} (выбран: {{name}})», `message` = сообщение о победителе;
-- HP не хранится на singleton-экземпляре режима и не добавляется в `Lot`, поэтому две сессии не
-  делят HP.
-- `getPresentationData` → ext = текущее HP как `♥ N` (целое); при HP < `MIN_HP` — `< 1 HP`.
-  Inactive → `—`, никогда не stale HP.
+- `getPresentationData` → ext = текущее HP как `♥ N`; при HP < 1 — `♥ < 1`; inactive → `—`.
+
+**WeakestLinkMode** («Слабое звено»)
+- `selectionWeight = 1` — у всех активных равный шанс;
+- начальный HP = `amount`, min–max нормированный в `[1..100]` (`normalizeToRange`) и округлённый
+  вверх до целого (минимальный amount → 1, максимальный → 100); карта HP пересчитывается при смене
+  состава участников до первого спина;
+- `processRoll`: урон получает **только выпавший лот**; `L` = активные лоты, кроме выпавшего, с
+  `HP ≤ HP(выпавшего)`; `D = HP(выпавшего)`, если `L` пуст (выпавший — наименьший), иначе
+  `D = ceil(среднее HP по L)`; HP клампится в 0; выбывание при HP ≤ 0; последний оставшийся — победитель;
+- `getPresentationData` → ext = `♥ N`, а также `accent = info` **только для списка**
+  (`targets: ['list']`) на лоте, получившем урон в последнем раунде и оставшемся в игре;
+  inactive → `—` и без акцента (выбывший сохраняет базовый `bad`).
+- `GameModeState = { initialHp: Map<lotId, HP>, lastHitId }`, `ParticipantModeState = { hp }`.
+
+**WeakestLinkAmountMode** («Слабое звено: HP = сумма»)
+- копия `WeakestLinkMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
+  нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); карта HP
+  пересчитывается при смене состава участников до первого спина;
+- остальные правила идентичны `WeakestLinkMode`: `selectionWeight = 1`, урон получает **только
+  выпавший лот**, `L` = активные кроме выпавшего с `HP ≤ HP(выпавшего)`, `D = HP(выпавшего)` если
+  `L` пуст, иначе `D = ceil(среднее HP по L)`; HP клампится в 0; выбывание при HP ≤ 0; последний
+  оставшийся — победитель;
+- HP и урон — всегда целые числа ≥ 1, поэтому партия всегда делает прогресс и завершается;
+- `getPresentationData` → ext = `♥ N`, а также `accent = info` **только для списка**
+  (`targets: ['list']`) на лоте, получившем урон в последнем раунде и оставшемся в игре;
+  inactive → `—` и без акцента;
+- `GameModeState = { initialHp, lastHitId }`, `ParticipantModeState = { hp }`.
+
+**KingOfTheHillMode** («Царь горы»)
+- `selectionWeight = 1` — у всех активных равный шанс;
+- начальный HP = `amount`, min–max нормированный в `[1..100]` (`normalizeToRange`) и округлённый
+  вверх до целого; карта HP и царь пересчитываются при смене состава до первого спина;
+- «царь» — активный лот с наибольшим HP (ничьи — случайный из них); он хранится в состоянии и
+  переопределяется один раз — при старте/смене состава и в конце каждого `processRoll` (это и есть
+  «начало следующего раунда»), поэтому механика и маркер `♔` всегда согласованы;
+- при переизбрании ничья по `max(HP)` разрешается по приоритету: текущий царь (если сохранил
+  лидерство) → атакующий этого раунда → случайный из лидеров;
+- `processRoll` (выпавший лот урона не получает никогда):
+  - выпал не царь → царь теряет `HP выпавшего` (кламп в 0; HP ≤ 0 → выбывание);
+  - выпал царь → уничтожается случайный из лотов с наименьшим HP (кроме самого царя), царь
+    прибавляет его HP (без верхнего ограничения);
+- затем определяется новый царь для следующего раунда; в **завершающей** партии царя нет
+  (`kingId = null`), поэтому победитель читается как исходный `good`, а не как «царь»;
+  последний оставшийся — победитель;
+- `getPresentationData` → ext = `♥ N`, у царя — `♔ ♥ N` и `accent = accent` (обе поверхности).
+  Inactive → `—`.
+- `GameModeState = { initialHp, kingId }`, `ParticipantModeState = { hp }`.
+- `Math.random()` здесь используется только для тай-брейков (выбор царя и жертвы), не для рулетки.
+
+**KingOfTheHillAmountMode** («Царь горы: HP = сумма»)
+- копия `KingOfTheHillMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
+  нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); все HP и весь
+  урон — целые числа; карта HP и царь пересчитываются при смене состава до первого спина;
+- остальные правила идентичны `KingOfTheHillMode`: `selectionWeight = 1`, царь — активный лот с
+  наибольшим HP, выпавший-не-царь бьёт царя своим HP, выпавший царь уничтожает слабейшего и
+  поглощает его HP, ничья по HP — приоритет: текущий царь → атакующий → случайный; в завершающей
+  партии царя нет (победитель читается как `good`);
+- `getPresentationData` → ext = `♥ N`, у царя — `♔ ♥ N` и `accent = accent`; inactive → `—`;
+- `GameModeState = { initialHp, kingId }`, `ParticipantModeState = { hp }`.
 
 Все режимы владеют своим состоянием и реализуют полный контракт `GameMode`, поэтому являются
 равноправными стратегиями.
@@ -426,8 +531,9 @@ export function getMode(modeId) { return MODES[modeId]; }
 режим, ни про визуализацию. Он не выводит размер визуальных объектов из весов.
 
 - `rollWeighted(candidates)` — взвешенный выбор по `selectionWeight` методом кумулятивного
-  распределения; `null`, если список пуст или суммарный вес ≤ 0. Единственный источник
-  случайности в игре.
+  распределения; `null`, если список пуст или суммарный вес ≤ 0. Единственный источник случайности
+  при выборе участника; режимы используют `Math.random()` только для тай-брейков (напр. выбор царя
+  в «Царе горы» или случайного из слабейших).
 - `canSpin(activeCount)` — `activeCount >= 1`.
 - `computeFinalRotation(targetStartAngle, targetEndAngle, currentRotation, durationMs)` —
   финальный угол колеса по переданному угловому диапазону целевого сектора (геометрию считает
@@ -527,7 +633,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 2. снимок id-множества **до** стратегии (`idsBefore`);
 3. `strategy.execute(parsedLots, lotManager)`;
 4. `gameSession.reconcileAfterBulkChange(idsBefore)`;
-5. `updateUI()` + `visualizationDriver.refresh(viewState, highlight)`;
+5. `updateUI()` + `visualizationDriver.refresh(viewState, accents)`;
 6. закрытие диалога и, при `lotsTruncated > 0`, информационный модал.
 
 ### 6.6 Вспомогательные вычисления — `utils.ts`
@@ -542,6 +648,9 @@ export function getMode(modeId) { return MODES[modeId]; }
   `StripRenderer`; движок её не знает.
 - `normalizeToFractions(values)` — нейтральная нормировка набора неотрицательных величин в доли
   (Σ = 1); используется рендерерами для перевода `visualValue`/`selectionWeight` в геометрию.
+- `normalizeToRange(values, minValue, maxValue)` — min–max нормализация значений из их собственного
+  диапазона в `[minValue..maxValue]` (один проход на min/max, один на выход, без промежуточных
+  массивов); при вырожденном размахе (все значения равны / один элемент) все результаты = `minValue`.
 - Отображение длительности: позиции слайдера 1–60 с отображаются напрямую; свыше — по таблице
   `DURATION_MAP` до 300 с; `sliderToDuration` / `durationToSlider`.
 - `getRandomPositionInRange(span, edgeMarginPercent, maxEdgeMargin)` — случайная точка внутри
@@ -574,7 +683,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 и не знает структуру `modeState`.
 
 Ключевые ссылки: `lotManager`, `gameSession`, `visualizationDriver`, `lotListView`, `settings`,
-`easingFunction`, `gameHighlight: Set<string>` (game-подсветка, принадлежит `App`),
+`easingFunction`, `outcomeAccents: Map<string, LotAccent>` (акценты последнего исхода,
+принадлежат `App`),
 `hoveredLotId` (транзиентный hover), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер
 ext-колонки).
 
@@ -582,14 +692,15 @@ ext-колонки).
 - `addLot()` — guard `isSessionLocked`; `LotManager.addLot` (ошибка → `ErrorDialog`);
   `gameSession.addLot(lot)`; `updateUI()` + `refresh`.
 - `spin()` — `gameSession.prepareSpin()`; отказ → `alert(prepareSpinFailureKey(reason))`;
-  успех → `updateControlsState()` и `visualizationDriver.spinTo({view, highlight, targetLotId,
+  успех → `updateControlsState()` и `visualizationDriver.spinTo({view, accents, targetLotId,
   durationMs, easing, onComplete: finishSpin})`.
 - `finishSpin()` — `gameSession.finishSpin()` в `try/catch` (исключение →
   `ErrorDialog('error.spinProcessingFailed')`); выставляет текст результата из
-  `outcome.result`; вычисляет game-highlight (`gameHighlightForOutcome`); играет переход
-  (`visualizationDriver.animateOutcome`), после чего фиксирует highlight, вызывает
+  `outcome.result`; строит акценты исхода (`defaultAccentsForOutcome`), сливает их с режимными
+  акцентами после-переходного view (`composeAccents` + `accentsFor`); играет переход
+  (`visualizationDriver.animateOutcome`), после чего фиксирует `outcomeAccents`, вызывает
   `updateUI()` + `refresh(after)` и, при `outcome.message`, показывает сообщение.
-- `reset()` — `gameSession.reset()`, очистка highlight, `visualizationDriver.reset(view)`,
+- `reset()` — `gameSession.reset()`, очистка `outcomeAccents`, `visualizationDriver.reset(view)`,
   текст и UI.
 - `deleteLot` / `handleClearLots` / `openImportDialog` / `handleImportConflict` /
   `executeImport` — guard-ы + согласованные операции над `LotManager` и `GameSession` (§6.5).
@@ -601,8 +712,12 @@ ext-колонки).
 - Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refresh` и `updateUI()`
   (список перерисовывается, т.к. `modeData`/ext зависят от режима).
 - `updateUI()` — строит `RenderableLot[]` из `gameSession.viewState`, вызывает `LotListView.render`
-  с `highlightIds = this.gameHighlight` и `extEnabled`, обновляет статистику (total из
+  с `accents = resolveAccents(view).list` и `extEnabled`, обновляет статистику (total из
   `LotManager`, active из `GameSession`), затем `updateControlsState()`.
+- `resolveAccents(view, base = outcomeAccents)` — композиция акцентов: базовые (акценты исхода ⊕
+  режимные `modeData.accent`, режимный перекрывает) → две карты (`list` / `visualization`)
+  фильтром по `LotAccent.targets`. `accentState()` оборачивает viz-карту в `AccentState`
+  (`pulse = 1`) для всех вызовов драйвера.
 - `updateControlsState()` — переносит блокировки в `disabled` (см. §7.5).
 
 `App` не вычисляет курсор визуализации сам — за него это делает рендерер (§7.3, §7.4).
@@ -614,9 +729,11 @@ ext-колонки).
 своих контролов; не импортирует `LotManager`, `GameSession`, `App`, рендереры и `t`.
 
 - `render(lots: RenderableLot[], options)` — полная перерисовка, сортировка на копии;
-  строки получают классы `inactive` / `highlighted`; для каждого лота — индикатор цвета, имя,
-  поле суммы, (при `extEnabled`) ячейка ext-колонки, кнопка удаления (кроме подсвеченных).
-- `options.highlightIds: ReadonlySet<string>` — набор game-highlight (победители/выбывшие).
+  строки получают классы `inactive` / `accent-<kind>`; для каждого лота — индикатор цвета, имя,
+  поле суммы, (при `extEnabled`) ячейка ext-колонки, кнопка удаления. Акцент — чисто визуальный
+  и никогда не убирает контролы: блокировка выражается `disabled` (см. §7.5), а не скрытием.
+- `options.accents?: ReadonlyMap<string, AccentKind>` — карта акцентов (уже отфильтрована по
+  цели `list`); вид акцента превращается в CSS-класс `accent-<kind>` и не интерпретируется.
 - `options.onLotHover(lotId | null)` — hover строки сообщается наружу по stable `lot.id`
   (`mouseenter`/`mouseleave`; обработчики перевешиваются при каждой перерисовке, поэтому hover
   переживает сортировку). Список сам hover не хранит и в game-состояние не переводит; `App`
@@ -632,20 +749,20 @@ ext-колонки).
 Владеет canvas, текущим `IRenderer`, типом визуализации и `AnimationController`; управляет
 жизненным циклом:
 
-- `setVisualization(type, view, highlight)` — построить новый рендерер, показать снимок;
+- `setVisualization(type, view, accents)` — построить новый рендерер, показать снимок;
   перенести текущую hover-подсветку на новый рендерер (по stable `lot.id`);
-- `refresh(view, highlight)` — показать снимок и перерисовать;
+- `refresh(view, accents)` — показать снимок и перерисовать;
 - `render()` — перерисовать без пересчёта (смена темы);
 - `setHover(lotId | null)` — транзиентная hover-подсветка из списка лотов; чисто презентационная:
   перерисовывает кадр, не трогая view-состояние, анимацию и игровое состояние;
-- `spinTo({view, highlight, targetLotId, durationMs, easing, onComplete})` — запросить у
+- `spinTo({view, accents, targetLotId, durationMs, easing, onComplete})` — запросить у
   визуализации целевой скаляр (`computeSpinTarget`), вести `AnimationController`; на каждом
   кадре только `setAnimationValue` + `render` (курсор рендерер вычисляет сам);
-- `animateOutcome({transition, highlight, durationMs, easing, onComplete})` — интерполировать
+- `animateOutcome({transition, accents, durationMs, easing, onComplete})` — интерполировать
   view-состояние `before → after` (presence выбывших 1 → 0) через переиспользуемый
-  интерполятор (без пересборки структур на кадр), рампить `pulse` game-подсветки; финальный
+  интерполятор (без пересборки структур на кадр), рампить `pulse` акцентов; финальный
   кадр фиксирует стабильный `after`;
-- `reset(view, highlight)` — остановить анимацию, сбросить рендерер (и hover), показать снимок;
+- `reset(view, accents)` — остановить анимацию, сбросить рендерер (и hover), показать снимок;
 - `getCursorLotId()` — read-only запрос текущего лота под курсором (для UI); сам курсор внутрь
   визуализации не передаётся.
 
@@ -653,7 +770,7 @@ ext-колонки).
 
 ### 7.4 Рендереры (Canvas 2D)
 
-`BaseRenderer` владеет только презентацией: canvas/ctx, `participants`, `highlight`,
+`BaseRenderer` владеет только презентацией: canvas/ctx, `participants`, `accents` + `pulse`,
 `animationValue`, картой `presence`, High-DPI и логическим размером (fallback 600×500). Он **не
 строит никакой геометрии** и не хранит общих `Segment`/углов: каждый рендерер в
 `onViewStateChanged()` сам выводит свою геометрию из `visualValue * presence`, а в `onReset()` её
@@ -678,13 +795,19 @@ ext-колонки).
   canvas и не пересчитывается на кадр перехода. Кроссфейд — `TRANSITION_FRACTION = 0.2`.
   Последний кадр гарантированно подсвечивает разыгранный лот.
 
-Подсветка: `highlight.game` (победители/выбывшие) и собственный курсор рендерера рисуются
-**независимо** и не затирают друг друга. Курсор рендерер вычисляет сам из `animationValue`
-(`getCursorLotId`) и мемоизирует на кадр; `highlight.pulse` плавно вводит game-акцент во время
-перехода. Все рендереры учитывают `presence` (альфа + сжатие) для анимации выбывания.
+Акценты: карта `accents` (lotId → `AccentKind`, уже отфильтрованная по цели `visualization`)
+и собственный курсор рендерера рисуются **независимо** и не затирают друг друга. Курсор
+рендерер вычисляет сам из `animationValue` (`getCursorLotId`) и мемоизирует на кадр;
+`pulse` плавно вводит акцент во время перехода. Все рендереры учитывают `presence`
+(альфа + сжатие) для анимации выбывания. Вид акцента отображается единым средством «контур +
+свечение» по таблице `ACCENT_VISUAL` (`baseRenderer.ts`), аддитивно поверх лота: Wheel —
+тонированная заливка + обводка сектора (поверх всех секторов); Strip — вписанная обводка полосы
+(`strokeRect`; ширина, порядок и геометрия полос не меняются); CountingRhyme — внешнее гало
+(`radius + 12` — дальше hover-гало, чтобы кольца не перекрывались). Геометрия лота не меняется;
+`pulse` масштабирует интенсивность (`alpha`).
 
 Hover (наведение в списке лотов) — **третий, независимый** канал подсветки (`setHover`,
-identity — stable `lot.id`). Он рисуется **аддитивно**, поэтому сосуществует с game-подсветкой
+identity — stable `lot.id`). Он рисуется **аддитивно**, поэтому сосуществует с акцентами
 и курсором, не заменяя их: Wheel — полупрозрачная glow-заливка (`rgba(127,212,255,0.25)`) плюс
 голубая обводка (`#7fd4ff`) всего сектора, рисуется **поверх всех секторов**, чтобы соседние
 бордюры не перекрывали края; Strip — обводка полосы (без изменения ширины/порядка);
@@ -771,15 +894,15 @@ spin()
   │     ├─ отказ? (spinInProgress / gameFinished / noActiveLots / noValidWeights) → alert, выход
   │     └─ успех: selectionWeight участников → rollWeighted, pendingSpin={лот,участник,режим,before}, locks
   ├─ updateControlsState()
-  └─ visualizationDriver.spinTo({view, highlight, targetLotId, ...})
+  └─ visualizationDriver.spinTo({view, accents, targetLotId, ...})
         ├─ renderer.setViewState(view); end = renderer.computeSpinTarget(targetLotId, duration)
         ├─ AnimationController 0..end: setAnimationValue + render (курсор рендерер считает сам)
         └─ onComplete → finishSpin()
               ├─ outcome = gameSession.finishSpin()   // mode.processRoll → новые state/participants/outcome
               ├─ resultText = t(outcome.result)
-              ├─ visualizationDriver.animateOutcome({transition: before→after, highlight, ...})
-              │     └─ интерполяция view (presence выбывших → 0), pulse game-подсветки
-              └─ onComplete: gameHighlight = outcome, updateUI(), refresh(after)
+              ├─ visualizationDriver.animateOutcome({transition: before→after, accents, ...})
+              │     └─ интерполяция view (presence выбывших → 0), ramp pulse акцентов
+              └─ onComplete: outcomeAccents = акценты исхода, updateUI(), refresh(after)
 ```
 
 Решение и переход определяются **до** визуализации: `prepareSpin()` решает, `finishSpin()`
@@ -793,7 +916,7 @@ addLot()
   ├─ lotManager.addLot(name, amount, color)   // ошибка → ErrorDialog
   ├─ gameSession.addLot(lot)                   // участие (+ modeState)
   ├─ сброс формы, новый цвет, фокус на имя
-  └─ updateUI() + visualizationDriver.refresh(viewState, highlight)
+  └─ updateUI() + visualizationDriver.refresh(viewState, accents)
 ```
 
 ### 8.4 Импорт

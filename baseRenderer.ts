@@ -1,9 +1,25 @@
 import type {
+    AccentKind,
+    AccentState,
     GameViewState,
-    HighlightState,
     IRenderer,
     RenderableParticipant
 } from './types.js';
+
+/**
+ * Canvas visual for each accent kind — the single source of truth for the
+ * renderers (colour + stroke width). Fixed hex on purpose: the canvas palette
+ * is independent of the CSS theme variables, exactly like the other canvas
+ * colours. `alpha` is NOT here: it comes from the transition `pulse` (see
+ * `BaseRenderer.accentVisual`).
+ */
+export const ACCENT_VISUAL: Record<AccentKind, { color: string; strokeWidth: number }> = {
+    accent:  { color: '#f39c12', strokeWidth: 4 },
+    good:    { color: '#2ecc71', strokeWidth: 4 },
+    bad:     { color: '#e74c3c', strokeWidth: 4 },
+    info:    { color: '#3498db', strokeWidth: 4 },
+    warning: { color: '#f1c40f', strokeWidth: 4 }
+};
 
 /**
  * Shared base for all canvas renderers (visualizations).
@@ -23,15 +39,21 @@ import type {
  *  - `modeData`       — opaque mode payload the renderer may display.
  *
  * It also carries the transient hover highlight (`hoverLotId`, a stable lot
- * id fed through `setHover`), kept separate from the game highlight so both
- * can be composed when they target the same Lot Representation.
+ * id fed through `setHover`), kept separate from the lot accents so both can be
+ * composed when they target the same Lot Representation.
  */
 export abstract class BaseRenderer implements IRenderer {
     protected readonly canvas: HTMLCanvasElement;
     protected readonly ctx: CanvasRenderingContext2D;
 
     protected participants: RenderableParticipant[] = [];
-    protected highlight: HighlightState = { game: new Set(), pulse: 1 };
+
+    /** Lot accents to draw (lotId → kind), already filtered to this surface. */
+    protected accents: ReadonlyMap<string, AccentKind> = new Map();
+
+    /** Emphasis ramp for the accents during an outcome transition (1 = stable). */
+    protected pulse = 1;
+
     protected animationValue = 0;
 
     /** Transient hover highlight (lots-list interaction); see `setHover`. */
@@ -56,9 +78,10 @@ export abstract class BaseRenderer implements IRenderer {
     // Presentation / highlight
     // ------------------------------------------------------------------
 
-    setViewState(view: GameViewState, highlight: HighlightState): void {
+    setViewState(view: GameViewState, accents: AccentState): void {
         this.participants = view.participants;
-        this.highlight = highlight;
+        this.accents = accents.accents;
+        this.pulse = accents.pulse;
 
         this.presenceByLotId.clear();
         for (const p of this.participants) {
@@ -71,7 +94,7 @@ export abstract class BaseRenderer implements IRenderer {
     /**
      * Stores the transient hover highlight. Identity is the stable lot id; the
      * concrete renderer decides the visual treatment and composes it with the
-     * game highlight. Stored only — the driver asks for a redraw.
+     * lot accents. Stored only — the driver asks for a redraw.
      */
     setHover(lotId: string | null): void {
         this.hoverLotId = lotId;
@@ -92,7 +115,8 @@ export abstract class BaseRenderer implements IRenderer {
     reset(): void {
         this.participants = [];
         this.presenceByLotId.clear();
-        this.highlight = { game: new Set(), pulse: 1 };
+        this.accents = new Map();
+        this.pulse = 1;
         this.animationValue = 0;
         this.hoverLotId = null;
         this.cursorForValue = null;
@@ -142,9 +166,29 @@ export abstract class BaseRenderer implements IRenderer {
         return value === undefined ? 1 : value;
     }
 
-    /** Whether the game highlight covers this lot (winners/eliminated). */
-    protected isGameHighlighted(lotId: string): boolean {
-        return this.highlight.game.has(lotId);
+    /**
+     * Accent kind assigned to this lot, or `null` when it has none. This is the
+     * only emphasis a renderer reads from the game; the concrete renderer picks
+     * the visual treatment.
+     */
+    protected accentOf(lotId: string): AccentKind | null {
+        return this.accents.get(lotId) ?? null;
+    }
+
+    /**
+     * Canvas visual for this lot's accent, or `null` when it has none.
+     * `alpha` folds in the transition `pulse` (stable state = 1), so a renderer
+     * draws the accent uniformly: stroke + glow, both scaled by `alpha`.
+     */
+    protected accentVisual(lotId: string): { color: string; strokeWidth: number; alpha: number } | null {
+        const kind = this.accentOf(lotId);
+        if (!kind) return null;
+        const visual = ACCENT_VISUAL[kind];
+        return {
+            color: visual.color,
+            strokeWidth: visual.strokeWidth,
+            alpha: Math.max(0, Math.min(1, this.pulse))
+        };
     }
 
     /** Whether this lot is under the transient hover highlight (lots list). */

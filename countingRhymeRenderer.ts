@@ -14,7 +14,7 @@ import { normalizeToFractions } from './utils.js';
  *    dwell time per circle is proportional to its chance.
  *
  * Hover (`setHover`, lots-list interaction) draws an additive outer halo: it
- * changes no radius/timing/cursor and composes with the game-result stroke.
+ * changes no radius/timing/cursor and composes with the lot accent halo.
  *
  * Contract:
  *  - `animationValue` is measured in *cycles* (one unit = one full traversal of
@@ -32,20 +32,23 @@ import { normalizeToFractions } from './utils.js';
  * seeded LCG); `Math.random()` is never called.
  */
 
-const HIGHLIGHT_COLOR = 'gold';
+const HIGHLIGHT_COLOR = 'gold';    // cursor / beat emphasis
 const HIGHLIGHT_GLOW_BLUR = 24;
 const HIGHLIGHT_STROKE_WIDTH = 4;
 
 const BASE_STROKE_COLOR = 'rgba(255, 255, 255, 0.45)';
 const BASE_STROKE_WIDTH = 2;
 
-const GAME_HIGHLIGHT_STROKE_WIDTH = 6;
-const GAME_HIGHLIGHT_GLOW_BLUR = 30;
-
 const MIN_CIRCLE_RADIUS = 14;
 const MAX_CIRCLE_RADIUS = 250;
 
-// Hover (lots-list interaction) — additive outer halo, distinct from the gold game highlight
+// Lot accents — additive outer halo in the accent colour, further out than the
+// hover halo so the two rings never cover each other. The circle radius is
+// never changed.
+const ACCENT_GLOW_BLUR = 18;
+const ACCENT_RING_OFFSET = 12;
+
+// Hover (lots-list interaction) — additive outer halo, distinct from the lot accents
 const HOVER_COLOR = '#7fd4ff';
 const HOVER_STROKE_WIDTH = 3;
 const HOVER_GLOW_BLUR = 18;
@@ -130,18 +133,12 @@ export class CountingRhymeRenderer extends BaseRenderer {
             ctx.restore();
 
             const intensity = intensities[i];
-            const game = this.isGameHighlighted(p.lot.id);
 
             ctx.save();
             ctx.globalAlpha = presence;
             ctx.beginPath();
             ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
-            if (game) {
-                ctx.strokeStyle = HIGHLIGHT_COLOR;
-                ctx.lineWidth = GAME_HIGHLIGHT_STROKE_WIDTH;
-                ctx.shadowColor = HIGHLIGHT_COLOR;
-                ctx.shadowBlur = GAME_HIGHLIGHT_GLOW_BLUR * this.highlight.pulse;
-            } else if (intensity > 0.01) {
+            if (intensity > 0.01) {
                 ctx.strokeStyle = HIGHLIGHT_COLOR;
                 ctx.lineWidth = HIGHLIGHT_STROKE_WIDTH;
                 ctx.shadowColor = HIGHLIGHT_COLOR;
@@ -154,8 +151,24 @@ export class CountingRhymeRenderer extends BaseRenderer {
             ctx.stroke();
             ctx.restore();
 
+            // Lot accent: an outer halo in the accent colour. It leaves the
+            // circle radius untouched and never replaces the cursor stroke.
+            const accent = this.accentVisual(p.lot.id);
+            if (accent && accent.alpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = presence * accent.alpha;
+                ctx.beginPath();
+                ctx.arc(cell.cx, cell.cy, radius + ACCENT_RING_OFFSET, 0, Math.PI * 2);
+                ctx.strokeStyle = accent.color;
+                ctx.lineWidth = accent.strokeWidth;
+                ctx.shadowColor = accent.color;
+                ctx.shadowBlur = ACCENT_GLOW_BLUR;
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // Hover adds an outer halo; it leaves the circle radius untouched and
-            // composes with the game-result stroke.
+            // composes with the accent halo and the cursor stroke.
             if (this.isHovered(p.lot.id)) {
                 ctx.save();
                 ctx.globalAlpha = presence;
