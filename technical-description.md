@@ -755,8 +755,9 @@ Hover-состояние `App` не хранит: его владелец — `V
 - Фильтр «только активные» (`#active-only-toggle`, **перед свитчером сортировки**) — переключает
   `activeOnly` и глиф `#active-only-icon` (`applyActiveOnlyState()`, 🔲/🔳) и вызывает `updateUI()`;
   как и кнопки сортировки, **никогда не блокируется** (он вне контролов, которыми управляет
-  `LotListView.setLocked()`/`updateControlsState()`). Подпись кнопки живёт в отдельном
-  `data-i18n`-span, поэтому смена языка не затирает глиф.
+  `LotListView.setLocked()`/`updateControlsState()`). Кнопка — **только глиф** (место в шапке
+  ограничено), смысл несёт тултип `lots.activeOnlyTitle`; сам глиф живёт в отдельном span'е, поэтому
+  `translateDOM` его не затирает.
 - Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refreshAfterStateChange()`
   (список перерисовывается, т.к. `modeData`/ext зависят от режима).
 - `updateUI(view = gameSession.viewState, listAccents?)` — строит `RenderableLot[]` из снимка,

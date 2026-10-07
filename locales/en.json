@@ -69,7 +69,6 @@
   "mode.king-of-the-hill-amount.resultDestroy": "King destroyed: {{victim}} (rolled: {{name}})",
   "mode.king-of-the-hill-amount.completionMessage": "🏆 KING OF THE HILL (HP = AMOUNT) WINNER: {{name}}",
   "lots.extToggleTitle": "Show extra mode information",
-  "lots.activeOnly": "Active",
   "lots.activeOnlyTitle": "Show only active lots",
   "importStrategy.replace.label": "🔄 Replace",
   "importStrategy.replace.description": "Remove all existing lots and import new ones",
