@@ -269,8 +269,8 @@ export class App {
      * with the mode-owned accents of the current view merged over them,
      * filtered to the `visualization` target.
      */
-    private accentState(): AccentState {
-        return { accents: this.resolveAccents(this.gameSession.viewState).visualization, pulse: 1 };
+    private accentState(view: GameViewState): AccentState {
+        return { accents: this.resolveAccents(view).visualization, pulse: 1 };
     }
 
     /**
@@ -324,10 +324,11 @@ export class App {
         if (this.gameSession.isSessionLocked) return;
         this.lotManager.updateLot(id, { amount: newAmount });
         // An amount change does not affect participation, but it does change the
-        // mode's view data (selection weight, visual value, the ext column), so
-        // both the list and the visualization must be re-rendered.
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+        // mode's view data (chance, magnitude, the ext column), so both the list
+        // and the visualization must be re-rendered. One snapshot per action.
+        const view = this.gameSession.viewState;
+        this.updateUI(view);
+        this.visualizationDriver.refresh(view, this.accentState(view));
     }
 
     /**
@@ -438,12 +439,13 @@ export class App {
             this.gameSession.setMode(newModeId);
             this.settings.modeId = newModeId;
 
-            // Re-render with the new mode's selection weights / visual values.
-            // Participation is deliberately preserved across a mode switch.
-            this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+            // Re-render with the new mode's axes (chance/magnitude) — one
+            // snapshot per action. Participation is preserved across a switch.
+            const view = this.gameSession.viewState;
+            this.visualizationDriver.refresh(view, this.accentState(view));
             // Re-render the lots list: modeData (e.g. the ext column) is
             // mode-owned and changes with the mode.
-            this.updateUI();
+            this.updateUI(view);
             // Update result text to show new mode name if no highlight active
             this.updateResultTextWithModeName();
             this.updateModeHelpTooltip();
@@ -464,10 +466,11 @@ export class App {
 
             // Recreate renderer with new visualization type and refresh — the
             // swap is entirely contained in the visualization boundary.
+            const view = this.gameSession.viewState;
             this.visualizationDriver.setVisualization(
                 this.settings.visualization,
-                this.gameSession.viewState,
-                this.accentState()
+                view,
+                this.accentState(view)
             );
         });
 
@@ -610,8 +613,9 @@ export class App {
         this.lotNameInput.focus();
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+        const view = this.gameSession.viewState;
+        this.updateUI(view);
+        this.visualizationDriver.refresh(view, this.accentState(view));
     }
 
     private spin(): void {
@@ -630,9 +634,10 @@ export class App {
 
         // Hand the already-decided target to the visualization boundary.
         // App says *what* to animate; the driver/visualization decide *how*.
+        const view = this.gameSession.viewState;
         this.visualizationDriver.spinTo({
-            view: this.gameSession.viewState,
-            accents: this.accentState(),
+            view,
+            accents: this.accentState(view),
             targetLotId: prepared.lot.id,
             durationMs: this.settings.animationDuration,
             easing: this.easingFunction,
@@ -702,7 +707,10 @@ export class App {
             onComplete: () => {
                 this.outcomeInProgress = false;
                 this.outcomeAccents = finalAccents;
-                this.updateUI();
+                // `after` IS the session's current snapshot here (nothing mutates
+                // the session while the outcome transition runs), so it is reused
+                // instead of rebuilding.
+                this.updateUI(after);
                 this.visualizationDriver.refresh(after, finalAccentState);
 
                 if (outcome.message) {
@@ -728,20 +736,22 @@ export class App {
 
         // Reset the visualization (stops any animation, resets the renderer,
         // shows the now-reset view). The whole sequence is synchronous, so a
-        // late `onComplete` cannot replay a stale spin.
-        this.visualizationDriver.reset(this.gameSession.viewState, this.accentState());
+        // late `onComplete` cannot replay a stale spin. One snapshot per action.
+        const view = this.gameSession.viewState;
+        this.visualizationDriver.reset(view, this.accentState(view));
 
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
 
         // Update UI
-        this.updateUI();
+        this.updateUI(view);
     }
 
-    private updateUI(): void {
-        // Global lot data comes from `LotManager`; participation and weights are
-        // projected by the session. Sorting is delegated to the view.
-        const view = this.gameSession.viewState;
+    private updateUI(view: GameViewState = this.gameSession.viewState): void {
+        // Global lot data comes from `LotManager`; participation and axes are
+        // projected by the session. Sorting is delegated to the view. A caller
+        // that already built the snapshot passes it in, so one user action
+        // builds the view state exactly once.
         const renderables: RenderableLot[] = view.participants.map(p => ({
             name: p.lot.name,
             amount: p.lot.amount,
@@ -843,8 +853,9 @@ export class App {
         this.outcomeAccents.delete(id);
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+        const view = this.gameSession.viewState;
+        this.updateUI(view);
+        this.visualizationDriver.refresh(view, this.accentState(view));
     }
 
     /** Handles clearing all lots */
@@ -877,8 +888,9 @@ export class App {
         }
 
         // Update UI and renderer
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+        const view = this.gameSession.viewState;
+        this.updateUI(view);
+        this.visualizationDriver.refresh(view, this.accentState(view));
     }
 
     /** Opens the import dialog */
@@ -941,8 +953,9 @@ export class App {
         this.gameSession.reconcileAfterBulkChange(idsBefore);
 
         // Update UI and renderer after import completes
-        this.updateUI();
-        this.visualizationDriver.refresh(this.gameSession.viewState, this.accentState());
+        const view = this.gameSession.viewState;
+        this.updateUI(view);
+        this.visualizationDriver.refresh(view, this.accentState(view));
 
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {

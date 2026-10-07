@@ -12,7 +12,12 @@
 >  - результат хода обобщён (`TurnOutcome`: winners/eliminated/changed/finished);
 >  - введены presentation-модель (`GameViewState`) и переход состояния (before → after);
 >  - контракт визуализации — жизненный цикл, а не «координата рулетки»;
->  - `selectionWeight` (вероятность выбора) и `visualValue` (визуальный размер) разделены;
+>  - оси визуализации разделены и независимы: `xValue` (шанс; заполняет **ядро** — ровно значение,
+>    ушедшее в прокрут), `yValue` (величина режима), `zValue` (прозрачность; пока никто не заполняет);
+>  - `xValue`/`yValue`/`zValue` и `presence` интерполируются между before и after, поэтому
+>    перестройка геометрии идёт без «прыжков»;
+>  - одно действие пользователя строит снимок view-состояния один раз (`App` передаёт его и в
+>    список, и в визуализацию), `prepareSpin()` веса не пересчитывает;
 >  - геометрия (углы/ширины/сетка) — внутренняя для каждой визуализации, общего `Segment` нет;
 >  - акценты лотов: единая палитра (`AccentKind`), автор смысла — режим (`modeData.accent`),
 >    композиция и раздача — `App` (акценты исхода ⊕ режимные, фильтр по цели); курсор
@@ -20,8 +25,8 @@
 >  - hover из списка лотов — отдельный аддитивный канал подсветки (`setHover`, по stable `lot.id`);
 >  - данные режима для UI обобщены (`modeData.ext`): список выводит готовый текст, а смысл и
 >    формат задаёт режим (HP, вероятность финальной победы, …);
->  - добавлен режим **Crown Defense** (`selectionWeight = 1`, `visualValue = HP`) — первое
->    доказательство расширяемости: без правок core и визуализаций.
+>  - расширяемость подтверждена режимами **Weakest Link** и **King of the Hill** (и их
+>    amount-вариантами) — без правок core и визуализаций.
 > Поведение `Normal` и `Survival` сохранено 1:1.
 
 ---
@@ -116,8 +121,8 @@ GameSession
 GameMode
  ├── mode state
  ├── rules
- ├── selection semantics (selectionWeight)
- ├── presentation semantics (visualValue, modeData)
+ ├── selection semantics (calculateSelectionWeight → ось xValue)
+ ├── presentation semantics (оси yValue / zValue, modeData)
  └── turn transition (pure)
 
 VisualizationDriver
@@ -258,9 +263,11 @@ interface GameMode {
   createParticipantState(lot: Lot): ParticipantModeState;
   onParticipantsChanged(state, participants, lots): GameModeState;
 
-  calculateSelectionWeight(lot, participant, state): number;   // вероятность выбора рулеткой
+  calculateSelectionWeight(lot, participant, state): number;   // шанс выбора → ось xValue
 
-  getParticipantVisualValue(lot, participant, state): number;  // визуальная величина для размера
+  getParticipantMagnitude(lot, participant, state): number | undefined;  // ось yValue: величина (размер)
+
+  getParticipantOpacity?(lot, participant, state): number | undefined;   // ось zValue: прозрачность (0..1)
 
   processRoll(rolledLot, rolled, participants, lots, state): {
     state: GameModeState;
@@ -273,10 +280,12 @@ interface GameMode {
 ```
 
 Все переходы **чистые**: режим получает предыдущее состояние и возвращает новое, не мутируя
-входы. Режим не обращается к DOM, `App`, `VisualizationDriver` или рендерерам. Режим задаёт две
+входы. Режим не обращается к DOM, `App`, `VisualizationDriver` или рендерерам. Режим задаёт
 **независимые** семантики: selection (`calculateSelectionWeight`) и presentation
-(`getParticipantVisualValue` + `getPresentationData`). `visualValue` — абстрактная
-величина, её смысл (amount / HP / score) знает только режим; визуализация его не интерпретирует.
+(`getParticipantMagnitude` + необязательный `getParticipantOpacity` + `getPresentationData`).
+`yValue` — абстрактная величина, её смысл (amount / HP / score) знает только режим; визуализация
+его не интерпретирует. `zValue` — прозрачность лота; сегодня его не заполняет ни один режим,
+поэтому прозрачных лотов нет.
 `getPresentationData` вызывается **один раз на сборку view-состояния** и возвращает карту
 `lotId → ModePresentationData`, поэтому режим может посчитать множественную презентацию
 (например, вероятность финальной победы) один раз, а не на каждого участника.
@@ -287,8 +296,9 @@ interface GameMode {
 interface RenderableParticipant {
   lot: Lot;
   active: boolean;
-  selectionWeight: number;             // вероятность выбора рулеткой (НЕ размер!)
-  visualValue: number;                 // визуальная величина; смысл задаёт режим
+  xValue: number;                      // ось 1 — ШАНС: вес выбора (НЕ размер!); заполняет ядро
+  yValue?: number;                     // ось 2 — величина; смысл задаёт режим; нет значения — отсутствует
+  zValue?: number;                     // ось 3 — прозрачность 0..1; отсутствие = 1
   presence: number;                    // визуальный множитель [0..1] (анимация выбывания)
   modeData?: ModePresentationData;     // режимные данные для UI (ext-колонка, accent)
 }
@@ -324,12 +334,14 @@ interface VisualizationTransition {    // контекст перехода од
 }
 ```
 
-`selectionWeight` и `visualValue` — **две независимые величины**. Геометрия конкретной
-визуализации строится из `visualValue * presence`; `selectionWeight` в геометрию рисования не
-попадает (он нужен выбору и тем визуальным механикам, что основаны на вероятности, например
-«такт» считалочки). Нормировку `visualValue` делает сама визуализация, поэтому участник с
-`presence: 1 → 0` сжимается, а остальные растут — переход выбывания получается из интерполяции
-view-состояния (см. §7.4).
+Оси **независимы**: `xValue` никогда не влияет на масштаб, `yValue`/`zValue` — на шанс.
+Геометрия конкретной визуализации строится из `yValue * presence`, альфа лота — из
+`presence × zValue`; `xValue` в геометрию рисования не попадает (он нужен выбору и тем
+визуальным механикам, что основаны на вероятности, например «такт» считалочки). Нормировку
+`yValue` делает сама визуализация, поэтому участник с `presence: 1 → 0` сжимается, а остальные
+растут — переход выбывания получается из интерполяции view-состояния (см. §7.4). `xValue`
+заполняет **ядро** (значение, ровно совпадающее с использованным в прокруте), `yValue`/`zValue` —
+режим, причём отсутствие значения выражается `undefined`, а не константой.
 
 ### Акценты лотов
 
@@ -427,8 +439,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 смена языка немедленно обновляет название и описание режима.
 
 **NormalMode**
-- `selectionWeight = amount` (больше сумма → выше шанс);
-- `visualValue = amount` (визуальный размер сектора совпадает с вероятностью);
+- `xValue = amount` (ось шанса: больше сумма → выше шанс), заполняет ядро;
+- `yValue = amount` (ось величины: визуальный размер сектора совпадает с вероятностью);
 - `processRoll` → `finished: true`, `winners: [rolledLot.id]`, `eliminated: []`;
 - `result` = «Победитель: {{name}}». Одна игра = один спин.
 - `getPresentationData` → ext = **вероятность финальной победы** `amount_i / Σ amount(active)`
@@ -436,8 +448,8 @@ export function getMode(modeId) { return MODES[modeId]; }
   разрешения формата (< 0.1%) — `< 0.1%`. Inactive → `—`.
 
 **SurvivalMode** (выбывание)
-- `selectionWeight = 1 / amount` (больше сумма → ниже шанс выбыть);
-- `visualValue = 1 / amount` (сохраняет прежний визуальный размер);
+- `xValue = 1 / amount` (ось шанса: больше сумма → ниже шанс выбыть);
+- `yValue = 1 / amount` (сохраняет прежний визуальный размер);
 - `processRoll` смотрит на состояние **после** удаления разыгранного лота:
   - остаётся ровно один → он победитель (`finished: true`, `eliminated: [rolled]`);
   - не остаётся никого (спин по единственному активному) → разыгранный лот объявляется
@@ -452,8 +464,8 @@ export function getMode(modeId) { return MODES[modeId]; }
   `< 0.1%`. Inactive → `—`.
 
 **CrownDefenseHalfTestMode** («Защита короны: половина урона»)
-- `selectionWeight = 1` для каждого активного — вероятность не зависит от HP;
-- `visualValue = текущее HP`; `GameModeState = {}` — HP выводится прямо из `amount`, состояние не
+- `xValue = 1` для каждого активного — вероятность не зависит от HP;
+- `yValue = текущее HP`; `GameModeState = {}` — HP выводится прямо из `amount`, состояние не
   нужно;
 - начальный HP = `amount` (без нормализации и floor); смена состава до первого спина ничего не
   пересчитывает — HP каждого лота не зависит от остальных;
@@ -464,7 +476,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `getPresentationData` → ext = текущее HP как `♥ N`; при HP < 1 — `♥ < 1`; inactive → `—`.
 
 **WeakestLinkMode** («Слабое звено»)
-- `selectionWeight = 1` — у всех активных равный шанс;
+- `xValue = 1` — у всех активных равный шанс;
 - начальный HP = `amount`, min–max нормированный в `[1..100]` (`normalizeToRange`) и округлённый
   вверх до целого (минимальный amount → 1, максимальный → 100); карта HP пересчитывается при смене
   состава участников до первого спина;
@@ -480,7 +492,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 - копия `WeakestLinkMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
   нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); карта HP
   пересчитывается при смене состава участников до первого спина;
-- остальные правила идентичны `WeakestLinkMode`: `selectionWeight = 1`, урон получает **только
+- остальные правила идентичны `WeakestLinkMode`: `xValue = 1`, урон получает **только
   выпавший лот**, `L` = активные кроме выпавшего с `HP ≤ HP(выпавшего)`, `D = HP(выпавшего)` если
   `L` пуст, иначе `D = ceil(среднее HP по L)`; HP клампится в 0; выбывание при HP ≤ 0; последний
   оставшийся — победитель;
@@ -491,7 +503,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `GameModeState = { initialHp, lastHitId }`, `ParticipantModeState = { hp }`.
 
 **KingOfTheHillMode** («Царь горы»)
-- `selectionWeight = 1` — у всех активных равный шанс;
+- `xValue = 1` — у всех активных равный шанс;
 - начальный HP = `amount`, min–max нормированный в `[1..100]` (`normalizeToRange`) и округлённый
   вверх до целого; карта HP и царь пересчитываются при смене состава до первого спина;
 - «царь» — активный лот с наибольшим HP (ничьи — случайный из них); он хранится в состоянии и
@@ -515,7 +527,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 - копия `KingOfTheHillMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
   нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); все HP и весь
   урон — целые числа; карта HP и царь пересчитываются при смене состава до первого спина;
-- остальные правила идентичны `KingOfTheHillMode`: `selectionWeight = 1`, царь — активный лот с
+- остальные правила идентичны `KingOfTheHillMode`: `xValue = 1`, царь — активный лот с
   наибольшим HP, выпавший-не-царь бьёт царя своим HP, выпавший царь уничтожает слабейшего и
   поглощает его HP, ничья по HP — приоритет: текущий царь → атакующий → случайный; в завершающей
   партии царя нет (победитель читается как `good`);
@@ -547,7 +559,7 @@ export function getMode(modeId) { return MODES[modeId]; }
   `max(2, round(durationSec * 2))` циклов. Гарантирует, что последний кадр подсветит
   разыгранный лот.
 
-Движок не знает про `visualValue`, `modeData`, HP, `Normal`/`Survival` или конкретные режимы и не
+Движок не знает про `yValue`/`zValue`, `modeData`, HP, `Normal`/`Survival` или конкретные режимы и не
 строит общий `Segment`/`startAngle`-контракт: угловая геометрия — внутренняя для `WheelRenderer`.
 Целевой лот определяется **только** через selection, а спин-геометрия считается по уже выбранному
 лоту (selection → rolledLot → animation geometry), не наоборот.
@@ -569,7 +581,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `activeLots` / `activeCount` — активные участники, спроецированные на актуальный глобальный
   список (без кэша-снимка);
 - `isActive(id)` — участие;
-- `viewState` — `GameViewState` (`selectionWeight`, `visualValue` и `modeData` считает режим).
+- `viewState` — `GameViewState` (`xValue` заполняет **ядро** — ровно то значение, что ушло в
+  прокрут; `yValue`/`zValue` и `modeData` считает режим).
 
 **Мутации участия** (все отклоняются при `sessionLocked`):
 - `addLot(lot)` — новый участник (`modeState = mode.createParticipantState(lot)`);
@@ -594,10 +607,11 @@ export function getMode(modeId) { return MODES[modeId]; }
 **`prepareSpin()`** возвращает `{ok:true, lot}` или `{ok:false, reason}` с одним из четырёх
 оснований: `spinInProgress`, `gameFinished`, `noActiveLots`, `noValidWeights`.
 
-При успехе: режим **пинится**, считается `selectionWeight` каждого активного участника, вызывается
-`RouletteEngine.rollWeighted`, сохраняется контекст `pendingSpin` (разыгранный лот + участник +
-режим + «before»-снимок состояния и view), затем атомарно поднимаются оба флага. При отказе
-флаги и `pendingSpin` **не меняются**.
+При успехе: режим **пинится**, строится один снимок `viewState` (он же — «before»), кандидаты
+берутся из его активных участников по `xValue` (веса **не пересчитываются** повторным вызовом
+режима), вызывается `RouletteEngine.rollWeighted`, сохраняется контекст `pendingSpin` (разыгранный
+лот + участник + режим + состояние и view «before»), затем атомарно поднимаются оба флага. При
+отказе флаги и `pendingSpin` **не меняются**.
 
 **`finishSpin()`** — применяет отложенный переход:
 - если `pendingSpin` нет → `null`;
@@ -633,7 +647,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 2. снимок id-множества **до** стратегии (`idsBefore`);
 3. `strategy.execute(parsedLots, lotManager)`;
 4. `gameSession.reconcileAfterBulkChange(idsBefore)`;
-5. `updateUI()` + `visualizationDriver.refresh(viewState, accents)`;
+5. один снимок `view` → `updateUI(view)` + `visualizationDriver.refresh(view, accents)`;
 6. закрытие диалога и, при `lotsTruncated > 0`, информационный модал.
 
 ### 6.6 Вспомогательные вычисления — `utils.ts`
@@ -644,10 +658,10 @@ export function getMode(modeId) { return MODES[modeId]; }
   и `hsl()` для импортированных); неизвестный формат возвращается без изменений.
 - Геометрия ленты (strip-specific, не общий контракт): `MIN_BAND_WIDTH = 60`,
   `BAND_WIDTH_SCALE = 400`, `getStripBandWidth(fraction) = max(60, fraction * 400)` — ширина
-  полосы из нормированной визуальной доли (`visualValue / Σ visualValue`). Используется только
+  полосы из нормированной визуальной доли (`yValue / Σ yValue`). Используется только
   `StripRenderer`; движок её не знает.
 - `normalizeToFractions(values)` — нейтральная нормировка набора неотрицательных величин в доли
-  (Σ = 1); используется рендерерами для перевода `visualValue`/`selectionWeight` в геометрию.
+  (Σ = 1); используется рендерерами для перевода `yValue`/`xValue` в геометрию.
 - `normalizeToRange(values, minValue, maxValue)` — min–max нормализация значений из их собственного
   диапазона в `[minValue..maxValue]` (один проход на min/max, один на выход, без промежуточных
   массивов); при вырожденном размахе (все значения равны / один элемент) все результаты = `minValue`.
@@ -690,7 +704,7 @@ ext-колонки).
 
 Основные операции:
 - `addLot()` — guard `isSessionLocked`; `LotManager.addLot` (ошибка → `ErrorDialog`);
-  `gameSession.addLot(lot)`; `updateUI()` + `refresh`.
+  `gameSession.addLot(lot)`; `updateUI(view)` + `refresh(view, …)` (один снимок на действие).
 - `spin()` — `gameSession.prepareSpin()`; отказ → `alert(prepareSpinFailureKey(reason))`;
   успех → `updateControlsState()` и `visualizationDriver.spinTo({view, accents, targetLotId,
   durationMs, easing, onComplete: finishSpin})`.
@@ -699,25 +713,30 @@ ext-колонки).
   `outcome.result`; строит акценты исхода (`defaultAccentsForOutcome`), сливает их с режимными
   акцентами после-переходного view (`composeAccents` + `accentsFor`); играет переход
   (`visualizationDriver.animateOutcome`), после чего фиксирует `outcomeAccents`, вызывает
-  `updateUI()` + `refresh(after)` и, при `outcome.message`, показывает сообщение.
+  `updateUI(after)` + `refresh(after, …)` (снимок `after` — текущий, поэтому переиспользуется)
+  и, при `outcome.message`, показывает сообщение.
 - `reset()` — `gameSession.reset()`, очистка `outcomeAccents`, `visualizationDriver.reset(view)`,
   текст и UI.
 - `deleteLot` / `handleClearLots` / `openImportDialog` / `handleImportConflict` /
   `executeImport` — guard-ы + согласованные операции над `LotManager` и `GameSession` (§6.5).
 - `handleLotHover(id)` — hover строки списка: `visualizationDriver.setHover(id)`; чисто визуально
   и не зависит от блокировок.
-- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot` + `refresh`.
+- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot`; один снимок
+  `view` на `updateUI(view)` + `refresh(view, …)`.
 - Тумблер `ext` (`#ext-toggle`, кнопка `↔️` в шапке списка) — переключает `extEnabled`, класс
   `btn-primary`/`btn-secondary` (`applyExtToggleState()`) и вызывает `updateUI()`; доступен всегда.
-- Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refresh` и `updateUI()`
-  (список перерисовывается, т.к. `modeData`/ext зависят от режима).
-- `updateUI()` — строит `RenderableLot[]` из `gameSession.viewState`, вызывает `LotListView.render`
-  с `accents = resolveAccents(view).list` и `extEnabled`, обновляет статистику (total из
-  `LotManager`, active из `GameSession`), затем `updateControlsState()`.
+- Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем один снимок: `refresh(view, …)`
+  и `updateUI(view)` (список перерисовывается, т.к. `modeData`/ext зависят от режима).
+- `updateUI(view = gameSession.viewState)` — строит `RenderableLot[]` из снимка, вызывает
+  `LotListView.render` с `accents = resolveAccents(view).list` и `extEnabled`, обновляет статистику
+  (total из `LotManager`, active из `GameSession`), затем `updateControlsState()`. Вызывающий может
+  передать уже построенный снимок, поэтому **одно действие пользователя строит view-состояние ровно
+  один раз** (до этапа осей обработчик собирал его трижды: `updateUI` + аргумент `refresh` +
+  `accentState`).
 - `resolveAccents(view, base = outcomeAccents)` — композиция акцентов: базовые (акценты исхода ⊕
   режимные `modeData.accent`, режимный перекрывает) → две карты (`list` / `visualization`)
-  фильтром по `LotAccent.targets`. `accentState()` оборачивает viz-карту в `AccentState`
-  (`pulse = 1`) для всех вызовов драйвера.
+  фильтром по `LotAccent.targets`. `accentState(view)` оборачивает viz-карту в `AccentState`
+  (`pulse = 1`) для всех вызовов драйвера; снимок принимается аргументом, второй сборки не делает.
 - `updateControlsState()` — переносит блокировки в `disabled` (см. §7.5).
 
 `App` не вычисляет курсор визуализации сам — за него это делает рендерер (§7.3, §7.4).
@@ -771,26 +790,29 @@ ext-колонки).
 ### 7.4 Рендереры (Canvas 2D)
 
 `BaseRenderer` владеет только презентацией: canvas/ctx, `participants`, `accents` + `pulse`,
-`animationValue`, картой `presence`, High-DPI и логическим размером (fallback 600×500). Он **не
-строит никакой геометрии** и не хранит общих `Segment`/углов: каждый рендерер в
-`onViewStateChanged()` сам выводит свою геометрию из `visualValue * presence`, а в `onReset()` её
-очищает. Общий `Segment` с `startAngle/endAngle`, доступный всем визуализациям, не вводится.
+`animationValue`, картами `presence` и `zValue` (ось 3), High-DPI и логическим размером
+(fallback 600×500). Он **не строит никакой геометрии** и не хранит общих `Segment`/углов: каждый
+рендерер в `onViewStateChanged()` сам выводит свою геометрию из `yValue * presence`, а в
+`onReset()` её очищает. Общий `Segment` с `startAngle/endAngle`, доступный всем визуализациям, не
+вводится. Альфа собственного рисования лота — `opacityOf(id) = presence × zValue` (`zValue`
+отсутствует = 1, поэтому сегодня альфа равна `presence`); hover — отдельный транзиентный канал и от
+`zValue` не зависит.
 
 - **`WheelRenderer`** — круг. Секторы заданы локальным типом `WheelSector { lot, startAngle,
-  endAngle }`, углы — из нормированного `visualValue`. `WHEEL_MARGIN = 30`,
+  `endAngle }`, углы — из нормированного `yValue`. `WHEEL_MARGIN = 30`,
   `SECTOR_STROKE_WIDTH = 2`, `HIGHLIGHT_BRIGHTNESS = 30 + 45·pulse`; подписи на `0.7·radius`
   только при размахе > `LABEL_MIN_ARC = 0.1`; указатель — золотой треугольник сверху; кольца
   `radius + 10` и `radius − 5`. Таргет и курсор — по этим секторам (`getCursorLotId` ищет сектор
   по локальному углу `−π/2 − rotation`).
 - **`StripRenderer`** — бесконечная лента. Локальный тип `StripBand { lot, startInCycle, width }`;
-  ширины — из нормированного `visualValue` через `getStripBandWidth`. `render()` приводит
+  ширины — из нормированного `yValue` через `getStripBandWidth`. `render()` приводит
   смещение по модулю и рисует копии цикла (`getCyclesNeeded`). `BAND_HEIGHT = 160`, подписи
   повёрнуты на `−π/2`, центральный маркер — золотая пунктирная вертикаль; рамка
   `rgba(255,255,255,0.3)`, 4 px. Таргет и курсор — по полосам
   (`(offset + centerX) mod totalCycleWidth`).
 - **`CountingRhymeRenderer`** — каждый лот — круг в детерминированной сетке (LCG, засеянный
-  FNV-1a-хешем id; `Math.random()` не используется). **Радиус — из `visualValue * presence`**
-  (визуальная величина), а **«такт»/таргет/курсор — из selection-разбиения** (`selectionWeight`),
+  FNV-1a-хешем id; `Math.random()` не используется). **Радиус — из `yValue * presence`**
+  (ось величины), а **«такт»/таргет/курсор — из разбиения по `xValue`** (ось шанса),
   поэтому dwell круга пропорционален вероятности. Сетка ячеек кэшируется по набору id + размеру
   canvas и не пересчитывается на кадр перехода. Кроссфейд — `TRANSITION_FRACTION = 0.2`.
   Последний кадр гарантированно подсвечивает разыгранный лот.
@@ -892,7 +914,7 @@ DOMContentLoaded
 spin()
   ├─ gameSession.prepareSpin()
   │     ├─ отказ? (spinInProgress / gameFinished / noActiveLots / noValidWeights) → alert, выход
-  │     └─ успех: selectionWeight участников → rollWeighted, pendingSpin={лот,участник,режим,before}, locks
+  │     └─ успех: снимок view (кандидаты по xValue) → rollWeighted, pendingSpin={лот,участник,режим,state+view before}, locks
   ├─ updateControlsState()
   └─ visualizationDriver.spinTo({view, accents, targetLotId, ...})
         ├─ renderer.setViewState(view); end = renderer.computeSpinTarget(targetLotId, duration)
@@ -960,10 +982,11 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 6. `spinInProgress` снимается в `finally` — исключение в `processRoll()` не «застревает».
 7. Отказ спина не меняет ни флаги, ни `pendingSpin`.
 8. Все переходы режима чистые; `modeState` и `modeData` непрозрачны для ядра.
-9. `selectionWeight ≠ visualValue`: выбор участника определяется только `selectionWeight`, а
-   размер/представление — только `visualValue` (× `presence`). Изменение одного не меняет другое.
+9. Оси независимы: выбор участника определяется только `xValue`, размер — только `yValue`
+   (× `presence`), альфа — `presence × zValue`. Изменение одной оси не меняет другие.
+   `xValue` заполняет ядро, `yValue`/`zValue` — режим (отсутствие значения = `undefined`).
 10. `RouletteEngine` знает только selection и roulette-механику: он не выводит визуальный размер
-    из веса и не знает про `visualValue`/`modeData`/конкретные режимы.
+    из веса и не знает про `yValue`/`zValue`/`modeData`/конкретные режимы.
 11. Геометрия визуализации — её собственная: `startAngle/endAngle` (Wheel), ширина полосы (Strip),
     сетка/радиус (Counting) не являются общим контрактом; общего `Segment` нет.
 12. Подсветка: game-набор приходит извне; cursor рендерер вычисляет сам из `animationValue` и
@@ -975,21 +998,21 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 
 ## 10. Расширяемость
 
-**Новый игровой режим** (например, Crown Defense с HP):
+**Новый игровой режим**:
 1. реализовать класс `GameMode` (свои `GameModeState`/`ParticipantModeState`, чистый
    `processRoll` с несколькими изменениями/победителями и `changed`, `calculateSelectionWeight`,
-   `getParticipantVisualValue`, `getPresentationData`);
+   `getParticipantMagnitude` и, при необходимости, `getParticipantOpacity`, `getPresentationData`);
 2. зарегистрировать в `MODES` (`modes.ts`) и расширить union `Mode`;
 3. добавить локализацию.
 `App`, `GameSession`, `RouletteEngine`, `VisualizationDriver` и существующие визуализации
-менять не требуется. Например, Crown Defense задаёт `selectionWeight = 1` для активных и
-`visualValue = текущее HP` — вероятность выбора и визуальный размер независимы. **Crown Defense
-реализован именно так** (`crownDefenseMode.ts`) — без правок core и визуализаций.
+менять не требуется. Например, `WeakestLinkMode` отдаёт «слабое звено»: `xValue = 1` для активных
+(равный шанс) и `yValue = текущее HP` — шанс и размер независимы. **Weakest Link и King of the Hill
+(с amount-вариантами) реализованы именно так** — без правок core и визуализаций.
 
 **Новая визуализация**:
 1. реализовать `IRenderer` (унаследовать `BaseRenderer`), построить собственную геометрию из
-   `visualValue * presence` в `onViewStateChanged`, реализовать `computeSpinTarget` и, при
-   наличии, `getCursorLotId`;
+   `yValue * presence` в `onViewStateChanged` (альфа — `presence × zValue`), реализовать
+   `computeSpinTarget` и, при наличии, `getCursorLotId`;
 2. зарегистрировать `VisualizationPackage` в `VISUALIZATION_PACKAGES` (`visualizationStrategy.ts`)
    и расширить union `VisualizationType`.
 `App`, `GameSession`, режимы и существующие визуализации менять не требуется.
@@ -1013,17 +1036,20 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
   тех же условиях) — оставлены как защита в глубину.
 - **`updateControlsState()` императивен** (из `updateUI()`, `spin()`, ветки `!result` в
   `finishSpin()`); радикальное решение — уведомление о смене состояния из `GameSession`.
-- **«Считалочка» — согласовано**: «такт»/таргет/курсор используют selection-разбиение
-  (`selectionWeight`), не меняющееся во время перехода, а радиус — `visualValue * presence`;
-  сетка ячеек кэшируется, поэтому подсветка не «прыгает» и раскладка не пересчитывается на кадр.
-- **Transition — минимальный**: анимация перехода — линейная интерполяция `visualValue` и
-  `presence` независимо друг от друга; модель задаёт драйвер, визуализация отвечает только за
-  отрисовку. Полноценная хореография перехода на уровне конкретной визуализации — возможный
-  следующий этап.
+- **«Считалочка» — согласовано**: «такт»/таргет/курсор используют разбиение по `xValue`, а радиус —
+  `yValue * presence`; сетка ячеек кэшируется по набору id + размеру, поэтому визуальная раскладка
+  не пересчитывается на кадр, а такт во время перехода меняется плавно (ось интерполируется).
+- **Transition — минимальный**: анимация перехода — линейная интерполяция осей (`xValue`, `yValue`,
+  `zValue`) и `presence` независимо друг от друга (см. §7.4); модель задаёт драйвер, визуализация
+  отвечает только за отрисовку. Полноценная хореография перехода на уровне конкретной визуализации —
+  возможный следующий этап.
 - **Курсор Wheel/Strip следует за рисованной геометрией**: во время перехода (когда меняется
-  `visualValue`/`presence`) курсор может смещаться вместе с геометрией — это ожидаемо, он
-  указывает на реально нарисованный сектор. У «считалочки» тайминг от вероятности, поэтому
-  стабилен.
+  `yValue`/`presence`) курсор может смещаться вместе с геометрией — это ожидаемо, он указывает на
+  реально нарисованный сектор. У «считалочки» такт считается от `xValue`, а не от геометрии кругов,
+  поэтому он не зависит от изменения радиусов.
+- **`zValue` без производителя**: канал прозрачности реализован полностью — рендереры читают
+  `presence × zValue`, а режим может заполнить ось через необязательный `getParticipantOpacity`; но
+  ни один режим этого не делает, поэтому прозрачных лотов нет и вид не меняется.
 - **ext-колонка (Survival)**: вероятность финальной победы считается один раз на сборку
   view-состояния (`getPresentationData`). До `SURVIVAL_EXACT_MAX_ACTIVE = 18` активных — точная
   DP по подмножествам (O(2^n·n), мемоизация); свыше — детерминированная квадратура трапеций

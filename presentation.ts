@@ -20,11 +20,15 @@ export const OUTCOME_TRANSITION_DURATION_MS = 600;
  * participants it owns. That keeps the per-frame cost of an outcome transition
  * O(n) field writes with no allocation.
  *
- * `visualValue` (visual magnitude) and `presence` (visibility) are interpolated
+ * `yValue` (visual magnitude) and `presence` (visibility) are interpolated
  * INDEPENDENTLY: e.g. HP 100 → 90 with presence 1 → 1, or a death HP 10 → 0
- * with presence 1 → 0. `selectionWeight` is NOT interpolated (it may only jump
- * with the stable `after` snapshot) so an outcome never reshapes the roulette
- * probabilities mid-transition.
+ * with presence 1 → 0. Every axis lerps: `xValue` (chance), `yValue`
+ * (magnitude) and `zValue` (opacity), each from `before` to `after`; `presence`
+ * (visibility) has its own track. Interpolating `xValue` is what lets the
+ * sectors/bands resize smoothly during the outcome rebuild — safe because a
+ * spin pushes its snapshot once and never re-pushes it mid-animation, so no
+ * roulette partition can drift while the wheel is moving. An axis absent on
+ * BOTH sides stays absent (`undefined`); an absent opacity counts as 1.
  *
  * The returned participants array is owned by the interpolator; callers must
  * not mutate the `before`/`after` snapshots it was created from.
@@ -39,27 +43,38 @@ export function createViewInterpolator(
     const participants: RenderableParticipant[] = [];
     const tracks: {
         target: RenderableParticipant;
-        fromVisualValue: number;
-        toVisualValue: number;
+        fromX: number;
+        toX: number;
+        fromY: number | undefined;
+        toY: number | undefined;
+        fromZ: number | undefined;
+        toZ: number | undefined;
         fromPresence: number;
         toPresence: number;
     }[] = [];
+
+    const lerp = (from: number, to: number, t: number): number => from + (to - from) * t;
 
     const track = (b: RenderableParticipant | undefined, a: RenderableParticipant | undefined): void => {
         const base = (a ?? b)!;
         const target: RenderableParticipant = {
             lot: base.lot,
             active: a ? a.active : (b ? b.active : false),
-            selectionWeight: a ? a.selectionWeight : (b ? b.selectionWeight : 0),
-            visualValue: b ? b.visualValue : 0,
+            xValue: b ? b.xValue : (a ? a.xValue : 0),
+            yValue: b ? b.yValue : a?.yValue,
+            zValue: b ? b.zValue : a?.zValue,
             presence: b ? b.presence : 0,
             modeData: a?.modeData ?? b?.modeData
         };
         participants.push(target);
         tracks.push({
             target,
-            fromVisualValue: b ? b.visualValue : 0,
-            toVisualValue: a ? a.visualValue : 0,
+            fromX: b ? b.xValue : 0,
+            toX: a ? a.xValue : 0,
+            fromY: b?.yValue,
+            toY: a?.yValue,
+            fromZ: b?.zValue,
+            toZ: a?.zValue,
             fromPresence: b ? b.presence : 0,
             toPresence: a ? a.presence : 0
         });
@@ -74,10 +89,16 @@ export function createViewInterpolator(
     return (t: number): GameViewState => {
         const clamped = Math.max(0, Math.min(1, t));
         for (const tr of tracks) {
-            tr.target.visualValue =
-                tr.fromVisualValue + (tr.toVisualValue - tr.fromVisualValue) * clamped;
-            tr.target.presence =
-                tr.fromPresence + (tr.toPresence - tr.fromPresence) * clamped;
+            tr.target.xValue = lerp(tr.fromX, tr.toX, clamped);
+            // An axis absent on BOTH sides stays absent; a one-sided opacity
+            // counts as 1 (opaque) and a one-sided magnitude as 0.
+            tr.target.yValue = (tr.fromY === undefined && tr.toY === undefined)
+                ? undefined
+                : lerp(tr.fromY ?? 0, tr.toY ?? 0, clamped);
+            tr.target.zValue = (tr.fromZ === undefined && tr.toZ === undefined)
+                ? undefined
+                : lerp(tr.fromZ ?? 1, tr.toZ ?? 1, clamped);
+            tr.target.presence = lerp(tr.fromPresence, tr.toPresence, clamped);
         }
         return { modeId: after.modeId, participants };
     };

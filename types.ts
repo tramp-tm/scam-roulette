@@ -169,14 +169,17 @@ export interface TurnOutcome {
  * that changed.
  *
  * SELECTION vs PRESENTATION
- * The mode defines two independent, explicitly separated semantics:
- *  - selection:    `calculateSelectionWeight()` — probability for roulette;
- *  - presentation: `getParticipantVisualValue()` — the abstract magnitude a
- *                  visualization renders as size/scale, independent of the
- *                  selection probability; plus `getPresentationData()` for
+ * The mode defines independent, explicitly separated semantics:
+ *  - selection:    `calculateSelectionWeight()` — probability for the roulette.
+ *                  The core transports it into the snapshot's `xValue` axis; it
+ *                  never drives size/scale.
+ *  - presentation: the axes `yValue` (abstract magnitude a visualization renders
+ *                  as size/scale; the meaning is the mode's own — amount, HP,
+ *                  score, …) and `zValue` (opacity, via the optional
+ *                  `getParticipantOpacity()`), plus `getPresentationData()` for
  *                  extra mode-specific data (`modeData`).
- * A mode must not assume `visualValue` means weight/amount/HP to the renderer,
- * and the core must not derive one from the other.
+ * A mode must not assume `yValue` means weight/amount/HP to the renderer, and
+ * the core must not derive one axis from another.
  */
 export interface GameMode {
     readonly id: Mode;
@@ -211,15 +214,28 @@ export interface GameMode {
     ): number;
 
     /**
-     * VISUAL magnitude for this participant, used by visualizations for
-     * size/scale. Independent of `calculateSelectionWeight`; the mode defines
-     * its own meaning (amount, score, HP, …) and renderers never assume it.
+     * Axis 2 (`yValue`): the mode's abstract MAGNITUDE, used by visualizations
+     * for size/scale. Independent of `calculateSelectionWeight`; the mode
+     * defines its own meaning (amount, score, HP, …) and renderers never assume
+     * it. Return `undefined` when the mode has nothing to put on this axis.
      */
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState
-    ): number;
+    ): number | undefined;
+
+    /**
+     * Axis 3 (`zValue`): lot OPACITY in [0, 1]; `undefined` = 1 (opaque).
+     * Optional — no mode fills it today, so every lot stays fully opaque. The
+     * renderers already consume the axis, so the channel is complete: a mode
+     * that wants to dim a lot only has to implement this method.
+     */
+    getParticipantOpacity?(
+        lot: Lot,
+        participant: GameParticipantState,
+        state: GameModeState
+    ): number | undefined;
 
     /** Pure turn processing: (state, rolled participant) -> (state', outcome). */
     processRoll(
@@ -255,16 +271,24 @@ export interface GameMode {
 /**
  * One participant as the presentation layer sees it.
  *
- * Two INDEPENDENT magnitudes:
- *  - `selectionWeight` — probability weight used by roulette selection. It
- *    never determines visual size.
- *  - `visualValue` — abstract presentation magnitude the visualization turns
- *    into a size/scale. The mode defines its meaning (amount, score, HP, …);
- *    renderers must never assume it means weight, amount or HP. Changing it
- *    does not change the selection probability, and vice versa.
+ * Three INDEPENDENT axes:
+ *  - `xValue` — CHANCE: the unnormalised selection weight, always exactly the
+ *    number the core used for the roll (the session transports it). Only ratios
+ *    matter. It drives the roulette geometry (sector/band width, beat — hence
+ *    dwell time) and never determines size/scale.
+ *  - `yValue` — MAGNITUDE: the abstract presentation magnitude the visualization
+ *    turns into a size/scale. The mode defines its meaning (amount, score, HP,
+ *    …); renderers must never assume it means weight, amount or HP.
+ *    `undefined` = the mode has nothing on this axis.
+ *  - `zValue` — OPACITY in [0, 1]; `undefined` = 1 (opaque). No mode fills it
+ *    today, so every lot is fully opaque.
+ * Changing one axis never changes another: probability and visual size must not
+ * be derived from one another.
  *
- * `presence` is a visual multiplier in [0, 1] used to animate eliminations by
- * interpolating a view state (a lot leaves the view when it reaches 0).
+ * `presence` is a separate visual multiplier in [0, 1] used to animate
+ * eliminations by interpolating a view state (a lot leaves the view when it
+ * reaches 0); together with `zValue` it forms the lot's alpha
+ * (`alpha = presence × zValue`).
  * `modeData` is mode-specific presentation payload the UI may render — the
  * core and the visualizations never interpret its meaning. It is produced once
  * per view-state build by `GameMode.getPresentationData()`.
@@ -272,8 +296,9 @@ export interface GameMode {
 export interface RenderableParticipant {
     lot: Lot;
     active: boolean;
-    selectionWeight: number;
-    visualValue: number;
+    xValue: number;
+    yValue?: number;
+    zValue?: number;
     presence: number;
     modeData?: ModePresentationData;
 }

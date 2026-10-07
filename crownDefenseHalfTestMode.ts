@@ -95,7 +95,7 @@ function highestHpAfterDamage(
  *    continues; no survivors is handled defensively (highest HP wins).
  *
  * Presentation:
- *  - `visualValue = current HP` (= amount) — the visualization draws HP as size;
+ *  - `yValue = current HP` (= amount) — the visualization draws HP as size;
  *  - `modeData.ext = "♥ HP"` (or `"♥ < 1"` below the minimum).
  *
  * Stateless/shared: HP is derived straight from `amount`, so it needs no
@@ -124,7 +124,7 @@ export class CrownDefenseHalfTestMode implements GameMode {
         return 1;
     }
 
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         _state: GameModeState

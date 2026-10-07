@@ -31,12 +31,15 @@ export const ACCENT_VISUAL: Record<AccentKind, { color: string; strokeWidth: num
  * shared `Segment`/angle type crossing visualizations.
  *
  * Presentation facts the renderers work from (all per participant):
- *  - `visualValue`    — the magnitude a renderer turns into size/scale;
- *  - `selectionWeight`— the roulette probability; used only where a renderer
- *                       needs the selection partition (e.g. the counting-rhyme
- *                       dwell/target), never for drawing size;
- *  - `presence`       — [0,1] visibility multiplier for elimination animation;
- *  - `modeData`       — opaque mode payload the renderer may display.
+ *  - `xValue`  — axis 1, the roulette CHANCE (exactly the value the roll used);
+ *                drives the roulette geometry (sector/band width, counting-rhyme
+ *                beat/dwell/target), never the drawing size;
+ *  - `yValue`  — axis 2, the mode's abstract MAGNITUDE → size/scale; may be
+ *                absent (the renderer then uses its own default);
+ *  - `zValue`  — axis 3, OPACITY in [0,1]; absent = 1;
+ *  - `presence`— [0,1] visibility multiplier for the elimination animation;
+ *                alpha uses `presence × zValue`, geometry uses `presence`;
+ *  - `modeData`— opaque mode payload the renderer may display.
  *
  * It also carries the transient hover highlight (`hoverLotId`, a stable lot
  * id fed through `setHover`), kept separate from the lot accents so both can be
@@ -60,6 +63,8 @@ export abstract class BaseRenderer implements IRenderer {
     protected hoverLotId: string | null = null;
 
     private presenceByLotId = new Map<string, number>();
+    /** Opacity axis (axis 3) per lot, resolved to `1` when the mode omits it. */
+    private zValueByLotId = new Map<string, number>();
 
     /** Per-frame memo for cursor resolution (avoids O(n) scans per element). */
     private cursorForValue: number | null = null;
@@ -84,8 +89,10 @@ export abstract class BaseRenderer implements IRenderer {
         this.pulse = accents.pulse;
 
         this.presenceByLotId.clear();
+        this.zValueByLotId.clear();
         for (const p of this.participants) {
             this.presenceByLotId.set(p.lot.id, p.presence);
+            this.zValueByLotId.set(p.lot.id, p.zValue ?? 1);
         }
 
         this.onViewStateChanged();
@@ -115,6 +122,7 @@ export abstract class BaseRenderer implements IRenderer {
     reset(): void {
         this.participants = [];
         this.presenceByLotId.clear();
+        this.zValueByLotId.clear();
         this.accents = new Map();
         this.pulse = 1;
         this.animationValue = 0;
@@ -145,25 +153,32 @@ export abstract class BaseRenderer implements IRenderer {
 
     /**
      * Participants that should be drawn: visible (`presence > 0`) and with a
-     * positive visual magnitude. The renderer maps `visualValue * presence`
-     * to its own geometry.
+     * positive magnitude on axis 2 (`yValue`). The renderer maps
+     * `yValue * presence` to its own geometry and `presence × zValue` to alpha.
      */
     protected drawableParticipants(): RenderableParticipant[] {
-        return this.participants.filter(p => p.presence > 0 && p.visualValue > 0);
-    }
-
-    /**
-     * Participants that take part in the roulette/cursor partition
-     * (`selectionWeight > 0`), independent of `visualValue`.
-     */
-    protected selectableParticipants(): RenderableParticipant[] {
-        return this.participants.filter(p => p.presence > 0 && p.selectionWeight > 0);
+        return this.participants.filter(p => p.presence > 0 && (p.yValue ?? 0) > 0);
     }
 
     /** Visual presence in [0, 1] for a lot (1 when unknown). */
     protected presenceOf(lotId: string): number {
         const value = this.presenceByLotId.get(lotId);
         return value === undefined ? 1 : value;
+    }
+
+    /** Opacity axis (axis 3) in [0, 1] for a lot (1 when absent/unknown). */
+    protected zValueOf(lotId: string): number {
+        const value = this.zValueByLotId.get(lotId);
+        return value === undefined ? 1 : value;
+    }
+
+    /**
+     * Alpha for the lot's OWN drawing (fill, stroke, label, accent overlay):
+     * `presence × zValue`. Hover is a separate transient UI channel and does
+     * NOT use this.
+     */
+    protected opacityOf(lotId: string): number {
+        return this.presenceOf(lotId) * this.zValueOf(lotId);
     }
 
     /**

@@ -40,7 +40,7 @@ export class NormalMode implements GameMode {
         return lot.amount;
     }
 
-    getParticipantVisualValue(lot: Lot): number {
+    getParticipantMagnitude(lot: Lot): number {
         // Visually equivalent to the pre-refactor behaviour (sector size was
         // derived from the selection weight). amount >= 0.01, so this is > 0.
         return lot.amount;

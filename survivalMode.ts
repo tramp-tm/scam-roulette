@@ -210,7 +210,7 @@ export class SurvivalMode implements GameMode {
         return survivalSelectionWeight(lot.amount);
     }
 
-    getParticipantVisualValue(lot: Lot): number {
+    getParticipantMagnitude(lot: Lot): number {
         // Visually equivalent to the pre-refactor behaviour: sector size was
         // the selection weight 1/amount. amount >= 0.01, so this is finite.
         return survivalSelectionWeight(lot.amount);

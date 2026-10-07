@@ -262,16 +262,17 @@ export class GameSession {
             return { ok: false, reason: 'noActiveLots' };
         }
 
-        const byId = this.lotIndex();
+        // Reuse the current snapshot for the weights instead of calling
+        // `calculateSelectionWeight` a second time: an active participant's
+        // `xValue` IS that value, computed from the same mode + state.
+        const snapshot = this.viewState;
+        const participantById = new Map(this.participants.map(p => [p.lotId, p]));
         const candidates: { participant: GameParticipantState; lot: Lot; selectionWeight: number }[] = [];
-        for (const p of activeParticipants) {
-            const lot = byId.get(p.lotId);
-            if (!lot) continue;
-            candidates.push({
-                participant: p,
-                lot,
-                selectionWeight: this.currentMode.calculateSelectionWeight(lot, p, this.modeState)
-            });
+        for (const r of snapshot.participants) {
+            if (!r.active) continue;
+            const participant = participantById.get(r.lot.id);
+            if (!participant) continue;
+            candidates.push({ participant, lot: r.lot, selectionWeight: r.xValue });
         }
 
         const entries: SelectionCandidate[] = candidates.map(c => ({
@@ -284,14 +285,16 @@ export class GameSession {
         const chosen = candidates.find(c => c.lot.id === rolled.lot.id)!;
         const modeAtDecision = this.currentMode;
 
-        // Pin the mode + full "before" snapshot at decision time.
+        // Pin the mode + full "before" snapshot at decision time. The snapshot
+        // built above IS the decision-time image, so it is reused rather than
+        // rebuilt.
         this.pendingSpin = {
             rolledLot: chosen.lot,
             rolledParticipant: chosen.participant,
             mode: modeAtDecision,
             participantsBefore: [...this.participants],
             stateBefore: this.modeState,
-            viewBefore: this.buildViewState(this.participants, this.modeState)
+            viewBefore: snapshot
         };
 
         this.sessionLocked = true;
@@ -363,8 +366,10 @@ export class GameSession {
         participants: readonly GameParticipantState[],
         state: GameModeState
     ): GameViewState {
-        const byId = this.lotIndex();
+        // One lot-list read per build: reuse it for both the id index and the
+        // batch presentation call (the list is copied by `getLots()`).
         const lots = this.getLots();
+        const byId = new Map(lots.map(l => [l.id, l]));
         const presentation = this.currentMode.getPresentationData(participants, lots, state);
         const renderables: RenderableParticipant[] = [];
 
@@ -372,14 +377,16 @@ export class GameSession {
             const lot = byId.get(p.lotId);
             if (!lot) continue;
 
-            const selectionWeight = p.active
-                ? this.currentMode.calculateSelectionWeight(lot, p, state)
-                : 0;
             renderables.push({
                 lot,
                 active: p.active,
-                selectionWeight,
-                visualValue: this.currentMode.getParticipantVisualValue(lot, p, state),
+                // Axis 1 (chance) is filled by the CORE — the same number the
+                // roulette uses, so "what you see is what was rolled".
+                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot, p, state) : 0,
+                // Axis 2 (magnitude): the mode's own meaning, or undefined.
+                yValue: this.currentMode.getParticipantMagnitude(lot, p, state),
+                // Axis 3 (opacity): undefined when the mode does not fill it.
+                zValue: this.currentMode.getParticipantOpacity?.(lot, p, state),
                 presence: p.active ? 1 : 0,
                 modeData: presentation.get(p.lotId)
             });

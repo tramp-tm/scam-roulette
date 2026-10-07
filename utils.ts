@@ -100,7 +100,7 @@ export const BAND_WIDTH_SCALE = 400;
 
 /**
  * Rendered width (px) of a strip band from its normalized visual fraction
- * (visualValue / Σ visualValue). Strip-specific visual geometry — it is NOT a
+ * (yValue / Σ yValue). Strip-specific visual geometry — it is NOT a
  * shared roulette contract and is not used by RouletteEngine.
  */
 export function getStripBandWidth(fraction: number): number {

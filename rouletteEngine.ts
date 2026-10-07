@@ -10,7 +10,7 @@ import { getRandomPositionInRange } from './utils.js';
  *  - the spin-target helpers receive the geometry facts (angles / widths /
  *    a cycle fraction) that a renderer computed from *its own* presentation
  *    geometry. The engine never derives a visual size from any weight, and
- *    knows nothing about `visualValue`, `modeData`, HP, `Normal`, `Survival`
+ *    knows nothing about `yValue`, `zValue`, `modeData`, HP, `Normal`, `Survival`
  *    or any concrete GameMode.
  *
  * CRITICAL: the result is determined BEFORE animation starts; animation never

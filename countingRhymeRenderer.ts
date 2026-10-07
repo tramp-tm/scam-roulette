@@ -6,11 +6,11 @@ import { normalizeToFractions } from './utils.js';
 /**
  * CountingRhymeRenderer
  * ---------------------
- * Each drawn lot is a circle. Two independent quantities drive it:
- *  - the circle RADIUS comes from the participant's `visualValue` (scaled by
+ * Each drawn lot is a circle. Two independent axes drive it:
+ *  - the circle RADIUS comes from the participant's `yValue` (axis 2, scaled by
  *    `presence`) — the abstract presentation magnitude, NOT the probability;
  *  - the highlight "beat" / cursor / spin target come from the participant's
- *    `selectionWeight` partition (the roulette probability), which is why the
+ *    `xValue` partition (axis 1, the roulette chance), which is why the
  *    dwell time per circle is proportional to its chance.
  *
  * Hover (`setHover`, lots-list interaction) draws an additive outer halo: it
@@ -26,7 +26,7 @@ import { normalizeToFractions } from './utils.js';
  * PERFORMANCE: the deterministic grid (cell permutation + jitter) depends only
  * on the drawn lot-id set and the canvas size, so it is cached and rebuilt only
  * when that signature changes — NOT on every transition frame. Radius is
- * computed per render from the current `visualValue * presence`.
+ * computed per render from the current `yValue * presence`.
  *
  * NOTE: the segment → grid-cell mapping is a deterministic permutation (FNV-1a
  * seeded LCG); `Math.random()` is never called.
@@ -109,7 +109,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
 
         let maxVisual = 0;
         for (const p of this.circles) {
-            const v = p.visualValue * p.presence;
+            const v = (p.yValue ?? 0) * p.presence;
             if (v > maxVisual) maxVisual = v;
         }
         const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
@@ -119,13 +119,16 @@ export class CountingRhymeRenderer extends BaseRenderer {
         for (let i = 0; i < n; i++) {
             const p = this.circles[i];
             const cell = this.cells[i];
+            // `presence` still gates hover and the label's visibility (transient
+            // UI channel); the circle's own drawing uses `presence × zValue`.
             const presence = p.presence;
+            const opacity = this.opacityOf(p.lot.id);
 
-            const visuals = p.visualValue * p.presence;
+            const visuals = (p.yValue ?? 0) * p.presence;
             const radius = MIN_CIRCLE_RADIUS + (maxVisual > 0 ? visuals / maxVisual : 0) * radiusRange;
 
             ctx.save();
-            ctx.globalAlpha = presence;
+            ctx.globalAlpha = opacity;
             ctx.beginPath();
             ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
             ctx.fillStyle = p.lot.color || '#888888';
@@ -135,7 +138,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const intensity = intensities[i];
 
             ctx.save();
-            ctx.globalAlpha = presence;
+            ctx.globalAlpha = opacity;
             ctx.beginPath();
             ctx.arc(cell.cx, cell.cy, radius, 0, Math.PI * 2);
             if (intensity > 0.01) {
@@ -143,7 +146,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
                 ctx.lineWidth = HIGHLIGHT_STROKE_WIDTH;
                 ctx.shadowColor = HIGHLIGHT_COLOR;
                 ctx.shadowBlur = HIGHLIGHT_GLOW_BLUR * intensity;
-                ctx.globalAlpha = presence * intensity;
+                ctx.globalAlpha = opacity * intensity;
             } else {
                 ctx.strokeStyle = BASE_STROKE_COLOR;
                 ctx.lineWidth = BASE_STROKE_WIDTH;
@@ -156,7 +159,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const accent = this.accentVisual(p.lot.id);
             if (accent && accent.alpha > 0) {
                 ctx.save();
-                ctx.globalAlpha = presence * accent.alpha;
+                ctx.globalAlpha = opacity * accent.alpha;
                 ctx.beginPath();
                 ctx.arc(cell.cx, cell.cy, radius + ACCENT_RING_OFFSET, 0, Math.PI * 2);
                 ctx.strokeStyle = accent.color;
@@ -183,7 +186,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             }
 
             if (radius >= LABEL_MIN_RADIUS && presence > 0.05) {
-                this.drawLabel(p.lot.name, cell.cx, cell.cy, radius, presence);
+                this.drawLabel(p.lot.name, cell.cx, cell.cy, radius, opacity);
             }
         }
     }
@@ -215,7 +218,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     // ------------------------------------------------------------------
-    // Beat partition (selection weights)
+    // Beat partition (axis 1: chance)
     // ------------------------------------------------------------------
 
     private rebuildBeat(): void {
@@ -225,7 +228,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             return;
         }
 
-        const weights = this.circles.map(p => (p.selectionWeight > 0 ? p.selectionWeight : 0));
+        const weights = this.circles.map(p => (p.xValue > 0 ? p.xValue : 0));
         let fractions = normalizeToFractions(weights);
         if (fractions.every(f => f === 0)) {
             // No selection weights at all — fall back to a uniform beat so the
@@ -312,7 +315,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
 
         let maxVisual = 0;
         for (const p of this.circles) {
-            const v = p.visualValue * p.presence;
+            const v = (p.yValue ?? 0) * p.presence;
             if (v > maxVisual) maxVisual = v;
         }
         const safeMax = maxVisual > 0 ? maxVisual : 1;
@@ -331,7 +334,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const rowOffset = (cols - itemsInRow) / 2;
 
             const buildRadius = MIN_CIRCLE_RADIUS
-                + (this.circles[i].visualValue * this.circles[i].presence / safeMax) * radiusRange;
+                + ((this.circles[i].yValue ?? 0) * this.circles[i].presence / safeMax) * radiusRange;
             const gapW = Math.max(0, cellWidth - 2 * buildRadius);
             const gapH = Math.max(0, cellHeight - 2 * buildRadius);
 
@@ -378,7 +381,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         return ((position % 1) + 1) % 1;
     }
 
-    private drawLabel(name: string, cx: number, cy: number, radius: number, presence: number): void {
+    private drawLabel(name: string, cx: number, cy: number, radius: number, alpha: number): void {
         const ctx = this.ctx;
         const maxWidth = radius * 1.6;
 
@@ -394,7 +397,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         ctx.restore();
 
         ctx.save();
-        ctx.globalAlpha = presence;
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = '#ffffff';
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center';

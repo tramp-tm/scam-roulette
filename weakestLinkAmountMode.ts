@@ -32,7 +32,7 @@ import { t } from './i18n.js';
  * so the game always makes progress and terminates.
  *
  * Presentation:
- *  - `visualValue = current HP` — the visualization draws HP as size (it
+ *  - `yValue = current HP` — the visualization draws HP as size (it
  *    normalizes magnitudes itself, so unnormalized amounts are fine);
  *  - `modeData.ext = "♥ HP"` — HP is a whole number ≥ 1 here, so no
  *    below-minimum marker is needed;
@@ -162,7 +162,7 @@ export class WeakestLinkAmountMode implements GameMode {
         return 1;
     }
 
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState

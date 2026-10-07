@@ -37,7 +37,7 @@ import { normalizeToRange } from './utils.js';
  *    round follows), so the winner always reads as the outcome's `good`.
  *
  * Presentation:
- *  - `visualValue = current HP` — the visualization draws HP as size;
+ *  - `yValue = current HP` — the visualization draws HP as size;
  *  - `modeData.ext = "♥ HP"` for everyone, prefixed with `♔` for the king;
  *  - `modeData.accent = accent` for the current king (both surfaces), so the
  *    "main actor" is visible in the lots list and in the visualization.
@@ -220,7 +220,7 @@ export class KingOfTheHillMode implements GameMode {
         return 1;
     }
 
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState

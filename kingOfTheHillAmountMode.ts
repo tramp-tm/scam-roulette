@@ -40,7 +40,7 @@ import { t } from './i18n.js';
  *    round follows), so the winner always reads as the outcome's `good`.
  *
  * Presentation:
- *  - `visualValue = current HP` — the visualization draws HP as size (it
+ *  - `yValue = current HP` — the visualization draws HP as size (it
  *    normalizes magnitudes itself, so unnormalized amounts are fine);
  *  - `modeData.ext = "♥ HP"` for everyone, prefixed with `♔` for the king;
  *  - `modeData.accent = accent` for the current king (both surfaces), so the
@@ -221,7 +221,7 @@ export class KingOfTheHillAmountMode implements GameMode {
         return 1;
     }
 
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState

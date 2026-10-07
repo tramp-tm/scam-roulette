@@ -61,9 +61,9 @@ interface WheelSector {
 /**
  * Wheel visualization renderer.
  *
- * Sector angular size comes from the participant's `visualValue` (scaled by
- * `presence`), NOT from `selectionWeight`. The spin target and the cursor are
- * resolved against this wheel-local geometry.
+ * Sector angular size comes from the participant's `yValue` (axis 2, scaled by
+ * `presence`), NOT from `xValue` (axis 1, the chance). The spin target and the
+ * cursor are resolved against this wheel-local geometry.
  *
  * Hover (`setHover`, lots-list interaction) draws a translucent glow fill plus
  * a crisp outline over the hovered sector, on top of every other sector, so
@@ -76,7 +76,7 @@ export class WheelRenderer extends BaseRenderer {
     protected override onViewStateChanged(): void {
         const parts = this.drawableParticipants().map(p => ({
             lot: p.lot,
-            value: p.visualValue * p.presence
+            value: (p.yValue ?? 0) * p.presence
         }));
         const fractions = normalizeToFractions(parts.map(p => p.value));
 
@@ -105,7 +105,7 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.rotate(this.animationValue);
 
         for (const sector of this.sectors) {
-            const presence = this.presenceOf(sector.lot.id);
+            const opacity = this.opacityOf(sector.lot.id);
             const cursor = this.isCursor(sector.lot.id);
 
             this.ctx.beginPath();
@@ -113,7 +113,7 @@ export class WheelRenderer extends BaseRenderer {
             this.ctx.arc(0, 0, radius, sector.startAngle, sector.endAngle);
             this.ctx.closePath();
 
-            this.ctx.globalAlpha = presence;
+            this.ctx.globalAlpha = opacity;
             this.ctx.fillStyle = cursor
                 ? brightenColor(sector.lot.color, CURSOR_HIGHLIGHT_BRIGHTNESS)
                 : sector.lot.color;
@@ -125,7 +125,7 @@ export class WheelRenderer extends BaseRenderer {
             this.ctx.globalAlpha = 1;
 
             if (sector.endAngle - sector.startAngle > LABEL_MIN_ARC) {
-                this.drawWheelLabel(sector, radius, presence);
+                this.drawWheelLabel(sector, radius, opacity);
             }
         }
 
@@ -135,7 +135,7 @@ export class WheelRenderer extends BaseRenderer {
         for (const sector of this.sectors) {
             const accent = this.accentVisual(sector.lot.id);
             if (!accent || accent.alpha <= 0) continue;
-            const alpha = this.presenceOf(sector.lot.id) * accent.alpha;
+            const alpha = this.opacityOf(sector.lot.id) * accent.alpha;
 
             this.ctx.save();
             this.ctx.beginPath();
@@ -205,7 +205,7 @@ export class WheelRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // The cursor follows the drawn (visualValue-based) geometry: the sector
+        // The cursor follows the drawn (yValue-based) geometry: the sector
         // whose drawn arc sits under the top pointer.
         if (this.sectors.length === 0) return null;
 
@@ -220,12 +220,12 @@ export class WheelRenderer extends BaseRenderer {
         return this.sectors[this.sectors.length - 1].lot.id;
     }
 
-    private drawWheelLabel(sector: WheelSector, radius: number, presence: number): void {
+    private drawWheelLabel(sector: WheelSector, radius: number, alpha: number): void {
         const midAngle = (sector.startAngle + sector.endAngle) / 2;
         const textRadius = radius * LABEL_RADIUS_RATIO;
 
         this.ctx.save();
-        this.ctx.globalAlpha = presence;
+        this.ctx.globalAlpha = alpha;
         this.ctx.translate(Math.cos(midAngle) * textRadius, Math.sin(midAngle) * textRadius);
         this.ctx.rotate(midAngle);
 

@@ -41,9 +41,9 @@ interface StripBand {
 /**
  * Strip (ribbon) visualization renderer.
  *
- * Band width comes from the participant's `visualValue` (scaled by `presence`),
- * NOT from `selectionWeight`. The spin target and the cursor are resolved
- * against this strip-local geometry.
+ * Band width comes from the participant's `yValue` (axis 2, scaled by
+ * `presence`), NOT from `xValue` (axis 1, the chance). The spin target and the
+ * cursor are resolved against this strip-local geometry.
  *
  * Hover (`setHover`, lots-list interaction) draws an additive outline around
  * the hovered lot's band, so it composes with — and never replaces — the lot
@@ -56,7 +56,7 @@ export class StripRenderer extends BaseRenderer {
     protected override onViewStateChanged(): void {
         const parts = this.drawableParticipants().map(p => ({
             lot: p.lot,
-            value: p.visualValue * p.presence
+            value: (p.yValue ?? 0) * p.presence
         }));
         const fractions = normalizeToFractions(parts.map(p => p.value));
 
@@ -111,7 +111,7 @@ export class StripRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // The cursor follows the drawn (visualValue-based) geometry: the band
+        // The cursor follows the drawn (yValue-based) geometry: the band
         // under the centre marker.
         if (this.bands.length === 0 || this.totalCycleWidth <= 0) return null;
 
@@ -141,7 +141,10 @@ export class StripRenderer extends BaseRenderer {
 
     private renderOneCycle(xOffset: number, centerY: number): void {
         for (const band of this.bands) {
+            // `presence` still gates hover (transient UI channel); the band's
+            // own drawing uses `presence × zValue`.
             const presence = this.presenceOf(band.lot.id);
+            const opacity = this.opacityOf(band.lot.id);
             const cursor = this.isCursor(band.lot.id);
 
             const baseColor = band.lot.color || '#888';
@@ -152,7 +155,7 @@ export class StripRenderer extends BaseRenderer {
             const currentX = xOffset + band.startInCycle;
 
             this.ctx.save();
-            this.ctx.globalAlpha = presence;
+            this.ctx.globalAlpha = opacity;
             this.ctx.fillStyle = fillColor;
             this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
             this.ctx.restore();
@@ -162,7 +165,7 @@ export class StripRenderer extends BaseRenderer {
             const accent = this.accentVisual(band.lot.id);
             if (accent && accent.alpha > 0) {
                 this.ctx.save();
-                this.ctx.globalAlpha = presence * accent.alpha;
+                this.ctx.globalAlpha = opacity * accent.alpha;
                 this.ctx.strokeStyle = accent.color;
                 this.ctx.lineWidth = accent.strokeWidth;
                 this.ctx.shadowColor = accent.color;
@@ -190,14 +193,14 @@ export class StripRenderer extends BaseRenderer {
             }
 
             if (presence > 0.01) {
-                this.drawBandLabel(band, currentX + band.width / 2, centerY, presence);
+                this.drawBandLabel(band, currentX + band.width / 2, centerY, opacity);
             }
         }
     }
 
-    private drawBandLabel(band: StripBand, textX: number, textY: number, presence: number): void {
+    private drawBandLabel(band: StripBand, textX: number, textY: number, alpha: number): void {
         this.ctx.save();
-        this.ctx.globalAlpha = presence;
+        this.ctx.globalAlpha = alpha;
         this.ctx.translate(textX, textY);
         this.ctx.rotate(-Math.PI / 2);
 

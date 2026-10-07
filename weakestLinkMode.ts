@@ -30,7 +30,7 @@ import { normalizeToRange } from './utils.js';
  *    wins.
  *
  * Presentation:
- *  - `visualValue = current HP` — the visualization draws HP as size;
+ *  - `yValue = current HP` — the visualization draws HP as size;
  *  - `modeData.ext = "♥ HP"` — HP is always a positive integer here, so no
  *    below-minimum marker is needed;
  *  - `modeData.accent = info` **in the lots list only** for the lot that took
@@ -163,7 +163,7 @@ export class WeakestLinkMode implements GameMode {
         return 1;
     }
 
-    getParticipantVisualValue(
+    getParticipantMagnitude(
         lot: Lot,
         participant: GameParticipantState,
         state: GameModeState
