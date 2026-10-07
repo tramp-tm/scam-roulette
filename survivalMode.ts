@@ -210,10 +210,11 @@ export class SurvivalMode implements GameMode {
         return survivalSelectionWeight(lot.amount);
     }
 
-    getParticipantMagnitude(lot: Lot): number {
-        // Visually equivalent to the pre-refactor behaviour: sector size was
-        // the selection weight 1/amount. amount >= 0.01, so this is finite.
-        return survivalSelectionWeight(lot.amount);
+    getParticipantMagnitude(_lot: Lot): number | undefined {
+        // Axis 2 stays empty on purpose: a magnitude here would only duplicate
+        // the chance (`xValue = 1/amount`). An ABSENT magnitude is rendered by
+        // every visualization at its maximum size, which is the previous look.
+        return undefined;
     }
 
     processRoll(

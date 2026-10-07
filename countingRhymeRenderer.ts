@@ -26,7 +26,8 @@ import { normalizeToFractions } from './utils.js';
  * PERFORMANCE: the deterministic grid (cell permutation + jitter) depends only
  * on the drawn lot-id set and the canvas size, so it is cached and rebuilt only
  * when that signature changes — NOT on every transition frame. Radius is
- * computed per render from the current `yValue * presence`.
+ * computed per render from the current `yValue` (× `presence`); when axis 2 is
+ * ABSENT (`yValue` undefined everywhere) every circle uses the MAXIMUM radius.
  *
  * NOTE: the segment → grid-cell mapping is a deterministic permutation (FNV-1a
  * seeded LCG); `Math.random()` is never called.
@@ -107,12 +108,12 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const n = Math.min(this.cells.length, this.circles.length);
         if (n === 0) return;
 
+        const magnitudes = this.magnitudes();
         let maxVisual = 0;
-        for (const p of this.circles) {
-            const v = (p.yValue ?? 0) * p.presence;
+        for (let i = 0; i < n; i++) {
+            const v = magnitudes[i] * this.circles[i].presence;
             if (v > maxVisual) maxVisual = v;
         }
-        const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
         const frac = this.normalizePosition(this.animationValue);
         const intensities = this.computeIntensities(frac);
 
@@ -124,8 +125,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const presence = p.presence;
             const opacity = this.opacityOf(p.lot.id);
 
-            const visuals = (p.yValue ?? 0) * p.presence;
-            const radius = MIN_CIRCLE_RADIUS + (maxVisual > 0 ? visuals / maxVisual : 0) * radiusRange;
+            const radius = this.radiusFor(magnitudes[i], presence, maxVisual);
 
             ctx.save();
             ctx.globalAlpha = opacity;
@@ -215,6 +215,39 @@ export class CountingRhymeRenderer extends BaseRenderer {
             if (frac < this.beatPrefix[i + 1]) return this.circles[i].lot.id;
         }
         return this.circles[n - 1].lot.id;
+    }
+
+    // ------------------------------------------------------------------
+    // Magnitude -> radius (axis 2)
+    // ------------------------------------------------------------------
+
+    /**
+     * Per-circle magnitude on axis 2 (`yValue`), aligned by index with
+     * `circles`. A missing value counts as the MAXIMUM defined magnitude; when
+     * NO circle carries one, the axis is absent and every magnitude is 0 (the
+     * radius then defaults to the maximum — see `radiusFor`).
+     */
+    private magnitudes(): number[] {
+        let maxDefined = 0;
+        let anyDefined = false;
+        for (const p of this.circles) {
+            if (p.yValue === undefined) continue;
+            anyDefined = true;
+            if (p.yValue > maxDefined) maxDefined = p.yValue;
+        }
+        return this.circles.map(p => (anyDefined ? (p.yValue ?? maxDefined) : 0));
+    }
+
+    /**
+     * Circle radius: axis 2 (`magnitude × presence`) scaled onto
+     * `[MIN_CIRCLE_RADIUS, effectiveMaxRadius]`. When the axis is absent
+     * (`maxVisual === 0`) — the degenerate "maximum" case — every circle uses
+     * the full radius (the visualization's default for a missing magnitude).
+     */
+    private radiusFor(magnitude: number, presence: number, maxVisual: number): number {
+        if (maxVisual <= 0) return this.effectiveMaxRadius;
+        const range = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
+        return MIN_CIRCLE_RADIUS + ((magnitude * presence) / maxVisual) * range;
     }
 
     // ------------------------------------------------------------------
@@ -313,14 +346,12 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const cellHalf = Math.min(cellWidth, cellHeight) / 2;
         this.effectiveMaxRadius = Math.min(MAX_CIRCLE_RADIUS, cellHalf * CELL_FILL_RATIO);
 
+        const magnitudes = this.magnitudes();
         let maxVisual = 0;
-        for (const p of this.circles) {
-            const v = (p.yValue ?? 0) * p.presence;
+        for (let i = 0; i < n; i++) {
+            const v = magnitudes[i] * this.circles[i].presence;
             if (v > maxVisual) maxVisual = v;
         }
-        const safeMax = maxVisual > 0 ? maxVisual : 1;
-        const radiusRange = Math.max(0, this.effectiveMaxRadius - MIN_CIRCLE_RADIUS);
-
         const seed = this.hashIds(this.circles.map(p => p.lot.id));
         const rand = this.makeLcg(seed);
         const cellOfSegment = this.buildCellPermutation(n, rand);
@@ -333,8 +364,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
             const itemsInRow = row === rows - 1 ? n - row * cols : cols;
             const rowOffset = (cols - itemsInRow) / 2;
 
-            const buildRadius = MIN_CIRCLE_RADIUS
-                + ((this.circles[i].yValue ?? 0) * this.circles[i].presence / safeMax) * radiusRange;
+            const buildRadius = this.radiusFor(magnitudes[i], this.circles[i].presence, maxVisual);
             const gapW = Math.max(0, cellWidth - 2 * buildRadius);
             const gapH = Math.max(0, cellHeight - 2 * buildRadius);
 

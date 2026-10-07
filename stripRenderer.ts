@@ -1,4 +1,4 @@
-import type { Lot } from './types.js';
+import type { Lot, RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
@@ -6,6 +6,10 @@ import { brightenColor, getStripBandWidth, normalizeToFractions } from './utils.
 // Band geometry
 const BAND_HEIGHT = 160;
 const BAND_HALF_HEIGHT = BAND_HEIGHT / 2;
+
+/** Smallest band height, as a fraction of the full band height (axis-2 floor). */
+const MIN_BAND_HEIGHT_RATIO = 0.35;
+const MIN_BAND_HEIGHT = BAND_HEIGHT * MIN_BAND_HEIGHT_RATIO;
 
 // Outer frame
 const FRAME_PADDING = 10;
@@ -30,40 +34,56 @@ const HOVER_COLOR = '#7fd4ff';
 const HOVER_STROKE_WIDTH = 3;
 const HOVER_GLOW_BLUR = 16;
 
-/** Strip-specific band geometry. Widths/offsets live here — never in the
- *  shared participant/presentation contract. */
+/** Strip-specific band geometry. Widths/offsets/heights live here — never in
+ *  the shared participant/presentation contract. */
 interface StripBand {
     lot: Lot;
     startInCycle: number;
     width: number;
+    /** Band height in px (MIN_BAND_HEIGHT .. BAND_HEIGHT), from the mode's magnitude. */
+    height: number;
 }
 
 /**
  * Strip (ribbon) visualization renderer.
  *
- * Band width comes from the participant's `yValue` (axis 2, scaled by
- * `presence`), NOT from `xValue` (axis 1, the chance). The spin target and the
- * cursor are resolved against this strip-local geometry.
+ * Two INDEPENDENT axes:
+ *  - the band WIDTH comes from the participant's `xValue` (axis 1, the CHANCE —
+ *    the value the roll used), normalised through `normalizeToFractions`. So
+ *    equal-chance modes draw equal-width bands;
+ *  - the band HEIGHT comes from `yValue` (axis 2, the mode's magnitude), scaled
+ *    onto `[MIN_BAND_HEIGHT, BAND_HEIGHT]`. An ABSENT magnitude (mode leaves
+ *    axis 2 empty) or all-equal magnitudes are the degenerate "maximum" case:
+ *    every band is full height.
+ *
+ * The spin target and the cursor are resolved against this strip-local geometry.
  *
  * Hover (`setHover`, lots-list interaction) draws an additive outline around
  * the hovered lot's band, so it composes with — and never replaces — the lot
- * accents or the cursor (and never alters band width or ordering).
+ * accents or the cursor (and never alters band width, height or ordering).
  */
 export class StripRenderer extends BaseRenderer {
     private bands: StripBand[] = [];
     private totalCycleWidth = 0;
 
     protected override onViewStateChanged(): void {
-        const parts = this.drawableParticipants().map(p => ({
-            lot: p.lot,
-            value: (p.yValue ?? 0) * p.presence
-        }));
-        const fractions = normalizeToFractions(parts.map(p => p.value));
+        const drawn = this.drawableParticipants();
+
+        // Band width: axis 1 (chance), normalised as before.
+        const fractions = normalizeToFractions(drawn.map(p => p.xValue));
+
+        // Band height: axis 2 (magnitude). No magnitude anywhere, or all equal,
+        // degenerates to the full band height.
+        const maxMagnitude = this.maxMagnitude(drawn);
 
         let x = 0;
-        this.bands = parts.map((p, i) => {
+        this.bands = drawn.map((p, i) => {
             const width = getStripBandWidth(fractions[i]);
-            const band: StripBand = { lot: p.lot, startInCycle: x, width };
+            const magnitude = Math.max(0, p.yValue ?? maxMagnitude);
+            const height = maxMagnitude > 0
+                ? MIN_BAND_HEIGHT + (magnitude / maxMagnitude) * (BAND_HEIGHT - MIN_BAND_HEIGHT)
+                : BAND_HEIGHT;
+            const band: StripBand = { lot: p.lot, startInCycle: x, width, height };
             x += width;
             return band;
         });
@@ -111,8 +131,8 @@ export class StripRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // The cursor follows the drawn (yValue-based) geometry: the band
-        // under the centre marker.
+        // The cursor follows the drawn (chance-based) geometry: the band under
+        // the centre marker.
         if (this.bands.length === 0 || this.totalCycleWidth <= 0) return null;
 
         const centerX = this.getLogicalSize().width / 2;
@@ -125,6 +145,19 @@ export class StripRenderer extends BaseRenderer {
             }
         }
         return this.bands[this.bands.length - 1].lot.id;
+    }
+
+    /**
+     * Largest magnitude (`yValue`) among the drawn participants, or 0 when none
+     * of them carries one (axis 2 absent). A missing magnitude is treated as the
+     * maximum, so a lot without axis 2 keeps the full-height (default) band.
+     */
+    private maxMagnitude(participants: readonly RenderableParticipant[]): number {
+        let max = 0;
+        for (const p of participants) {
+            if (p.yValue !== undefined && p.yValue > max) max = p.yValue;
+        }
+        return max;
     }
 
     private getVisualOffset(): number {
@@ -141,6 +174,7 @@ export class StripRenderer extends BaseRenderer {
 
     private renderOneCycle(xOffset: number, centerY: number): void {
         for (const band of this.bands) {
+            const halfHeight = band.height / 2;
             // `presence` still gates hover (transient UI channel); the band's
             // own drawing uses `presence × zValue`.
             const presence = this.presenceOf(band.lot.id);
@@ -157,7 +191,7 @@ export class StripRenderer extends BaseRenderer {
             this.ctx.save();
             this.ctx.globalAlpha = opacity;
             this.ctx.fillStyle = fillColor;
-            this.ctx.fillRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
+            this.ctx.fillRect(currentX, centerY - halfHeight, band.width, band.height);
             this.ctx.restore();
 
             // Lot accent: an additive outline in the accent colour, inset so the
@@ -172,9 +206,9 @@ export class StripRenderer extends BaseRenderer {
                 this.ctx.shadowBlur = ACCENT_GLOW_BLUR;
                 this.ctx.strokeRect(
                     currentX + ACCENT_INSET,
-                    centerY - BAND_HALF_HEIGHT + ACCENT_INSET,
+                    centerY - halfHeight + ACCENT_INSET,
                     band.width - 2 * ACCENT_INSET,
-                    BAND_HEIGHT - 2 * ACCENT_INSET
+                    band.height - 2 * ACCENT_INSET
                 );
                 this.ctx.restore();
             }
@@ -188,7 +222,7 @@ export class StripRenderer extends BaseRenderer {
                 this.ctx.lineWidth = HOVER_STROKE_WIDTH;
                 this.ctx.shadowColor = HOVER_COLOR;
                 this.ctx.shadowBlur = HOVER_GLOW_BLUR;
-                this.ctx.strokeRect(currentX, centerY - BAND_HALF_HEIGHT, band.width, BAND_HEIGHT);
+                this.ctx.strokeRect(currentX, centerY - halfHeight, band.width, band.height);
                 this.ctx.restore();
             }
 

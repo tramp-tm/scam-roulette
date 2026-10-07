@@ -40,10 +40,12 @@ export class NormalMode implements GameMode {
         return lot.amount;
     }
 
-    getParticipantMagnitude(lot: Lot): number {
-        // Visually equivalent to the pre-refactor behaviour (sector size was
-        // derived from the selection weight). amount >= 0.01, so this is > 0.
-        return lot.amount;
+    getParticipantMagnitude(_lot: Lot): number | undefined {
+        // Axis 2 stays empty on purpose: a magnitude here would only duplicate
+        // the chance (`xValue = amount`). An ABSENT magnitude is rendered by
+        // every visualization at its maximum size (full circle / full-height
+        // band / full-radius circle), which is exactly the previous look.
+        return undefined;
     }
 
     processRoll(

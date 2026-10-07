@@ -152,12 +152,15 @@ export abstract class BaseRenderer implements IRenderer {
     // ------------------------------------------------------------------
 
     /**
-     * Participants that should be drawn: visible (`presence > 0`) and with a
-     * positive magnitude on axis 2 (`yValue`). The renderer maps
-     * `yValue * presence` to its own geometry and `presence × zValue` to alpha.
+     * Participants that should be drawn: visible (`presence > 0`). A lot
+     * WITHOUT a magnitude on axis 2 is still drawn — what an absent axis means
+     * is the visualization's own decision (its default is the maximum size), so
+     * the base class filters by visibility only. The renderer maps axis 1
+     * (`xValue`) to its roulette geometry, axis 2 (`yValue`) to size and
+     * `presence × zValue` to alpha.
      */
     protected drawableParticipants(): RenderableParticipant[] {
-        return this.participants.filter(p => p.presence > 0 && (p.yValue ?? 0) > 0);
+        return this.participants.filter(p => p.presence > 0);
     }
 
     /** Visual presence in [0, 1] for a lot (1 when unknown). */

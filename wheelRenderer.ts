@@ -1,4 +1,4 @@
-import type { Lot } from './types.js';
+import type { Lot, RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor, normalizeToFractions } from './utils.js';
@@ -6,6 +6,9 @@ import { brightenColor, normalizeToFractions } from './utils.js';
 // Wheel geometry
 const WHEEL_MARGIN = 30;
 const TAU = Math.PI * 2;
+
+/** Smallest sector radius, as a fraction of the wheel's max radius (axis-2 floor). */
+const MIN_RADIUS_RATIO = 0.35;
 
 // Sector strokes
 const SECTOR_STROKE = '#fff';
@@ -50,20 +53,32 @@ const INNER_RING_STROKE = 'rgba(255, 255, 255, 0.1)';
 const OUTER_RING_WIDTH = 4;
 const INNER_RING_WIDTH = 2;
 
-/** Wheel-specific sector geometry. Angles live here — never in the shared
+/** Wheel-specific sector geometry. Angles/radii live here — never in the shared
  *  participant/presentation contract. */
 interface WheelSector {
     lot: Lot;
     startAngle: number;
     endAngle: number;
+    /** Sector radius as a fraction of the wheel's max radius (MIN_RADIUS_RATIO .. 1). */
+    radiusRatio: number;
 }
 
 /**
  * Wheel visualization renderer.
  *
- * Sector angular size comes from the participant's `yValue` (axis 2, scaled by
- * `presence`), NOT from `xValue` (axis 1, the chance). The spin target and the
- * cursor are resolved against this wheel-local geometry.
+ * Two INDEPENDENT axes:
+ *  - the sector ANGLE comes from the participant's `xValue` (axis 1, the CHANCE
+ *    — exactly the value the roll used), normalised through
+ *    `normalizeToFractions`. So equal-chance modes draw equal sectors and the
+ *    cursor rides an honest partition;
+ *  - the sector RADIUS comes from `yValue` (axis 2, the mode's magnitude),
+ *    scaled onto `[MIN_RADIUS_RATIO, 1]` of the maximum radius. An ABSENT
+ *    magnitude (mode leaves axis 2 empty) or all-equal magnitudes are the
+ *    degenerate "maximum" case: every sector uses the full radius — the
+ *    familiar full circle.
+ *
+ * The spin target and the cursor are resolved against this wheel-local ANGULAR
+ * geometry (independent of the per-sector radius).
  *
  * Hover (`setHover`, lots-list interaction) draws a translucent glow fill plus
  * a crisp outline over the hovered sector, on top of every other sector, so
@@ -74,18 +89,25 @@ export class WheelRenderer extends BaseRenderer {
     private sectors: WheelSector[] = [];
 
     protected override onViewStateChanged(): void {
-        const parts = this.drawableParticipants().map(p => ({
-            lot: p.lot,
-            value: (p.yValue ?? 0) * p.presence
-        }));
-        const fractions = normalizeToFractions(parts.map(p => p.value));
+        const drawn = this.drawableParticipants();
+
+        // Angular partition: axis 1 (chance). Normalised as before.
+        const fractions = normalizeToFractions(drawn.map(p => p.xValue));
+
+        // Radius: axis 2 (magnitude). No magnitude anywhere, or all magnitudes
+        // equal, degenerates to the maximum radius for every sector.
+        const maxMagnitude = this.maxMagnitude(drawn);
 
         let cumulative = 0;
-        this.sectors = parts.map((p, i) => {
+        this.sectors = drawn.map((p, i) => {
             const startAngle = cumulative * TAU;
             cumulative += fractions[i];
             const endAngle = cumulative * TAU;
-            return { lot: p.lot, startAngle, endAngle };
+            const magnitude = Math.max(0, p.yValue ?? maxMagnitude);
+            const radiusRatio = maxMagnitude > 0
+                ? MIN_RADIUS_RATIO + (magnitude / maxMagnitude) * (1 - MIN_RADIUS_RATIO)
+                : 1;
+            return { lot: p.lot, startAngle, endAngle, radiusRatio };
         });
     }
 
@@ -97,7 +119,7 @@ export class WheelRenderer extends BaseRenderer {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
-        const radius = Math.min(centerX, centerY) - WHEEL_MARGIN;
+        const maxRadius = Math.min(centerX, centerY) - WHEEL_MARGIN;
 
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         this.ctx.save();
@@ -105,6 +127,7 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.rotate(this.animationValue);
 
         for (const sector of this.sectors) {
+            const radius = maxRadius * sector.radiusRatio;
             const opacity = this.opacityOf(sector.lot.id);
             const cursor = this.isCursor(sector.lot.id);
 
@@ -135,6 +158,7 @@ export class WheelRenderer extends BaseRenderer {
         for (const sector of this.sectors) {
             const accent = this.accentVisual(sector.lot.id);
             if (!accent || accent.alpha <= 0) continue;
+            const radius = maxRadius * sector.radiusRatio;
             const alpha = this.opacityOf(sector.lot.id) * accent.alpha;
 
             this.ctx.save();
@@ -161,6 +185,7 @@ export class WheelRenderer extends BaseRenderer {
         // fill plus a crisp outline over the full sector (both radii + arc).
         const hovered = this.sectors.find(s => this.isHovered(s.lot.id));
         if (hovered) {
+            const radius = maxRadius * hovered.radiusRatio;
             // Translucent glow fill.
             this.ctx.beginPath();
             this.ctx.moveTo(0, 0);
@@ -190,7 +215,7 @@ export class WheelRenderer extends BaseRenderer {
         this.ctx.restore();
 
         this.drawPointer(centerX, centerY);
-        this.drawOuterRing(centerX, centerY, radius);
+        this.drawOuterRing(centerX, centerY, maxRadius);
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
@@ -205,8 +230,8 @@ export class WheelRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
-        // The cursor follows the drawn (yValue-based) geometry: the sector
-        // whose drawn arc sits under the top pointer.
+        // The cursor follows the drawn (chance-based) ANGULAR partition: the
+        // sector whose drawn arc sits under the top pointer.
         if (this.sectors.length === 0) return null;
 
         // A sector at angle θ appears at θ + R. It sits under the top pointer
@@ -218,6 +243,19 @@ export class WheelRenderer extends BaseRenderer {
             if (local >= sector.startAngle && local < sector.endAngle) return sector.lot.id;
         }
         return this.sectors[this.sectors.length - 1].lot.id;
+    }
+
+    /**
+     * Largest magnitude (`yValue`) among the drawn participants, or 0 when none
+     * of them carries one (axis 2 absent). A missing magnitude is treated as
+     * the maximum, so a lot without axis 2 keeps the full-size (default) radius.
+     */
+    private maxMagnitude(participants: readonly RenderableParticipant[]): number {
+        let max = 0;
+        for (const p of participants) {
+            if (p.yValue !== undefined && p.yValue > max) max = p.yValue;
+        }
+        return max;
     }
 
     private drawWheelLabel(sector: WheelSector, radius: number, alpha: number): void {
