@@ -86,7 +86,7 @@ function highestHpAfterDamage(
  *
  * Rules (one spin):
  *  - every active participant has an equal chance to be rolled
- *    (`selectionWeight = 1` — HP is NOT used for selection);
+ *    (`xValue = 1` — HP is NOT used for selection);
  *  - the rolled participant takes NO damage;
  *  - every other active participant takes `ceil(hp(rolled) / 2)`, rounded up to
  *    0.01; HP clamps at 0;

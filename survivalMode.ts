@@ -183,7 +183,7 @@ function survivalWinProbabilities(amounts: readonly number[]): number[] {
  * Survival mode (elimination).
  *
  * Rules:
- *  - selectionWeight = `1 / amount` (higher amount → lower chance to be eliminated);
+ *  - xValue = `1 / amount` (higher amount → lower chance to be eliminated);
  *  - each spin eliminates the rolled lot;
  *  - the winner is decided from the state AFTER removing the rolled lot, so
  *    the last lot standing is never spun again;

@@ -16,7 +16,7 @@ import { formatPercentFloor } from './utils.js';
  * Normal mode.
  *
  * Rules:
- *  - selectionWeight = `amount` (higher amount → higher chance to win);
+ *  - xValue = `amount` (higher amount → higher chance to win);
  *  - one spin ends the game;
  *  - the rolled lot is the winner;
  *  - nobody is eliminated.

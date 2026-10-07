@@ -14,18 +14,17 @@ import { t } from './i18n.js';
 /**
  * King of the Hill: HP = amount.
  *
- * A copy of `KingOfTheHillMode` with ONE rule changed — where HP comes from:
- *  - a lot's initial HP is its `amount` directly, with NO normalization,
- *    rounded UP to a whole number (`ceil(amount)`); amounts are validated as
- *    positive (≥ 0.01), so every lot starts at HP ≥ 1. All HP and all damage
- *    therefore stay whole numbers.
+ * HP source (no normalization):
+ *  - a lot's initial HP is its `amount` directly, rounded UP to a whole number
+ *    (`ceil(amount)`); amounts are validated as positive (≥ 0.01), so every lot
+ *    starts at HP ≥ 1 and all HP / all damage stay whole numbers.
  *
- * Everything else is identical to `KingOfTheHillMode`:
+ * Rules:
  *  - "the king" is the active lot with the highest HP; ties are broken
  *    uniformly at random. The king is decided at the START of a round (stored in
  *    the game state, recomputed at the end of the previous round), so the
  *    mechanics and the ext marker always agree;
- *  - every active lot has an equal chance to be rolled (`selectionWeight = 1`);
+ *  - every active lot has an equal chance to be rolled (`xValue = 1`);
  *  - the rolled lot ALWAYS survives:
  *      · rolled lot is NOT the king → it damages the king by its own HP
  *        (HP clamps at 0; a king at 0 HP is eliminated);

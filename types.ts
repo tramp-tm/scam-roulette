@@ -19,8 +19,6 @@ export type Mode =
     | 'survival'
     | 'crown-defense-half-test'
     | 'weakest-link'
-    | 'weakest-link-amount'
-    | 'king-of-the-hill'
     | 'king-of-the-hill-amount';
 
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';

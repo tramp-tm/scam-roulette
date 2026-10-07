@@ -25,8 +25,8 @@
 >  - hover из списка лотов — отдельный аддитивный канал подсветки (`setHover`, по stable `lot.id`);
 >  - данные режима для UI обобщены (`modeData.ext`): список выводит готовый текст, а смысл и
 >    формат задаёт режим (HP, вероятность финальной победы, …);
->  - расширяемость подтверждена режимами **Weakest Link** и **King of the Hill** (и их
->    amount-вариантами) — без правок core и визуализаций.
+>  - расширяемость подтверждена режимами «Слабое звено» и «Царь горы: HP = сумма» — без правок
+>    core и визуализаций.
 > Поведение `Normal` и `Survival` сохранено 1:1.
 
 ---
@@ -37,8 +37,8 @@
 
 - вести список «лотов» (участников/призов) — имя, сумма, цвет;
 - импортировать лоты из CSV-текста или из Google Sheets по ссылке;
-- выбирать игровой режим (**Normal**, **Survival**, **Crown Defense**, три его тестовых варианта
-  и **Слабое звено**, **Царь горы**);
+- выбирать игровой режим (**Normal**, **Survival**, **Crown Defense: Half Damage**,
+  **Слабое звено**, **Царь горы: HP = сумма**);
 - выбирать одну из трёх визуализаций (**Wheel** / **Strip** / **Counting Rhyme**);
 - запускать «спин» — анимацию, которая заканчивается уже заранее определённым победителем
   (взвешенный случайный выбор), после чего проигрывается переход состояния (например,
@@ -159,12 +159,9 @@ Renderer
 | `modes.ts` | Реестр режимов (`MODES`, `getMode`) |
 | `normalMode.ts` | Режим Normal: правила, состояние, presentation |
 | `survivalMode.ts` | Режим Survival: правила, состояние, presentation |
-| `crownDefenseMode.ts` | Режим Crown Defense: HP-состояние, фиксированный урон, равный selection |
-| `crownDefenseHalfTestMode.ts` | Тестовый вариант: HP = amount, урон = ½ HP выпавшего |
-| `crownDefense10mTestMode.ts` | Тестовый вариант: HP = amount, урон = 10% от среднего HP |
-| `crownDefenseAmountTestMode.ts` | Тестовый вариант: HP = amount, урон = 10% от макс. HP |
-| `weakestLinkMode.ts` | Режим «Слабое звено»: HP = нормализация amount в [1..100], урон = min(HP активных) |
-| `kingOfTheHillMode.ts` | Режим «Царь горы»: HP = нормализация amount в [1..100], царь = макс. HP, выпавший бьёт царя своим HP |
+| `crownDefenseHalfTestMode.ts` | Режим «Защита короны: половина урона»: HP = amount, урон = ½ HP выпавшего |
+| `weakestLinkMode.ts` | Режим «Слабое звено»: HP = нормализация amount в [1..100], урон = среднее HP лотов не сильнее выпавшего |
+| `kingOfTheHillAmountMode.ts` | Режим «Царь горы: HP = сумма»: HP = ceil(amount) без нормализации, царь = макс. HP, выпавший бьёт царя своим HP |
 | `rouletteEngine.ts` | Взвешенный выбор по selection-весам; спин-таргет по геометрии рендерера |
 | `animation.ts` | Easing-функции и `AnimationController` (requestAnimationFrame) |
 | `visualizationDriver.ts` | Жизненный цикл визуализации: view state, spin, outcome transition, reset, cursor |
@@ -428,8 +425,6 @@ export const MODES = {
     survival: new SurvivalMode(),
     'crown-defense-half-test': new CrownDefenseHalfTestMode(),
     'weakest-link': new WeakestLinkMode(),
-    'weakest-link-amount': new WeakestLinkAmountMode(),
-    'king-of-the-hill': new KingOfTheHillMode(),
     'king-of-the-hill-amount': new KingOfTheHillAmountMode()
 };
 export function getMode(modeId) { return MODES[modeId]; }
@@ -488,24 +483,11 @@ export function getMode(modeId) { return MODES[modeId]; }
   inactive → `—` и без акцента (выбывший сохраняет базовый `bad`).
 - `GameModeState = { initialHp: Map<lotId, HP>, lastHitId }`, `ParticipantModeState = { hp }`.
 
-**WeakestLinkAmountMode** («Слабое звено: HP = сумма»)
-- копия `WeakestLinkMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
-  нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); карта HP
-  пересчитывается при смене состава участников до первого спина;
-- остальные правила идентичны `WeakestLinkMode`: `xValue = 1`, урон получает **только
-  выпавший лот**, `L` = активные кроме выпавшего с `HP ≤ HP(выпавшего)`, `D = HP(выпавшего)` если
-  `L` пуст, иначе `D = ceil(среднее HP по L)`; HP клампится в 0; выбывание при HP ≤ 0; последний
-  оставшийся — победитель;
-- HP и урон — всегда целые числа ≥ 1, поэтому партия всегда делает прогресс и завершается;
-- `getPresentationData` → ext = `♥ N`, а также `accent = info` **только для списка**
-  (`targets: ['list']`) на лоте, получившем урон в последнем раунде и оставшемся в игре;
-  inactive → `—` и без акцента;
-- `GameModeState = { initialHp, lastHitId }`, `ParticipantModeState = { hp }`.
-
-**KingOfTheHillMode** («Царь горы»)
+**KingOfTheHillAmountMode** («Царь горы: HP = сумма»)
 - `xValue = 1` — у всех активных равный шанс;
-- начальный HP = `amount`, min–max нормированный в `[1..100]` (`normalizeToRange`) и округлённый
-  вверх до целого; карта HP и царь пересчитываются при смене состава до первого спина;
+- начальный HP = `ceil(amount)` **без нормализации** (валидация `LotManager` гарантирует
+  `amount ≥ 0.01`, поэтому HP ≥ 1); все HP и весь урон — целые числа; карта HP и царь
+  пересчитываются при смене состава до первого спина;
 - «царь» — активный лот с наибольшим HP (ничьи — случайный из них); он хранится в состоянии и
   переопределяется один раз — при старте/смене состава и в конце каждого `processRoll` (это и есть
   «начало следующего раунда»), поэтому механика и маркер `♔` всегда согласованы;
@@ -518,21 +500,12 @@ export function getMode(modeId) { return MODES[modeId]; }
 - затем определяется новый царь для следующего раунда; в **завершающей** партии царя нет
   (`kingId = null`), поэтому победитель читается как исходный `good`, а не как «царь»;
   последний оставшийся — победитель;
+- «царь горы» разыгрывается тем же способом, что и прежде: урон получает **только царь**
+  (выпавший-не-царь бьёт его своим HP), а выпавший царь уничтожает слабейшего и поглощает его HP;
 - `getPresentationData` → ext = `♥ N`, у царя — `♔ ♥ N` и `accent = accent` (обе поверхности).
   Inactive → `—`.
 - `GameModeState = { initialHp, kingId }`, `ParticipantModeState = { hp }`.
 - `Math.random()` здесь используется только для тай-брейков (выбор царя и жертвы), не для рулетки.
-
-**KingOfTheHillAmountMode** («Царь горы: HP = сумма»)
-- копия `KingOfTheHillMode` с единственным отличием — начальный HP: `HP = ceil(amount)` **без
-  нормализации** (валидация `LotManager` гарантирует `amount ≥ 0.01`, поэтому HP ≥ 1); все HP и весь
-  урон — целые числа; карта HP и царь пересчитываются при смене состава до первого спина;
-- остальные правила идентичны `KingOfTheHillMode`: `xValue = 1`, царь — активный лот с
-  наибольшим HP, выпавший-не-царь бьёт царя своим HP, выпавший царь уничтожает слабейшего и
-  поглощает его HP, ничья по HP — приоритет: текущий царь → атакующий → случайный; в завершающей
-  партии царя нет (победитель читается как `good`);
-- `getPresentationData` → ext = `♥ N`, у царя — `♔ ♥ N` и `accent = accent`; inactive → `—`;
-- `GameModeState = { initialHp, kingId }`, `ParticipantModeState = { hp }`.
 
 Все режимы владеют своим состоянием и реализуют полный контракт `GameMode`, поэтому являются
 равноправными стратегиями.
@@ -1006,8 +979,8 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 3. добавить локализацию.
 `App`, `GameSession`, `RouletteEngine`, `VisualizationDriver` и существующие визуализации
 менять не требуется. Например, `WeakestLinkMode` отдаёт «слабое звено»: `xValue = 1` для активных
-(равный шанс) и `yValue = текущее HP` — шанс и размер независимы. **Weakest Link и King of the Hill
-(с amount-вариантами) реализованы именно так** — без правок core и визуализаций.
+(равный шанс) и `yValue = текущее HP` — шанс и размер независимы. **«Слабое звено» и «Царь горы:
+HP = сумма» реализованы именно так** — без правок core и визуализаций.
 
 **Новая визуализация**:
 1. реализовать `IRenderer` (унаследовать `BaseRenderer`), построить собственную геометрию из

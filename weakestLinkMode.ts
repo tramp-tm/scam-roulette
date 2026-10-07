@@ -17,7 +17,7 @@ import { normalizeToRange } from './utils.js';
  *
  * Rules (one spin):
  *  - every active participant has an equal chance to be rolled
- *    (`selectionWeight = 1` — HP is NOT used for selection);
+ *    (`xValue = 1` — HP is NOT used for selection);
  *  - a lot's initial HP is its `amount` min–max normalized onto
  *    `[MIN_HP, MAX_HP]`, rounded UP to whole HP (smallest amount → `MIN_HP`,
  *    largest → `MAX_HP`);
