@@ -83,7 +83,9 @@ export class App {
 
     private settings: Settings = {
         visualization: 'wheel',
-        animationDuration: 3000
+        animationDuration: 3000,
+        realChances: false,
+        realMagnitudes: false
     };
 
     // Easing function setting - source of truth for user preference
@@ -155,6 +157,9 @@ export class App {
 
     // Settings toggle element
     private settingsToggleBtn: HTMLButtonElement | null = null;
+    private vizTuningToggleBtn: HTMLButtonElement | null = null;
+    private realChancesSwitch: HTMLElement | null = null;
+    private realMagnitudesSwitch: HTMLElement | null = null;
 
     constructor() {
         this.lotManager = new LotManager([]);
@@ -177,6 +182,9 @@ export class App {
             this.canvas,
             this.settings.visualization
         );
+
+        // Push the initial tuning so the renderer never runs on its own defaults.
+        this.applyVisualizationTuning();
 
         // Initialize DOM elements
         this.resultText = document.getElementById('result-text');
@@ -214,6 +222,9 @@ export class App {
 
         // Settings toggle button
         this.settingsToggleBtn = document.getElementById('toggle-settings-subblock') as HTMLButtonElement;
+        this.vizTuningToggleBtn = document.getElementById('toggle-viz-subblock') as HTMLButtonElement | null;
+        this.realChancesSwitch = document.getElementById('real-chances-switch');
+        this.realMagnitudesSwitch = document.getElementById('real-magnitudes-switch');
 
         // Initialize UI
         this.updateUI();
@@ -634,6 +645,61 @@ export class App {
                 }
             });
         }
+
+        // Visualization tuning sub-block toggle button — the same collapse pattern
+        if (this.vizTuningToggleBtn) {
+            this.vizTuningToggleBtn.addEventListener('click', () => {
+                const subBlock = document.getElementById('viz-subblock') as HTMLElement | null;
+                if (subBlock) {
+                    subBlock.classList.toggle('hidden');
+                    this.vizTuningToggleBtn!.textContent = subBlock.classList.contains('hidden') ? '⁝' : '✕';
+                }
+            });
+        }
+
+        // "Real chances" / "real magnitudes" switches — presentation-only: they
+        // rebuild the visualization geometry, never anything in the session.
+        this.wireTuningSwitch(this.realChancesSwitch, 'realChances');
+        this.wireTuningSwitch(this.realMagnitudesSwitch, 'realMagnitudes');
+        this.syncTuningSwitches();
+    }
+
+    /**
+     * Wires one tuning switch (a `.switch` pair of On/Off buttons): a click flips
+     * the matching `Settings` flag, hands the tuning to the driver and keeps the
+     * buttons in sync. Purely presentational — session state is never touched.
+     */
+    private wireTuningSwitch(switchEl: HTMLElement | null, key: 'realChances' | 'realMagnitudes'): void {
+        if (!switchEl) return;
+        switchEl.querySelectorAll<HTMLButtonElement>('.switch-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const value = btn.dataset.value === 'on';
+                if (this.settings[key] === value) return;
+                this.settings[key] = value;
+                this.syncTuningSwitches();
+                this.applyVisualizationTuning();
+            });
+        });
+    }
+
+    /** Mirrors `settings` onto the two switches ("Off" = the default state). */
+    private syncTuningSwitches(): void {
+        this.realChancesSwitch?.querySelectorAll<HTMLButtonElement>('.switch-btn').forEach(btn => {
+            btn.classList.toggle('active', (btn.dataset.value === 'on') === this.settings.realChances);
+        });
+        this.realMagnitudesSwitch?.querySelectorAll<HTMLButtonElement>('.switch-btn').forEach(btn => {
+            btn.classList.toggle('active', (btn.dataset.value === 'on') === this.settings.realMagnitudes);
+        });
+    }
+
+    /** Hands the current tuning to the driver and re-renders the visualization. */
+    private applyVisualizationTuning(): void {
+        this.visualizationDriver.setTuning({
+            realChances: this.settings.realChances,
+            realMagnitudes: this.settings.realMagnitudes
+        });
+        const view = this.gameSession.viewState;
+        this.visualizationDriver.refresh(view, this.accentState(view));
     }
 
 
@@ -905,6 +971,14 @@ export class App {
         if (this.durationInput) this.durationInput.disabled = spinTimeLocked;
         if (this.visualizationSelect) this.visualizationSelect.disabled = spinTimeLocked;
         if (this.easingSelect) this.easingSelect.disabled = spinTimeLocked;
+
+        // Visualization tuning ("real chances" / "real magnitudes") is spin-time
+        // configuration too: it rebuilds the geometry, so it must not change
+        // mid-animation or while the outcome transition plays.
+        [this.realChancesSwitch, this.realMagnitudesSwitch].forEach(group => {
+            group?.querySelectorAll<HTMLButtonElement>('.switch-btn')
+                .forEach(btn => { btn.disabled = spinTimeLocked; });
+        });
 
         // Sorting is never disabled. The sort buttons always accept clicks; the
         // list view re-applies the current lock state to any freshly-rendered list

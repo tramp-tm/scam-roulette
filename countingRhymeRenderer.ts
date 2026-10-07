@@ -23,6 +23,12 @@ import { normalizeToFractions } from './utils.js';
  *  - the engine guarantees endValue ≡ targetMid (mod 1), so the final animated
  *    frame highlights the rolled lot.
  *
+ * The cursor/highlight follows the ANIMATION POSITION, never the drawn set: it is
+ * re-resolved only when the position moves. An elimination re-indexes the ring,
+ * so re-resolving a frozen position would pass the cursor to the neighbour of the
+ * lot that vanished; instead the cursor stays on that lot (which draws nothing
+ * once it is gone).
+ *
  * PERFORMANCE: the deterministic grid (cell permutation + jitter) depends only
  * on the drawn lot-id set and the canvas size, so it is cached and rebuilt only
  * when that signature changes — NOT on every transition frame. Radius is
@@ -84,6 +90,14 @@ export class CountingRhymeRenderer extends BaseRenderer {
     /** Prefix sums of the selection-weight (beat) partition. */
     private beatPrefix: number[] = [];
 
+    /**
+     * Cursor memo: the lot the cursor sits on and the normalized position it was
+     * resolved at. See `cursorFor` — the cursor follows the animation, not the
+     * participant set.
+     */
+    private heldCursorLotId: string | null = null;
+    private heldCursorFraction: number | null = null;
+
     protected override onViewStateChanged(): void {
         this.circles = this.drawableParticipants();
         this.rebuildBeat();
@@ -98,6 +112,8 @@ export class CountingRhymeRenderer extends BaseRenderer {
         this.lastHeight = 0;
         this.effectiveMaxRadius = 0;
         this.beatPrefix = [];
+        this.heldCursorLotId = null;
+        this.heldCursorFraction = null;
     }
 
     render(): void {
@@ -192,6 +208,10 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
+        // A new spin re-targets the cursor: drop any held lot so the next
+        // resolution happens over the current ring (see `cursorFor`).
+        this.heldCursorFraction = null;
+
         const idx = this.circles.findIndex(p => p.lot.id === rolledLotId);
         if (idx < 0 || this.beatPrefix.length < idx + 2) return this.animationValue;
 
@@ -207,10 +227,29 @@ export class CountingRhymeRenderer extends BaseRenderer {
     }
 
     getCursorLotId(animationValue: number): string | null {
+        return this.cursorFor(this.normalizePosition(animationValue));
+    }
+
+    /**
+     * The lot under the cursor at `frac`, resolved ONLY when the animation
+     * position moves. The index table is rebuilt whenever a lot is eliminated, so
+     * re-resolving a position that just stopped would hand the cursor to the
+     * neighbour of the lot that vanished; holding the previous lot instead keeps
+     * the cursor on the vanishing lot (it draws nothing once it is gone).
+     */
+    private cursorFor(frac: number): string | null {
+        if (this.heldCursorFraction === null || this.heldCursorFraction !== frac) {
+            this.heldCursorFraction = frac;
+            this.heldCursorLotId = this.lotIdAt(frac);
+        }
+        return this.heldCursorLotId;
+    }
+
+    /** Index-based cursor resolution over the currently drawn ring. */
+    private lotIdAt(frac: number): string | null {
         const n = this.circles.length;
         if (n === 0 || this.beatPrefix.length < n + 1) return null;
 
-        const frac = this.normalizePosition(animationValue);
         for (let i = 0; i < n; i++) {
             if (frac < this.beatPrefix[i + 1]) return this.circles[i].lot.id;
         }
@@ -280,19 +319,23 @@ export class CountingRhymeRenderer extends BaseRenderer {
         const intensities = new Array<number>(n).fill(0);
         if (n === 0 || this.beatPrefix.length < n + 1) return intensities;
 
-        let idx = n - 1;
-        for (let i = 0; i < n; i++) {
-            if (frac < this.beatPrefix[i + 1]) {
-                idx = i;
-                break;
-            }
-        }
+        // Emphasis belongs to the HELD cursor (see `cursorFor`), not to a fresh
+        // index lookup: a lot eliminated under a frozen position lights nothing
+        // instead of passing its emphasis to the next lot.
+        const fresh = this.heldCursorFraction !== frac;
+        const cursorLotId = this.cursorFor(frac);
+        const idx = cursorLotId === null ? -1 : this.circles.findIndex(p => p.lot.id === cursorLotId);
+        if (idx < 0) return intensities;
 
         const start = this.beatPrefix[idx];
         const weight = this.beatPrefix[idx + 1] - start;
         const local = weight > 0 ? (frac - start) / weight : 0;
 
-        if (n === 1 || local >= TRANSITION_FRACTION) {
+        // A HELD cursor (the position has not moved) keeps the FULL emphasis on
+        // its lot: no crossfade into whatever beat the frozen position happens to
+        // fall in once the ring has been re-indexed. `local < 0` means the held
+        // lot no longer even covers this segment — same treatment.
+        if (!fresh || n === 1 || local < 0 || local >= TRANSITION_FRACTION) {
             intensities[idx] = 1;
             return intensities;
         }

@@ -97,8 +97,12 @@ export function brightenColor(color: string, percent: number): string {
 /** Minimum width (px) of a strip band, regardless of its visual fraction. */
 const MIN_BAND_WIDTH = 60;
 
-/** Multiplier applied to a band's normalized visual fraction to get its width. */
-const BAND_WIDTH_SCALE = 400;
+/**
+ * Multiplier applied to a band's normalized visual fraction to get its width.
+ * Exported because the strip's "real chances" mode needs the bare scale: it draws
+ * `fraction * BAND_WIDTH_SCALE` WITHOUT the minimum-width floor.
+ */
+export const BAND_WIDTH_SCALE = 400;
 
 /**
  * Rendered width (px) of a strip band from its normalized visual fraction
@@ -107,6 +111,50 @@ const BAND_WIDTH_SCALE = 400;
  */
 export function getStripBandWidth(fraction: number): number {
     return Math.max(MIN_BAND_WIDTH, fraction * BAND_WIDTH_SCALE);
+}
+
+// ========================================
+// VISUAL CHANCE FLOOR (readable sectors)
+// ========================================
+
+/** Smallest visible share of a wheel sector (a fraction of the full circle). */
+export const MIN_VISUAL_SECTOR = 0.01;
+
+/**
+ * Reshapes honest chance fractions (Σ = 1) so their MINIMUM becomes exactly
+ * `minSector`, keeping the sum at 1 and the order (and the relative gaps) intact:
+ * `b_i = m + k·(a_i − aMin)` with `k = (1 − n·m)/(1 − n·aMin)`.
+ *
+ * The map is affine, so distinct chances never collapse onto one another (unlike
+ * a plain `max(floor, a)`), and the floor is adaptive: `m = min(minSector, 1/n)` —
+ * with many participants it degrades to the even share, and `m = 1/n` gives
+ * `k = 0` (every sector equal), which is the only way to keep Σ = 1 once the
+ * floor has reached the mean.
+ *
+ * Returns the input UNCHANGED unless it is a proper distribution whose smallest
+ * share is below the floor: `n <= 1`, a sum other than 1 (e.g. the all-zero
+ * degenerate case), `m <= 0`, `aMin >= m` (the floor is already satisfied — the
+ * operator never LOWERS the smallest share) or a non-positive/non-finite scale.
+ */
+export function normalizeChancesAffine(fractions: readonly number[], minSector: number): number[] {
+    const n = fractions.length;
+    if (n <= 1) return [...fractions];
+
+    let sum = 0;
+    for (const a of fractions) sum += a;
+    if (Math.abs(sum - 1) > 1e-9) return [...fractions];
+
+    const aMin = Math.min(...fractions);
+    const m = Math.min(minSector, 1 / n);
+    if (!(m > 0)) return [...fractions];
+    if (aMin >= m) return [...fractions];
+
+    // k === 0 is the documented degenerate case (m reached the mean => every
+    // share becomes exactly 1/n); k < 0 or a non-finite k means bad input.
+    const k = (1 - n * m) / (1 - n * aMin);
+    if (!isFinite(k) || k < 0) return [...fractions];
+
+    return fractions.map(a => m + k * (a - aMin));
 }
 
 /**

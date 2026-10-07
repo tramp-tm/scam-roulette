@@ -1,7 +1,7 @@
 import type { Lot, RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
-import { brightenColor, normalizeToFractions } from './utils.js';
+import { brightenColor, MIN_VISUAL_SECTOR, normalizeChancesAffine, normalizeToFractions } from './utils.js';
 
 // Wheel geometry
 const WHEEL_MARGIN = 30;
@@ -91,8 +91,13 @@ export class WheelRenderer extends BaseRenderer {
     protected override onViewStateChanged(): void {
         const drawn = this.drawableParticipants();
 
-        // Angular partition: axis 1 (chance). Normalised as before.
+        // Angular partition: axis 1 (chance). `realChances` draws the honest
+        // share; by default the smallest sector is lifted to a readable floor
+        // (affine, so the order and the relative gaps survive).
         const fractions = normalizeToFractions(drawn.map(p => p.xValue));
+        const sectorFractions = this.tuning.realChances
+            ? fractions
+            : normalizeChancesAffine(fractions, MIN_VISUAL_SECTOR);
 
         // Radius: axis 2 (magnitude). No magnitude anywhere, or all magnitudes
         // equal, degenerates to the maximum radius for every sector.
@@ -101,11 +106,15 @@ export class WheelRenderer extends BaseRenderer {
         let cumulative = 0;
         this.sectors = drawn.map((p, i) => {
             const startAngle = cumulative * TAU;
-            cumulative += fractions[i];
+            cumulative += sectorFractions[i];
             const endAngle = cumulative * TAU;
             const magnitude = Math.max(0, p.yValue ?? maxMagnitude);
+            // `realMagnitudes` draws the honest ratio (a zero magnitude is a
+            // zero-radius sector); by default it keeps the readable floor.
             const radiusRatio = maxMagnitude > 0
-                ? MIN_RADIUS_RATIO + (magnitude / maxMagnitude) * (1 - MIN_RADIUS_RATIO)
+                ? (this.tuning.realMagnitudes
+                    ? magnitude / maxMagnitude
+                    : MIN_RADIUS_RATIO + (magnitude / maxMagnitude) * (1 - MIN_RADIUS_RATIO))
                 : 1;
             return { lot: p.lot, startAngle, endAngle, radiusRatio };
         });

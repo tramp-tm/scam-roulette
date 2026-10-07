@@ -26,6 +26,21 @@ export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 export interface Settings {
     visualization: VisualizationType;
     animationDuration: number; // milliseconds
+    /** Draw the true chance share instead of the readable minimum-share floor. */
+    realChances: boolean;
+    /** Draw the true magnitude ratio instead of the readable size floor. */
+    realMagnitudes: boolean;
+}
+
+/**
+ * Per-visualization tuning, derived from `Settings` and fed through
+ * `IRenderer.setTuning`. Each visualization decides how (and whether) to apply
+ * it: the counting rhyme ignores both flags (its beat is always the honest
+ * chance partition and its radius the current min-max).
+ */
+export interface VisualizationTuning {
+    realChances: boolean;
+    realMagnitudes: boolean;
 }
 
 // ========================================
@@ -373,6 +388,13 @@ export interface SelectionCandidate {
  * Neither mutates the other.
  */
 export interface IRenderer {
+    /**
+     * Adopt the visualization tuning (the "real chances" / "real magnitudes"
+     * switches). A pure setter: the geometry is rebuilt by the next
+     * `setViewState`, and a visualization may ignore flags it has no use for.
+     */
+    setTuning(tuning: VisualizationTuning): void;
+
     /**
      * Adopt a presentation snapshot + accent state. This is the only way
      * accents are fed in; the visualization manages its own cursor internally.

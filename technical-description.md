@@ -206,6 +206,13 @@ interface Lot {                 // Только постоянные данны�
 interface Settings {            // Настройки приложения (тема и язык намеренно не входят)
   visualization: VisualizationType; // 'wheel' | 'strip' | 'counting-rhyme'
   animationDuration: number;    // мс
+  realChances: boolean;         // «реальные шансы»: без читабельного флора (§6.7, §7.4)
+  realMagnitudes: boolean;      // «реальные величины»: без читабельного флора
+}
+
+interface VisualizationTuning { // то, что App отдаёт рендереру (подмножество Settings)
+  realChances: boolean;
+  realMagnitudes: boolean;
 }
 
 interface MessageDescriptor {   // Отложенное локализуемое сообщение (режим отдаёт ключ, UI переводит)
@@ -393,6 +400,7 @@ hex (`ACCENT_VISUAL` в `baseRenderer.ts`), как и остальные canvas-
 
 ```ts
 interface IRenderer {                  // визуализация; чисто визуальная, правил не знает
+  setTuning(tuning: VisualizationTuning): void; // геометрия пересобирается на следующем setViewState
   setViewState(view: GameViewState, accents: AccentState): void;  // акценты лотов (lotId → kind), уже отфильтрованы по цели
   setHover(lotId: string | null): void; // hover-подсветка из списка лотов (stable lot.id; null — снять)
   render(): void;
@@ -669,14 +677,21 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `brightenColor(color, percent)` — осветляет цвет лота. Понимает `#RGB`/`#RRGGBB`,
   `rgb()/rgba()` и `hsl()/hsla()` (приложение производит `rgb()` для добавленных вручную лотов
   и `hsl()` для импортированных); неизвестный формат возвращается без изменений.
-- Геометрия ленты (strip-specific, не общий контракт): `MIN_BAND_WIDTH = 60` и
-  `BAND_WIDTH_SCALE = 400` — ВНУТРЕННИЕ константы модуля (не экспортируются);
+- Геометрия ленты (strip-specific, не общий контракт): `MIN_BAND_WIDTH = 60` — внутренняя
+  константа, `BAND_WIDTH_SCALE = 400` — ЭКСПОРТИРУЕТСЯ (нужен режиму «реальные шансы» ленты);
   `getStripBandWidth(fraction) = max(60, fraction * 400)` — ширина полосы из нормированной
-  доли ШАНСА (`xValue / Σ xValue`). Используется только `StripRenderer`; движок её не знает.
+  доли ШАНСА (`xValue / Σ xValue`) в читабельном (дефолтном) режиме. Используется только
+  `StripRenderer`; движок её не знает.
 - `indexLots(lots)` — `lotId → Lot`: нейтральный индекс, общий для `GameSession` (сборка view и
   ход) и режимов (внутренние лукапы по id). Единственная реализация индекса лотов в проекте.
 - `normalizeToFractions(values)` — нейтральная нормировка набора неотрицательных величин в доли
   (Σ = 1); используется рендерерами для перевода `yValue`/`xValue` в геометрию.
+- `normalizeChancesAffine(fractions, minSector)` + `MIN_VISUAL_SECTOR = 0.01` — «читабельный»
+  режим шансов колеса: аффинная карта честных долей так, чтобы минимум стал ровно
+  `m = min(minSector, 1/n)`, сохранив Σ = 1, порядок и ОТНОСИТЕЛЬНЫЕ разности
+  (`b_i = m + k·(a_i − aMin)`, `k = (1 − n·m)/(1 − n·aMin)`). При `minSector > 1/n` деградирует
+  в равные доли `1/n` (`k = 0`); при уже выполненном флоре (`aMin ≥ m`) и любом нарушении
+  предусловий (`n ≤ 1`, Σ ≠ 1) возвращает вход как есть — минимум никогда не ОПУСКАЕТСЯ.
 - `normalizeToRange(values, minValue, maxValue)` — min–max нормализация значений из их собственного
   диапазона в `[minValue..maxValue]` (один проход на min/max, один на выход, без промежуточных
   массивов); при вырожденном размахе (все значения равны / один элемент) все результаты = `minValue`.
@@ -691,6 +706,11 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 ### 6.7 Настройки времени, языка и темы
 
+- **Переключатели визуализации** (панель «Настройки визуализации», `#viz-subblock`): два
+  свитчера Выкл/Вкл на существующих классах `.switch`/`.switch-btn`
+  (`#real-chances-switch`, `#real-magnitudes-switch`) → `settings.realChances`/`realMagnitudes`
+  → `visualizationDriver.setTuning` + `refresh` (геометрия пересобирается в `setViewState`).
+  Гейтятся как селект визуализации (spin/finished/outcome); считалка игнорирует оба.
 - **Длительность**: слайдер (нелинейная шкала 1–300 с) и числовое поле; хранится в
   миллисекундах (`settings.animationDuration`); поле валидируется по `change`.
   **Числовое поле и есть отображение длительности** (`#duration-input` в обёртке
@@ -721,7 +741,9 @@ export function getMode(modeId) { return MODES[modeId]; }
 Ключевые ссылки: `lotManager`, `gameSession`, `visualizationDriver`, `lotListView`, `settings`,
 `easingFunction`, `outcomeAccents: Map<string, LotAccent>` (акценты последнего исхода,
 принадлежат `App`), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер ext-колонки),
-`activeOnly` + `activeOnlyIcon` (UI-фильтр «только активные» и его глиф).
+`activeOnly` + `activeOnlyIcon` (UI-фильтр «только активные» и его глиф), `realChances` +
+`realMagnitudes` в `settings` и парные `realChancesSwitch`/`realMagnitudesSwitch` +
+`vizTuningToggleBtn` (`wireTuningSwitch`/`syncTuningSwitches`/`applyVisualizationTuning`).
 Hover-состояние `App` не хранит: его владелец — `VisualizationDriver` (см. §7.3).
 
 Основные операции:
@@ -845,8 +867,10 @@ Hover-состояние `App` не хранит: его владелец — `V
 `zValue` не зависит.
 
 - **`WheelRenderer`** — круг. Секторы заданы локальным типом `WheelSector { lot, startAngle,
-  endAngle, radiusRatio }`: УГОЛ — из нормированного `xValue` (шанс), РАДИУС — `radiusRatio`
-  (`MIN_RADIUS_RATIO = 0.35 .. 1` от максимума) из `yValue` (отсутствие/равенство → `1`).
+  endAngle, radiusRatio }`: УГОЛ — из нормированного `xValue` (шанс): `realChances` = честные
+  доли, иначе `normalizeChancesAffine(…, MIN_VISUAL_SECTOR)`; РАДИУС — `radiusRatio`
+  (`MIN_RADIUS_RATIO = 0.35 .. 1` от максимума; `realMagnitudes` = честное `value / max`) из
+  `yValue` (отсутствие/равенство → `1`).
   `WHEEL_MARGIN = 30`,
   `SECTOR_STROKE_WIDTH = 2`, `HIGHLIGHT_BRIGHTNESS = 30 + 45·pulse`; подписи на `0.7·radius`
   только при размахе > `LABEL_MIN_ARC = 0.1`; указатель — золотой треугольник сверху; кольца
@@ -857,8 +881,9 @@ Hover-состояние `App` не хранит: его владелец — `V
   у всех одна базовая линия (`fieldTop + FRAME_PADDING + BAND_HEIGHT`), высота растёт вверх,
   поэтому нижние кромки совпадают, а верхние — нет (короткие полосы оставляют пустоту сверху).
   Локальный тип `StripBand { lot, startInCycle, width, height }`: ШИРИНА — из нормированного
-  `xValue` (шанс) через `getStripBandWidth`, ВЫСОТА — из `yValue` в `[MIN_BAND_HEIGHT,
-  BAND_HEIGHT]` (отсутствие/равенство → полная высота; `MIN_BAND_HEIGHT = 112`).
+  `xValue` (шанс) через `getStripBandWidth` (`realChances` = `fraction × BAND_WIDTH_SCALE` без
+  флора), ВЫСОТА — из `yValue` (`realMagnitudes` = `(value / max) × BAND_HEIGHT`) в
+  `[MIN_BAND_HEIGHT, BAND_HEIGHT]` (отсутствие/равенство → полная высота; `MIN_BAND_HEIGHT = 112`).
   `render()` приводит смещение по модулю и рисует копии цикла (`getCyclesNeeded`).
   `BAND_HEIGHT = 320`. **Подписи лотов — как подписи по оси X**: повёрнуты на `−π/2`
   (вертикально, читаются снизу вверх), стоят в полосе ПОД рамкой (вне прямоугольников, поэтому
@@ -877,6 +902,13 @@ Hover-состояние `App` не хранит: его владелец — `V
   пропорционален вероятности. Сетка ячеек кэшируется по набору id + размеру
   canvas и не пересчитывается на кадр перехода. Кроссфейд — `TRANSITION_FRACTION = 0.2`.
   Последний кадр гарантированно подсвечивает разыгранный лот.
+  **Курсор следует за ПОЗИЦИЕЙ анимации, а не за набором лотов** (`cursorFor`/`heldCursor*`):
+  он пересчитывается только при изменении позиции, поэтому выбывание лота (кольцо
+  переиндексируется) не передаёт курсор соседу — курсор остаётся на выбывающем лоте (пока тот
+  ещё виден, подсвечен он; когда исчез — не подсвечено ничего), а полная эмфаза держится без
+  кроссфейда. Новый спин (`computeSpinTarget`) и `reset()` сбрасывают удержание.
+  Оба переключателя (`realChances`/`realMagnitudes`) считалка ИГНОРИРУЕТ: такт — всегда
+  `normalizeToFractions`, радиус — всегда текущий min-max.
 
 Акценты: карта `accents` (lotId → `AccentKind`, уже отфильтрованная по цели `visualization`)
 и собственный курсор рендерера рисуются **независимо** и не затирают друг друга. Курсор
@@ -1096,6 +1128,9 @@ HP = сумма» реализованы именно так** — без пра
 
 ## 11. Замечания и технический долг
 
+- **Вид колеса по умолчанию изменён**: сектора по умолчанию считаются через
+  `normalizeChancesAffine` (читабельный флор `MIN_VISUAL_SECTOR`), а не «честными» долями —
+  осознанное изменение дефолтного вида; откатывается переключателем «Реальные шансы».
 - **Ключи локалей без реализации**: `settings.soundEffects`, `settings.soundOn/Off`,
   `importDialog.corsError`, `importDialog.fetching`, `importDialog.noValidLots`, часть
   `linkPlaceholder`/`linkTextareaPlaceholder`.

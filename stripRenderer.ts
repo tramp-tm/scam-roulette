@@ -1,7 +1,7 @@
 import type { Lot, RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
-import { brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
+import { BAND_WIDTH_SCALE, brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
 
 // Band geometry
 const BAND_HEIGHT = 320;
@@ -79,7 +79,9 @@ export class StripRenderer extends BaseRenderer {
     protected override onViewStateChanged(): void {
         const drawn = this.drawableParticipants();
 
-        // Band width: axis 1 (chance), normalised as before.
+        // Band width: axis 1 (chance). `realChances` draws the honest share (no
+        // floor, so a tiny chance is a tiny band); by default every band keeps
+        // the minimum width that makes it readable.
         const fractions = normalizeToFractions(drawn.map(p => p.xValue));
 
         // Band height: axis 2 (magnitude). No magnitude anywhere, or all equal,
@@ -88,10 +90,16 @@ export class StripRenderer extends BaseRenderer {
 
         let x = 0;
         this.bands = drawn.map((p, i) => {
-            const width = getStripBandWidth(fractions[i]);
+            const width = this.tuning.realChances
+                ? fractions[i] * BAND_WIDTH_SCALE
+                : getStripBandWidth(fractions[i]);
             const magnitude = Math.max(0, p.yValue ?? maxMagnitude);
+            // `realMagnitudes` draws the honest ratio (a zero magnitude is a zero
+            // height); by default it keeps the readable floor.
             const height = maxMagnitude > 0
-                ? MIN_BAND_HEIGHT + (magnitude / maxMagnitude) * (BAND_HEIGHT - MIN_BAND_HEIGHT)
+                ? (this.tuning.realMagnitudes
+                    ? (magnitude / maxMagnitude) * BAND_HEIGHT
+                    : MIN_BAND_HEIGHT + (magnitude / maxMagnitude) * (BAND_HEIGHT - MIN_BAND_HEIGHT))
                 : BAND_HEIGHT;
             const band: StripBand = { lot: p.lot, startInCycle: x, width, height };
             x += width;

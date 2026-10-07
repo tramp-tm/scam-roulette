@@ -150,6 +150,7 @@
                         </div>
                     </div>
                 </div>
+                </div><!-- /settings-main-block: it used to be left open, which nested everything after it -->
 
                 <!-- Collapsible sub-block (hidden by default) -->
                 <div id="settings-subblock" class="settings-sub-block hidden">
@@ -188,6 +189,33 @@
                                 <option value="linear" data-i18n="easing.linear.name">Linear (No Easing)</option>
                             </select>
                             <span id="easing-help" class="settings-help" aria-hidden="true">?</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization Tuning Panel -->
+            <div class="panel">
+                <div class="settings-header-row">
+                    <h3 data-i18n="settings.vizTuningTitle">🎛 Visualization settings</h3>
+                    <button id="toggle-viz-subblock" class="settings-toggle-btn" title="Toggle visualization settings">⁝</button>
+                </div>
+
+                <!-- Collapsible sub-block (hidden by default) -->
+                <div id="viz-subblock" class="settings-sub-block hidden">
+                    <div class="settings-group">
+                        <label data-i18n="settings.realChances">Real chances</label>
+                        <div id="real-chances-switch" class="switch">
+                            <button class="switch-btn active" data-value="off" data-i18n="settings.off">Off</button>
+                            <button class="switch-btn" data-value="on" data-i18n="settings.on">On</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <label data-i18n="settings.realMagnitudes">Real magnitudes</label>
+                        <div id="real-magnitudes-switch" class="switch">
+                            <button class="switch-btn active" data-value="off" data-i18n="settings.off">Off</button>
+                            <button class="switch-btn" data-value="on" data-i18n="settings.on">On</button>
                         </div>
                     </div>
                 </div>

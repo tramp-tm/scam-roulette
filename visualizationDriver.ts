@@ -7,6 +7,7 @@ import type {
     GameViewState,
     IRenderer,
     VisualizationTransition,
+    VisualizationTuning,
     VisualizationType
 } from './types.js';
 
@@ -58,6 +59,12 @@ export class VisualizationDriver {
     private readonly animationController: AnimationController;
 
     /**
+     * Tuning currently applied to the renderer. Mirrored here so a renderer swap
+     * (`setVisualization`) can re-apply it to the freshly created renderer.
+     */
+    private tuning: VisualizationTuning = { realChances: false, realMagnitudes: false };
+
+    /**
      * Last hover id set through `setHover`, mirrored so it can be re-applied
      * when the renderer is swapped. Never reaches game state.
      */
@@ -89,11 +96,24 @@ export class VisualizationDriver {
         this.animationController.stop();
         this.visualizationType = type;
         this.renderer = getVisualizationPackage(type).createRenderer(this.canvas);
+        // A fresh renderer starts untuned: re-apply before the first
+        // `setViewState`, which is what rebuilds the geometry.
+        this.renderer.setTuning(this.tuning);
         this.renderer.setViewState(view, accents);
         // Re-apply the hover highlight so a visualization swap cannot drop it
         // (identity is the stable lot id, so this can never hit an unrelated lot).
         this.renderer.setHover(this.hoveredLotId);
         this.renderer.render();
+    }
+
+    /**
+     * Applies the "real chances" / "real magnitudes" tuning to the current
+     * renderer. Geometry is rebuilt on the next `setViewState` (the caller
+     * refreshes), and the value is remembered for later renderer swaps.
+     */
+    setTuning(tuning: VisualizationTuning): void {
+        this.tuning = tuning;
+        this.renderer.setTuning(tuning);
     }
 
     /** Shows a presentation snapshot and redraws. */

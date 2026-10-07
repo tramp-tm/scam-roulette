@@ -3,7 +3,8 @@ import type {
     AccentState,
     GameViewState,
     IRenderer,
-    RenderableParticipant
+    RenderableParticipant,
+    VisualizationTuning
 } from './types.js';
 
 /**
@@ -57,6 +58,13 @@ export abstract class BaseRenderer implements IRenderer {
     /** Emphasis ramp for the accents during an outcome transition (1 = stable). */
     protected pulse = 1;
 
+    /**
+     * Presentation tuning ("real chances" / "real magnitudes"). Each renderer
+     * decides how to apply it — the counting rhyme ignores both flags. Changing
+     * it only takes effect on the next `setViewState`, which rebuilds geometry.
+     */
+    protected tuning: VisualizationTuning = { realChances: false, realMagnitudes: false };
+
     protected animationValue = 0;
 
     /** Transient hover highlight (lots-list interaction); see `setHover`. */
@@ -82,6 +90,11 @@ export abstract class BaseRenderer implements IRenderer {
     // ------------------------------------------------------------------
     // Presentation / highlight
     // ------------------------------------------------------------------
+
+    /** Adopts the tuning; the geometry follows on the next `setViewState`. */
+    setTuning(tuning: VisualizationTuning): void {
+        this.tuning = tuning;
+    }
 
     setViewState(view: GameViewState, accents: AccentState): void {
         this.participants = view.participants;
