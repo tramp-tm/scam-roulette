@@ -138,9 +138,19 @@ export class App {
     private modeHelp: HTMLElement | null = null;
     private easingHelp: HTMLElement | null = null;
     private extToggle: HTMLButtonElement | null = null;
+    /** Glyph inside the "only active" toggle; its label span stays i18n-owned. */
+    private activeOnlyIcon: HTMLElement | null = null;
 
     /** UI-only: whether the mode-provided extra-info column is shown. */
     private extEnabled = false;
+
+    /**
+     * UI-only: whether the lots list shows ACTIVE lots only. Purely
+     * presentational — nothing outside the list is filtered (participation,
+     * weights and the visualization are unaffected). Never disabled: like the
+     * sort controls it stays available in every lifecycle state.
+     */
+    private activeOnly = false;
 
 
     // Settings toggle element
@@ -195,6 +205,7 @@ export class App {
         this.modeHelp = document.getElementById('mode-help');
         this.easingHelp = document.getElementById('easing-help');
         this.extToggle = document.getElementById('ext-toggle') as HTMLButtonElement | null;
+        this.activeOnlyIcon = document.getElementById('active-only-icon');
 
         // LotListView owns the list DOM and the sorting controls. `#sort-controls`
         // sits outside `#lots-list`, so it is passed in explicitly.
@@ -216,7 +227,20 @@ export class App {
                 this.updateUI();
             });
         }
+
+        // "Only active" filter toggle — like the ext toggle a pure presentation
+        // setting: it only re-renders the list and is never disabled.
+        const activeOnlyToggle = document.getElementById('active-only-toggle') as HTMLButtonElement | null;
+        if (activeOnlyToggle) {
+            activeOnlyToggle.addEventListener('click', () => {
+                this.activeOnly = !this.activeOnly;
+                this.applyActiveOnlyState();
+                this.updateUI();
+            });
+        }
+
         this.applyExtToggleState();
+        this.applyActiveOnlyState();
 
         // Set initial slider and number input positions based on default duration (3s)
         if (this.durationSlider && this.durationInput) {
@@ -372,6 +396,16 @@ export class App {
         if (!this.extToggle) return;
         this.extToggle.classList.toggle('btn-primary', this.extEnabled);
         this.extToggle.classList.toggle('btn-secondary', !this.extEnabled);
+    }
+
+    /**
+     * Reflects the "only active" filter on its button. Only the GLYPH is written
+     * here: the label lives in its own `data-i18n` span, so translateDOM() owns
+     * the text and a re-translation can never clobber the glyph.
+     */
+    private applyActiveOnlyState(): void {
+        if (!this.activeOnlyIcon) return;
+        this.activeOnlyIcon.textContent = this.activeOnly ? '🔳' : '🔲';
     }
 
     /**
@@ -808,7 +842,8 @@ export class App {
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
             onDelete: (id) => this.deleteLot(id),
             onLotHover: (id) => this.handleLotHover(id),
-            extEnabled: this.extEnabled
+            extEnabled: this.extEnabled,
+            activeOnly: this.activeOnly
         });
 
         // Update stats. Game-session counters are read from the GameSession:
@@ -919,8 +954,12 @@ export class App {
         this.lotManager.clearAll();
         this.gameSession.clearLots();
 
-        // Reset accents and result display
+        // Reset accents, the "only active" filter (an emptied list has nothing
+        // left to filter, so it returns to the neutral show-all state) and the
+        // result display.
         this.outcomeAccents = new Map();
+        this.activeOnly = false;
+        this.applyActiveOnlyState();
         if (this.resultText) {
             this.updateResultTextWithModeName();
         }

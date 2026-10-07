@@ -69,6 +69,8 @@
   "mode.king-of-the-hill-amount.resultDestroy": "Царь уничтожил: {{victim}} (выпал: {{name}})",
   "mode.king-of-the-hill-amount.completionMessage": "🏆 ПОБЕДИТЕЛЬ «ЦАРЯ ГОРЫ» (HP = СУММА): {{name}}",
   "lots.extToggleTitle": "Показать дополнительную информацию режима",
+  "lots.activeOnly": "Активные",
+  "lots.activeOnlyTitle": "Показать только активные лоты",
   "importStrategy.replace.label": "🔄 Заменить",
   "importStrategy.replace.description": "Удалить все существующие лоты и импортировать новые",
   "importStrategy.merge.label": "🔗 Объединить",

@@ -711,7 +711,8 @@ textarea:disabled {
 /* ========================================
    EXT COLUMN (mode-provided extra info)
    ======================================== */
-.ext-toggle-btn {
+/* Compact sizing shared by the lots-header tool buttons (ext column, active-only). */
+.header-tool-btn {
     padding: 6px 12px;
     font-size: 0.85em;
     line-height: 1;

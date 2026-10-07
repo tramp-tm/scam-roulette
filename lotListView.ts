@@ -49,6 +49,14 @@ export interface LotListViewOptions {
      * formatting live in the current GameMode.
      */
     extEnabled?: boolean;
+    /**
+     * When true, list only the lots that are currently ACTIVE — the same
+     * predicate that adds the `inactive` row class, so a filtered-out lot is
+     * exactly one that would have been drawn as inactive. Purely presentational:
+     * it filters the VIEW only; participation, selection weights and the
+     * visualization are untouched.
+     */
+    activeOnly?: boolean;
 }
 
 /**
@@ -114,11 +122,14 @@ export class LotListView {
             onAmountChange,
             onDelete,
             onLotHover,
-            extEnabled = false
+            extEnabled = false,
+            activeOnly = false
         } = options;
 
-        // Sorting happens on a copy — the caller's array is never mutated.
-        const sorted = [...lots].sort((a, b) => {
+        // Sorting happens on a copy — the caller's array is never mutated, and
+        // `activeOnly` filters that copy (never the caller's array).
+        const visible = activeOnly ? lots.filter(l => l.active) : [...lots];
+        const sorted = visible.sort((a, b) => {
             if (this.sortField === 'name') {
                 return this.sortDirection === 'asc'
                     ? a.name.localeCompare(b.name)

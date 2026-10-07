@@ -175,7 +175,7 @@ Renderer
 | `wheelRenderer.ts` | Рендерер «колесо» |
 | `stripRenderer.ts` | Рендерер «лента» (бесконечная прокрутка) |
 | `countingRhymeRenderer.ts` | Рендерер «считалочка» (круги с подсветкой) |
-| `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, акценты (CSS-классы), hover, ext-колонка) |
+| `lotListView.ts` | Компонент списка лотов (сортировка, фильтр «только активные», редактирование, блокировка, акценты (CSS-классы), hover, ext-колонка) |
 | `utils.ts` | Цвета (генерация/осветление), индекс лотов, геометрия ленты, длительность, формат процентов |
 | `i18n.ts` | Инициализация i18next, перевод DOM, синхронизация `lang`, хелпер `t` |
 | `csvParser.ts` | Разбор CSV-текста в `ParsedLot[]` (через Papa Parse) |
@@ -720,7 +720,8 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 Ключевые ссылки: `lotManager`, `gameSession`, `visualizationDriver`, `lotListView`, `settings`,
 `easingFunction`, `outcomeAccents: Map<string, LotAccent>` (акценты последнего исхода,
-принадлежат `App`), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер ext-колонки).
+принадлежат `App`), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер ext-колонки),
+`activeOnly` + `activeOnlyIcon` (UI-фильтр «только активные» и его глиф).
 Hover-состояние `App` не хранит: его владелец — `VisualizationDriver` (см. §7.3).
 
 Основные операции:
@@ -743,17 +744,25 @@ Hover-состояние `App` не хранит: его владелец — `V
   текст результата. Единый метод не используется — иной вызов драйвера и порядок.
 - `deleteLot` / `handleClearLots` / `openImportDialog` / `handleImportConflict` /
   `executeImport` — guard-ы + согласованные операции над `LotManager` и `GameSession` (§6.5).
+  `handleClearLots` дополнительно сбрасывает UI-фильтр «только активные» (у пустого списка
+  фильтровать нечего) — в отличие от `reset()`, который его сохраняет.
 - `handleLotHover(id)` — hover строки списка: `visualizationDriver.setHover(id)`; чисто визуально
   и не зависит от блокировок.
 - `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot`;
   `refreshAfterStateChange()`.
 - Тумблер `ext` (`#ext-toggle`, кнопка `↔️` в шапке списка) — переключает `extEnabled`, класс
   `btn-primary`/`btn-secondary` (`applyExtToggleState()`) и вызывает `updateUI()`; доступен всегда.
+- Фильтр «только активные» (`#active-only-toggle`, **перед свитчером сортировки**) — переключает
+  `activeOnly` и глиф `#active-only-icon` (`applyActiveOnlyState()`, 🔲/🔳) и вызывает `updateUI()`;
+  как и кнопки сортировки, **никогда не блокируется** (он вне контролов, которыми управляет
+  `LotListView.setLocked()`/`updateControlsState()`). Подпись кнопки живёт в отдельном
+  `data-i18n`-span, поэтому смена языка не затирает глиф.
 - Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refreshAfterStateChange()`
   (список перерисовывается, т.к. `modeData`/ext зависят от режима).
 - `updateUI(view = gameSession.viewState, listAccents?)` — строит `RenderableLot[]` из снимка,
-  вызывает `LotListView.render` с `accents = listAccents ?? resolveAccents(view).list` и
-  `extEnabled`, обновляет статистику (total из `LotManager`, active из `GameSession`), затем
+  вызывает `LotListView.render` с `accents = listAccents ?? resolveAccents(view).list`,
+  `extEnabled` и `activeOnly`, обновляет статистику (total из `LotManager`, active из
+  `GameSession`), затем
   `updateControlsState()`. Вызывающий может передать уже построенный снимок и уже
   посчитанные акценты, поэтому **одно действие строит view-состояние ровно один раз**.
 - `refreshAfterStateChange(view = gameSession.viewState)` — **единственная точка обновления
@@ -778,8 +787,9 @@ Hover-состояние `App` не хранит: его владелец — `V
 Чисто презентационный компонент: владеет DOM списка, сортировкой и `disabled`-состоянием
 своих контролов; не импортирует `LotManager`, `GameSession`, `App`, рендереры и `t`.
 
-- `render(lots: RenderableLot[], options)` — полная перерисовка, сортировка на копии;
-  строки получают классы `inactive` / `accent-<kind>`; для каждого лота — индикатор цвета, имя,
+- `render(lots: RenderableLot[], options)` — полная перерисовка, сортировка на копии (и
+  необязательная фильтрация той же копии — входной массив не мутируется); строки получают классы
+  `inactive` / `accent-<kind>`; для каждого лота — индикатор цвета, имя,
   поле суммы, (при `extEnabled`) ячейка ext-колонки, кнопка удаления. Акцент — чисто визуальный
   и никогда не убирает контролы: блокировка выражается `disabled` (см. §7.5), а не скрытием.
 - `options.accents?: ReadonlyMap<string, AccentKind>` — карта акцентов (уже отфильтрована по
@@ -790,9 +800,12 @@ Hover-состояние `App` не хранит: его владелец — `V
   прокидывает id в `VisualizationDriver.setHover`.
 - `options.extEnabled` — показать доп. колонку `modeData.ext.value` (текст режима выводится
   **как есть**; список его не считает и не интерпретирует).
+- `options.activeOnly` — показать только активные лоты (предикат тот же, что даёт класс
+  `inactive`). Фильтруется только VIEW: участие, веса и визуализация не затрагиваются.
 - `options.modeData` (в `RenderableLot`) переносится и, для `ext`, отображается; список не
   знает, что означает значение (HP, вероятность, балл, …).
-- `setLocked(boolean)` — блокирует поля сумм и кнопки удаления.
+- `setLocked(boolean)` — блокирует поля сумм и кнопки удаления **внутри списка**; кнопки в шапке
+  (сортировка, фильтр «только активные», ext) не блокируются никогда.
 
 ### 7.3 `VisualizationDriver` — граница визуализации (`visualizationDriver.ts`)
 

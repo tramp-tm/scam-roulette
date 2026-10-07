@@ -36,6 +36,10 @@
                 <div class="lots-header-row">
                     <h3 data-i18n="lots.title">📋 Lots</h3>
                     <div class="lots-header-tools">
+                        <!-- "Only active" list filter: a view-only toggle, never disabled -->
+                        <button id="active-only-toggle" class="btn-secondary header-tool-btn" data-i18n-title="lots.activeOnlyTitle" title="Show only active lots">
+                            <span id="active-only-icon" aria-hidden="true">🔲</span> <span data-i18n="lots.activeOnly">Active</span>
+                        </button>
                         <div id="sort-controls" class="switch">
                             <button id="sort-by-name" class="switch-btn active" data-sort-field="name" data-i18n-title="sort.titleByName" title="Sort by name (A-Z)">
                                 <span class="label-primary" data-i18n="sort.byName">🅰️ Name</span><span class="sort-direction" aria-hidden="true"></span>
@@ -44,7 +48,7 @@
                                 <span class="label-primary" data-i18n="sort.byAmount">💵 Amount</span><span class="sort-direction" aria-hidden="true"></span>
                             </button>
                         </div>
-                        <button id="ext-toggle" class="btn-secondary ext-toggle-btn" data-i18n-title="lots.extToggleTitle" title="↔️">↔️</button>
+                        <button id="ext-toggle" class="btn-secondary header-tool-btn" data-i18n-title="lots.extToggleTitle" title="↔️">↔️</button>
                     </div>
                 </div>
 
