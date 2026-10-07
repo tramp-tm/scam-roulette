@@ -589,10 +589,11 @@ h1 {
 
 #roulette-canvas {
     width: 100%;
-    /* Fills the visualization area; the floor keeps it usable in a short window
-       (the page scrolls instead of collapsing the canvas to nothing). */
+    /* Fills the visualization area; the floor keeps the strip field (band height
+       + frame + its captions) fully visible in a short window — the page scrolls
+       instead of clipping the visualization. */
     flex: 1 1 auto;
-    min-height: 300px;
+    min-height: 400px;
     display: block;
     background: transparent;
     border-radius: 8px;

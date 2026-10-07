@@ -4,21 +4,24 @@ import { BaseRenderer } from './baseRenderer.js';
 import { brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
 
 // Band geometry
-const BAND_HEIGHT = 160;
-const BAND_HALF_HEIGHT = BAND_HEIGHT / 2;
+const BAND_HEIGHT = 320;
 
 /** Smallest band height, as a fraction of the full band height (axis-2 floor). */
 const MIN_BAND_HEIGHT_RATIO = 0.35;
 const MIN_BAND_HEIGHT = BAND_HEIGHT * MIN_BAND_HEIGHT_RATIO;
 
-// Outer frame
+// Outer frame (the container around the full band height)
 const FRAME_PADDING = 10;
+const FIELD_HEIGHT = BAND_HEIGHT + 2 * FRAME_PADDING;
 
-// Labels
+// Labels — axis-style: rotated, drawn in the strip UNDER the band field (below
+// the rectangles, so a short band can never clip them). The name is shortened to
+// the length of that strip (frame bottom -> canvas bottom), so a label always
+// stays between the frame and the bottom edge of the canvas.
 const LABEL_FONT = 'bold 14px Arial';
-const LABEL_OFFSET_Y = -12;
-const LABEL_MAX_CHARS = 15;
-const LABEL_TRUNCATED_CHARS = 13;
+const LABEL_GAP_Y = 8;       // frame bottom -> the label's near end
+const LABEL_MARGIN_Y = 6;    // the label's far end -> canvas bottom
+const LABEL_ELLIPSIS = '..';
 
 // Cursor highlight
 const CURSOR_HIGHLIGHT_BRIGHTNESS = 18;
@@ -55,6 +58,13 @@ interface StripBand {
  *    onto `[MIN_BAND_HEIGHT, BAND_HEIGHT]`. An ABSENT magnitude (mode leaves
  *    axis 2 empty) or all-equal magnitudes are the degenerate "maximum" case:
  *    every band is full height.
+ *
+ * The band FIELD (the frame around the full band height) is centred in the
+ * canvas and the bands inside it are ALIGNED TO ITS BOTTOM: they share one
+ * baseline and their height grows upwards (the width/height axes themselves are
+ * unchanged). Each lot's label is a rotated axis-style caption UNDER the field,
+ * so a short band can never clip it; its length is the strip between the frame
+ * and the bottom of the canvas, and a longer name is shortened to that.
  *
  * The spin target and the cursor are resolved against this strip-local geometry.
  *
@@ -97,7 +107,15 @@ export class StripRenderer extends BaseRenderer {
 
     render(): void {
         const { width: canvasWidth, height: canvasHeight } = this.getLogicalSize();
-        const centerY = canvasHeight / 2;
+
+        // The field (frame + the full band height) is CENTRED vertically; inside
+        // it every band rests on ONE bottom baseline, so heights grow upwards.
+        // The labels are captions under the field, like axis labels on a chart.
+        const fieldTop = (canvasHeight - FIELD_HEIGHT) / 2;
+        const bandBottom = fieldTop + FRAME_PADDING + BAND_HEIGHT;
+        const labelTop = fieldTop + FIELD_HEIGHT + LABEL_GAP_Y;
+        // How much room the caption has before the bottom edge of the canvas.
+        const labelMaxLength = canvasHeight - LABEL_MARGIN_Y - labelTop;
 
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
@@ -109,12 +127,12 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.save();
         this.ctx.translate(-visualScrollOffset, 0);
         for (let cycle = -1; cycle <= cyclesNeeded; cycle++) {
-            this.renderOneCycle(cycle * this.totalCycleWidth, centerY);
+            this.renderOneCycle(cycle * this.totalCycleWidth, bandBottom, labelTop, labelMaxLength);
         }
         this.ctx.restore();
 
         this.drawCenterMarker(canvasWidth / 2, canvasHeight);
-        this.drawFrame(canvasWidth, centerY);
+        this.drawFrame(canvasWidth, fieldTop);
     }
 
     computeSpinTarget(rolledLotId: string, durationMs: number): number {
@@ -172,9 +190,11 @@ export class StripRenderer extends BaseRenderer {
         return Math.ceil(totalRenderWidth / this.totalCycleWidth) + 1;
     }
 
-    private renderOneCycle(xOffset: number, centerY: number): void {
+    private renderOneCycle(xOffset: number, bandBottom: number, labelTop: number, labelMaxLength: number): void {
         for (const band of this.bands) {
-            const halfHeight = band.height / 2;
+            // Bottom-aligned: the band's top edge sits its own height above the
+            // shared baseline.
+            const top = bandBottom - band.height;
             // `presence` still gates hover (transient UI channel); the band's
             // own drawing uses `presence × zValue`.
             const presence = this.presenceOf(band.lot.id);
@@ -191,7 +211,7 @@ export class StripRenderer extends BaseRenderer {
             this.ctx.save();
             this.ctx.globalAlpha = opacity;
             this.ctx.fillStyle = fillColor;
-            this.ctx.fillRect(currentX, centerY - halfHeight, band.width, band.height);
+            this.ctx.fillRect(currentX, top, band.width, band.height);
             this.ctx.restore();
 
             // Lot accent: an additive outline in the accent colour, inset so the
@@ -206,7 +226,7 @@ export class StripRenderer extends BaseRenderer {
                 this.ctx.shadowBlur = ACCENT_GLOW_BLUR;
                 this.ctx.strokeRect(
                     currentX + ACCENT_INSET,
-                    centerY - halfHeight + ACCENT_INSET,
+                    top + ACCENT_INSET,
                     band.width - 2 * ACCENT_INSET,
                     band.height - 2 * ACCENT_INSET
                 );
@@ -222,17 +242,24 @@ export class StripRenderer extends BaseRenderer {
                 this.ctx.lineWidth = HOVER_STROKE_WIDTH;
                 this.ctx.shadowColor = HOVER_COLOR;
                 this.ctx.shadowBlur = HOVER_GLOW_BLUR;
-                this.ctx.strokeRect(currentX, centerY - halfHeight, band.width, band.height);
+                this.ctx.strokeRect(currentX, top, band.width, band.height);
                 this.ctx.restore();
             }
 
             if (presence > 0.01) {
-                this.drawBandLabel(band, currentX + band.width / 2, centerY, opacity);
+                this.drawBandLabel(band, currentX + band.width / 2, labelTop, labelMaxLength, opacity);
             }
         }
     }
 
-    private drawBandLabel(band: StripBand, textX: number, textY: number, alpha: number): void {
+    /**
+     * Axis-style caption for a lot: vertical (rotated like chart axis labels, so
+     * long names still fit narrow bands), anchored just under the frame and
+     * running DOWN `labelTop -> canvas bottom`. `textAlign: 'right'` puts the end
+     * of the name at the anchor (nearest the frame) and `textBaseline: 'middle'`
+     * keeps it centred on the band's own centre line.
+     */
+    private drawBandLabel(band: StripBand, textX: number, textY: number, maxLength: number, alpha: number): void {
         this.ctx.save();
         this.ctx.globalAlpha = alpha;
         this.ctx.translate(textX, textY);
@@ -240,16 +267,30 @@ export class StripRenderer extends BaseRenderer {
 
         this.ctx.fillStyle = '#fff';
         this.ctx.font = LABEL_FONT;
-        this.ctx.textAlign = 'center';
+        this.ctx.textAlign = 'right';
         this.ctx.textBaseline = 'middle';
 
-        const name = band.lot.name;
-        const displayName = name.length > LABEL_MAX_CHARS
-            ? name.substring(0, LABEL_TRUNCATED_CHARS) + '..'
-            : name;
-
-        this.ctx.fillText(displayName, 0, LABEL_OFFSET_Y);
+        this.ctx.fillText(this.fitLabel(band, maxLength), 0, 0);
         this.ctx.restore();
+    }
+
+    /**
+     * The lot name shortened to the room the caption has (`LABEL_ELLIPSIS` marks
+     * the cut). Real text metrics are used, so it adapts both to the name and to
+     * the available strip; an empty string means even the ellipsis does not fit.
+     */
+    private fitLabel(band: StripBand, maxLength: number): string {
+        if (maxLength <= 0) return '';
+
+        const name = band.lot.name;
+        if (this.ctx.measureText(name).width <= maxLength) return name;
+        if (this.ctx.measureText(LABEL_ELLIPSIS).width > maxLength) return '';
+
+        let cut = name;
+        while (cut.length > 0 && this.ctx.measureText(cut + LABEL_ELLIPSIS).width > maxLength) {
+            cut = cut.slice(0, -1);
+        }
+        return cut + LABEL_ELLIPSIS;
     }
 
     private drawCenterMarker(x: number, canvasHeight: number): void {
@@ -282,13 +323,10 @@ export class StripRenderer extends BaseRenderer {
         this.ctx.restore();
     }
 
-    private drawFrame(canvasWidth: number, centerY: number): void {
-        const top = centerY - BAND_HALF_HEIGHT - FRAME_PADDING;
-        const height = (BAND_HALF_HEIGHT + FRAME_PADDING) * 2;
-
+    private drawFrame(canvasWidth: number, fieldTop: number): void {
         this.ctx.save();
         this.ctx.beginPath();
-        this.ctx.rect(0, top, canvasWidth, height);
+        this.ctx.rect(0, fieldTop, canvasWidth, FIELD_HEIGHT);
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         this.ctx.lineWidth = 4;
         this.ctx.stroke();
