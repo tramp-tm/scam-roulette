@@ -21,6 +21,12 @@ export class ImportDialog extends ModalDialog {
     private importCallback: ImportCallback;
     private parsedLots: ParsedLot[] = [];
     private errorCount: number = 0;
+    /**
+     * The dialog's own body container. Every internal element is looked up
+     * INSIDE it — never through the global document, which a sibling modal
+     * (`ImportConflictDialog`, opened on top) also populates.
+     */
+    private body: HTMLElement | null = null;
 
     constructor(importCallback: ImportCallback) {
         super();
@@ -83,6 +89,7 @@ export class ImportDialog extends ModalDialog {
             const container = document.createElement('div');
             container.className = 'modal-body';
             container.innerHTML = html;
+            this.body = container;
             
             // Insert after header
             const header = this.content.querySelector('h2');
@@ -95,8 +102,8 @@ export class ImportDialog extends ModalDialog {
     }
 
     private initializeComponents(): void {
-        const csvContentContainer = document.getElementById('tab-csv-content');
-        const linkContentContainer = document.getElementById('tab-link-content');
+        const csvContentContainer = this.body?.querySelector<HTMLElement>('#tab-csv-content') ?? null;
+        const linkContentContainer = this.body?.querySelector<HTMLElement>('#tab-link-content') ?? null;
 
         if (csvContentContainer) {
             this.csvTabContent = new CsvTabContent(csvContentContainer);
@@ -133,7 +140,7 @@ export class ImportDialog extends ModalDialog {
         let tabParsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
         
         // Check which tab is currently active
-        const activeTabButton = document.querySelector('.tab-button.active') as HTMLElement | null;
+        const activeTabButton = this.body?.querySelector<HTMLElement>('.tab-button.active') ?? null;
         const activeTab = activeTabButton?.dataset.tab || 'csv';
 
         
@@ -163,8 +170,8 @@ export class ImportDialog extends ModalDialog {
     }
 
     private updateSharedStatus(): void {
-        const validCountSpan = document.getElementById('valid-count');
-        const errorCountSpan = document.getElementById('error-count');
+        const validCountSpan = this.body?.querySelector('#valid-count');
+        const errorCountSpan = this.body?.querySelector('#error-count');
         
         if (validCountSpan) {
             validCountSpan.textContent = `${t('importDialog.validLots')}: ${this.parsedLots.length}`;
@@ -175,10 +182,14 @@ export class ImportDialog extends ModalDialog {
     }
 
     private setupEventListeners(): void {
+        // Every lookup is scoped to this dialog's own body.
+        const body = this.body;
+        if (!body) return;
+
         // Tab switching
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const csvTabContent = document.getElementById('tab-csv-content');
-        const linkTabContent = document.getElementById('tab-link-content');
+        const tabButtons = body.querySelectorAll('.tab-button');
+        const csvTabContent = body.querySelector('#tab-csv-content');
+        const linkTabContent = body.querySelector('#tab-link-content');
 
         if (!csvTabContent || !linkTabContent) return;
 
@@ -207,20 +218,20 @@ export class ImportDialog extends ModalDialog {
         });
 
         // Handle import button click
-        const importBtn = document.querySelector('#import-btn');
+        const importBtn = body.querySelector('#import-btn');
         if (importBtn) {
             importBtn.addEventListener('click', () => this.handleImport());
         }
 
         // Handle preview button click
-        const previewBtn = document.querySelector('#preview-btn');
+        const previewBtn = body.querySelector('#preview-btn');
         if (previewBtn) {
             previewBtn.addEventListener('click', () => this.handlePreview());
         }
     }
 
     private renderPreviewList(lots: (ParsedLot & { color?: string })[]): void {
-        const previewList = document.getElementById('preview-lots-list') as HTMLUListElement | null;
+        const previewList = this.body?.querySelector<HTMLUListElement>('#preview-lots-list') ?? null;
         if (!previewList) return;
         
         previewList.innerHTML = '';
@@ -266,7 +277,7 @@ export class ImportDialog extends ModalDialog {
         }
 
         // Show preview container and render lots
-        const previewContainer = document.getElementById('preview-container');
+        const previewContainer = this.body?.querySelector('#preview-container');
         if (previewContainer) {
             previewContainer.classList.remove('hidden');
             

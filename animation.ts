@@ -80,7 +80,7 @@ export class AnimationController {
     private duration: number = 1000;
     private easing: EasingFunction = DEFAULT_EASING;
 
-    private onUpdate?: (value: number, progress: number) => void;
+    private onUpdate?: (value: number) => void;
     private onComplete?: () => void;
 
     /**
@@ -91,17 +91,15 @@ export class AnimationController {
         endValue: number;
         duration: number;
         easing?: EasingFunction;
-        onUpdate?: (value: number, progress: number) => void;
+        onUpdate?: (value: number) => void;
         onComplete?: () => void;
-    }): this {
+    }): void {
         this.startValue = options.startValue;
         this.endValue = options.endValue;
         this.duration = options.duration;
         this.easing = options.easing ?? DEFAULT_EASING;
         this.onUpdate = options.onUpdate;
         this.onComplete = options.onComplete;
-        
-        return this;
     }
 
     /**
@@ -132,7 +130,7 @@ export class AnimationController {
 
         // Call update callback
         if (this.onUpdate) {
-            this.onUpdate(currentValue, progress);
+            this.onUpdate(currentValue);
         }
 
         // Check if animation is complete
@@ -141,10 +139,10 @@ export class AnimationController {
         } else {
             // Animation complete - ensure final value is set
             if (this.onUpdate) {
-                this.onUpdate(this.endValue, 1);
+                this.onUpdate(this.endValue);
             }
             
-            // Clear animation state so isAnimating() returns false
+            // Clear the animation state.
             this.animationFrameId = null;
             this.startTime = null;
             
@@ -165,10 +163,4 @@ export class AnimationController {
         this.startTime = null;
     }
 
-    /**
-     * Checks if animation is currently running.
-     */
-    isAnimating(): boolean {
-        return this.startTime !== null && this.animationFrameId !== null;
-    }
 }

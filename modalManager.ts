@@ -1,5 +1,3 @@
-import { translateDOM } from './i18n.js';
-
 /**
  * Singleton manager for modal dialogs.
  * Handles z-index stacking and tracks open modals in order.
@@ -58,20 +56,4 @@ export class ModalManager {
         return topmost === modalElement;
     }
 
-    /**
-     * Re-translates all currently open modals
-     */
-    public retranslateAllOpenModals(): void {
-        this.openModals.forEach(modal => {
-            if (modal.classList.contains('hidden')) return;
-
-            // Find the modal content container and translate it
-            const content = modal.querySelector('.modal-content');
-
-            if (content && content instanceof HTMLElement) {
-                // Re-translate the content
-                translateDOM();
-            }
-        });
-    }
 }

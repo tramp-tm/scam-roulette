@@ -9,8 +9,6 @@ export abstract class ModalDialog {
     protected overlay: HTMLElement | null = null;
     protected content: HTMLElement | null = null;
     
-    /** Called when dialog is opened */
-    protected onOpen?: () => void;
     /** Called when dialog is closed (with optional data) */
     protected onClose?: (data?: unknown) => void;
 
@@ -66,7 +64,7 @@ export abstract class ModalDialog {
      */
     protected retranslate(): void {
         if (this.content) {
-            translateDOM();
+            translateDOM(this.content);
         }
     }
 
@@ -81,7 +79,6 @@ export abstract class ModalDialog {
         
         // Ensure content is translated when opened
         this.retranslate();
-        this.onOpen?.();
     }
 
     /** Closes the dialog, unregisters from manager, and optionally passes data to onClose callback */
@@ -107,26 +104,6 @@ export abstract class ModalDialog {
         if (this.content) {
             // Insert after close button
             this.content.insertBefore(header, this.content.children[1] || null);
-        }
-    }
-
-    /** Renders content into the dialog - override in subclasses */
-    protected renderContent(html: string): void {
-        if (this.content) {
-            const container = document.createElement('div');
-            container.className = 'modal-body';
-            container.innerHTML = html;
-            this.content.appendChild(container);
-        }
-    }
-
-    /** Renders footer buttons - override in subclasses */
-    protected renderFooter(html: string): void {
-        if (this.content) {
-            const footer = document.createElement('div');
-            footer.className = 'modal-footer';
-            footer.innerHTML = html;
-            this.content.appendChild(footer);
         }
     }
 

@@ -10,7 +10,17 @@ import type {
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
-import { normalizeToRange } from './utils.js';
+import { indexLots, normalizeToRange } from './utils.js';
+import {
+    castState,
+    collectHp,
+    computeChanged,
+    computeEliminated,
+    materializeParticipants,
+    participantHp,
+    resolveSurvivors
+} from './hpElimination.js';
+import type { HpParticipantState } from './hpElimination.js';
 
 /**
  * Weakest Link.
@@ -38,7 +48,9 @@ import { normalizeToRange } from './utils.js';
  *    eliminated lot keeps the outcome's `bad`).
  *
  * Stateless/shared: the initial HP and the last damaged lot live in the game
- * state, the current HP in each participant's mode state.
+ * state, the current HP in each participant's mode state. The turn pipeline
+ * (steps 1, 4–7 of `processRoll`) is shared with the other HP-elimination modes
+ * in `hpElimination.ts`; only the damage rule below is local.
  */
 
 /** HP of the participant with the smallest `amount` (lower normalization bound). */
@@ -64,22 +76,6 @@ interface WeakestLinkGameState {
 }
 
 /**
- * Per-participant state: the participant's current HP (`null` until first
- * materialized; derived from the game state's initial-HP map by `effectiveHp`).
- */
-interface WeakestLinkParticipantState {
-    hp: number | null;
-}
-
-function asGameState(state: GameModeState): WeakestLinkGameState {
-    return state as WeakestLinkGameState;
-}
-
-function asParticipantState(participant: GameParticipantState): WeakestLinkParticipantState {
-    return participant.modeState as WeakestLinkParticipantState;
-}
-
-/**
  * Initial HP for a set of lots: amounts min–max normalized onto
  * `[MIN_HP, MAX_HP]` and rounded UP to whole HP. The smallest amount maps to
  * `MIN_HP`, the largest to `MAX_HP`; when every amount is equal the degenerate
@@ -94,37 +90,6 @@ function buildInitialHp(lots: readonly Lot[]): Map<string, number> {
     return map;
 }
 
-/** Current HP of a participant, deriving the initial value on first read. */
-function effectiveHp(
-    lot: Lot,
-    participant: GameParticipantState,
-    state: WeakestLinkGameState
-): number {
-    const ps = asParticipantState(participant);
-    if (typeof ps.hp === 'number') return ps.hp;
-    return state.initialHp.get(lot.id) ?? MIN_HP;
-}
-
-/**
- * Deterministic winner for the (defensive) no-survivors case: the participant
- * with the highest HP after damage; ties broken by participant order.
- */
-function highestHpAfterDamage(
-    participants: readonly GameParticipantState[],
-    hpAfter: ReadonlyMap<string, number>
-): string {
-    let bestId = participants[0].lotId;
-    let bestHp = -Infinity;
-    for (const p of participants) {
-        const hp = hpAfter.get(p.lotId) ?? 0;
-        if (hp > bestHp) {
-            bestHp = hp;
-            bestId = p.lotId;
-        }
-    }
-    return bestId;
-}
-
 export class WeakestLinkMode implements GameMode {
     readonly id: Mode = 'weakest-link';
 
@@ -137,7 +102,7 @@ export class WeakestLinkMode implements GameMode {
     }
 
     createParticipantState(_lot: Lot): ParticipantModeState {
-        const participant: WeakestLinkParticipantState = { hp: null };
+        const participant: HpParticipantState = { hp: null };
         return participant;
     }
 
@@ -149,7 +114,7 @@ export class WeakestLinkMode implements GameMode {
         // Recompute the normalization set so a lot added before the first spin
         // rescales everyone's (lazily derived) initial HP. Once a spin has
         // locked the session, participant changes are rejected.
-        const byId = new Map(lots.map(l => [l.id, l]));
+        const byId = indexLots(lots);
         const currentLots: Lot[] = [];
         for (const p of participants) {
             const lot = byId.get(p.lotId);
@@ -168,26 +133,26 @@ export class WeakestLinkMode implements GameMode {
         participant: GameParticipantState,
         state: GameModeState
     ): number {
-        return effectiveHp(lot, participant, asGameState(state));
+        const gs = castState<WeakestLinkGameState>(state);
+        return participantHp(lot, participant, l => gs.initialHp.get(l.id) ?? MIN_HP);
     }
 
     processRoll(
         rolledLot: Lot,
-        _rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): { state: GameModeState; participants: GameParticipantState[]; outcome: TurnOutcome } {
-        const gs = asGameState(state);
-        const lotById = new Map(lots.map(l => [l.id, l]));
+        const gs = castState<WeakestLinkGameState>(state);
+        // This mode's HP source: the normalized initial-HP map.
+        const initialHp = (lot: Lot): number => gs.initialHp.get(lot.id) ?? MIN_HP;
 
-        // 1. HP before this turn's damage, for every participant. Computed up
-        //    front so no participant's damage depends on another's outcome.
-        const hpBefore = new Map<string, number>();
-        for (const p of participants) {
-            const lot = lotById.get(p.lotId);
-            hpBefore.set(p.lotId, lot ? effectiveHp(lot, p, gs) : 0);
-        }
+        // 1. HP before this turn's damage, for every participant.
+        const hpBefore = collectHp(
+            participants,
+            lotById,
+            (lot, p) => participantHp(lot, p, initialHp)
+        );
 
         // 2. This mode's rule: only the ROLLED lot takes damage, and the damage
         //    is derived from the lots that are no stronger than it:
@@ -211,45 +176,11 @@ export class WeakestLinkMode implements GameMode {
         const hpAfter = new Map<string, number>(hpBefore);
         hpAfter.set(rolledLot.id, Math.max(0, rolledHp - damage));
 
-        // 4. Eliminated = active participants whose HP reached 0.
-        const eliminated: string[] = [];
-        for (const p of participants) {
-            if (p.active && (hpAfter.get(p.lotId) ?? 0) <= 0) eliminated.push(p.lotId);
-        }
-        const eliminatedSet = new Set(eliminated);
-
-        // 5. New participant records: HP materialized, eliminations applied.
-        const nextParticipants: GameParticipantState[] = participants.map(p => {
-            const next: WeakestLinkParticipantState = { hp: hpAfter.get(p.lotId) ?? 0 };
-            return {
-                lotId: p.lotId,
-                active: p.active && !eliminatedSet.has(p.lotId),
-                modeState: next
-            };
-        });
-
-        // 6. Participants whose HP actually changed (only the rolled lot's HP
-        //    changes).
-        const changed = participants
-            .filter(p => p.active && (hpAfter.get(p.lotId) ?? 0) !== (hpBefore.get(p.lotId) ?? 0))
-            .map(p => p.lotId);
-
-        // 7. Winner / completion.
-        const remaining = nextParticipants.filter(p => p.active);
-        let winners: string[] = [];
-        let finished: boolean;
-
-        if (remaining.length === 1) {
-            finished = true;
-            winners = [remaining[0].lotId];
-        } else if (remaining.length > 1) {
-            finished = false;
-        } else {
-            // Defensive: no survivors — impossible while the rolled lot is
-            // never damaged, but kept total and deterministic.
-            finished = true;
-            winners = [highestHpAfterDamage(participants, hpAfter)];
-        }
+        // 4–7. Shared pipeline (elimination, materialization, changed, winner).
+        const eliminated = computeEliminated(participants, hpAfter);
+        const nextParticipants = materializeParticipants(participants, hpAfter, new Set(eliminated));
+        const changed = computeChanged(participants, hpBefore, hpAfter, { includeEliminated: true });
+        const { winners, finished } = resolveSurvivors(nextParticipants, hpAfter);
 
         const winnerLot = winners.length > 0 ? lotById.get(winners[0]) : undefined;
 
@@ -281,21 +212,21 @@ export class WeakestLinkMode implements GameMode {
 
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): ReadonlyMap<string, ModePresentationData> {
-        const gs = asGameState(state);
-        const byId = new Map(lots.map(l => [l.id, l]));
+        const gs = castState<WeakestLinkGameState>(state);
+        const initialHp = (lot: Lot): number => gs.initialHp.get(lot.id) ?? MIN_HP;
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             // Inactive lots are "not participating" — never stale HP.
             if (!p.active || !lot) {
                 result.set(p.lotId, { ext: { value: '—' } });
                 continue;
             }
             const data: ModePresentationData = {
-                ext: { value: `♥ ${Math.round(effectiveHp(lot, p, gs))}` }
+                ext: { value: `♥ ${Math.round(participantHp(lot, p, initialHp))}` }
             };
             // The lot that just took damage is flagged for exactly one round —
             // in the LOTS LIST only. An eliminated lot is not accented, so it

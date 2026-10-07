@@ -166,6 +166,7 @@ Renderer
 | `crownDefenseHalfTestMode.ts` | Режим «Защита короны: половина урона»: HP = amount, урон = ½ HP выпавшего |
 | `weakestLinkMode.ts` | Режим «Слабое звено»: HP = нормализация amount в [1..100], урон = среднее HP лотов не сильнее выпавшего |
 | `kingOfTheHillAmountMode.ts` | Режим «Царь горы: HP = сумма»: HP = ceil(amount) без нормализации, царь = макс. HP, выпавший бьёт царя своим HP |
+| `hpElimination.ts` | Общий каркас HP-элиминационного хода трёх HP-режимов: ленивый `participantHp`, шаги 1/4–7 (`collectHp`, `computeEliminated`, `computeChanged`, `materializeParticipants`, `resolveSurvivors`) |
 | `rouletteEngine.ts` | Взвешенный выбор по selection-весам; спин-таргет по геометрии рендерера |
 | `animation.ts` | Easing-функции и `AnimationController` (requestAnimationFrame) |
 | `visualizationDriver.ts` | Жизненный цикл визуализации: view state, spin, outcome transition, reset, cursor |
@@ -175,7 +176,7 @@ Renderer
 | `stripRenderer.ts` | Рендерер «лента» (бесконечная прокрутка) |
 | `countingRhymeRenderer.ts` | Рендерер «считалочка» (круги с подсветкой) |
 | `lotListView.ts` | Компонент списка лотов (сортировка, редактирование, блокировка, акценты (CSS-классы), hover, ext-колонка) |
-| `utils.ts` | Цвета (генерация/осветление), геометрия ленты, длительность, формат процентов |
+| `utils.ts` | Цвета (генерация/осветление), индекс лотов, геометрия ленты, длительность, формат процентов |
 | `i18n.ts` | Инициализация i18next, перевод DOM, синхронизация `lang`, хелпер `t` |
 | `csvParser.ts` | Разбор CSV-текста в `ParsedLot[]` (через Papa Parse) |
 | `importStrategies.ts` | Стратегии импорта `REPLACE` / `MERGE` |
@@ -203,7 +204,6 @@ interface Lot {                 // Только постоянные данны�
 }
 
 interface Settings {            // Настройки приложения (тема и язык намеренно не входят)
-  modeId: Mode;                 // id режима из реестра MODES
   visualization: VisualizationType; // 'wheel' | 'strip' | 'counting-rhyme'
   animationDuration: number;    // мс
 }
@@ -264,19 +264,19 @@ interface GameMode {
   createParticipantState(lot: Lot): ParticipantModeState;
   onParticipantsChanged(state, participants, lots): GameModeState;
 
-  calculateSelectionWeight(lot, participant, state): number;   // шанс выбора → ось xValue
+  calculateSelectionWeight(lot): number;                       // шанс выбора → ось xValue
 
   getParticipantMagnitude(lot, participant, state): number | undefined;  // ось yValue: величина (размер)
 
   getParticipantOpacity?(lot, participant, state): number | undefined;   // ось zValue: прозрачность (0..1)
 
-  processRoll(rolledLot, rolled, participants, lots, state): {
+  processRoll(rolledLot, participants, lotById, state): {
     state: GameModeState;
     participants: GameParticipantState[];
     outcome: TurnOutcome;
   };
 
-  getPresentationData(participants, lots, state): ReadonlyMap<string, ModePresentationData>;
+  getPresentationData(participants, lotById, state): ReadonlyMap<string, ModePresentationData>;
 }
 ```
 
@@ -290,6 +290,16 @@ interface GameMode {
 `getPresentationData` вызывается **один раз на сборку view-состояния** и возвращает карту
 `lotId → ModePresentationData`, поэтому режим может посчитать множественную презентацию
 (например, вероятность финальной победы) один раз, а не на каждого участника.
+
+Поверхность контракта — только фактически используемое:
+- `calculateSelectionWeight` получает **только лот** (ни один режим не выводит вес из участия
+  или состояния игры);
+- `processRoll` **не получает разыгранного участника** (ни одному режиму он не нужен;
+  при необходимости режим берёт его через `lotById.get(rolledLot.id)`);
+- `processRoll` и `getPresentationData` получают готовый индекс `lotById: ReadonlyMap<string, Lot>`
+  вместо массива `lots` — индекс строится один раз в сессии и не пересобирается в
+  каждом режиме. Массив `lots` остаётся только там, где действительно нужен весь
+  набор: `createGameState` и `onParticipantsChanged` (пересборка нормализованного HP до первого спина).
 
 ### 5.4 Presentation-модель
 
@@ -411,13 +421,17 @@ interface VisualizationPackage {       // реестр: только фабри�
 ### 6.1 Управление лотами — `LotManager`
 
 `LotManager` владеет **глобальным** списком лотов и ничего не знает про режимы и участие.
+**Домен не зависит от i18n**: ошибки возвращаются машиночитаемым `reason`, а текст
+локализует презентационный слой (`App.addLotFailureKey` → `t(key, params)`); в `AddLotError` нет поля `message`.
 
 - `addLot(name, amount, color)` → `AddLotResult | AddLotError`:
   - имя после `trim()` не пустое → иначе `invalid_name`;
   - `amount` — конечное число > 0 → иначе `invalid_amount`;
   - количество лотов < `MAX_LOTS` (3000) → иначе `max_lots_reached`;
   - валидная сумма нормализуется: `max(0.01, parseFloat(amount))`; `id = lot_<timestamp>_<random>`.
-- `updateLot(id, {name?, amount?, color?})`, `deleteLot(id)`, `getLotById(id)`,
+- Соответствие `reason` → ключ i18n (в `App`): `invalid_name` → `error.invalidName`,
+  `invalid_amount` → `error.invalidAmount`, `max_lots_reached` → `error.maxLotsReached` с `{ max: MAX_LOTS }`.
+- `updateLot(id, {name?, amount?, color?})`, `deleteLot(id)`,
   `clearAll()`, `getTotalCount()`, `getAllLots()` (возвращает копию).
 
 `MAX_LOTS = 3000` используется и при импорте (лишние лоты отбрасываются — «truncated»).
@@ -439,6 +453,21 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 `name`/`description` — ленивые геттеры, вызывающие `t(...)` при каждом обращении, поэтому
 смена языка немедленно обновляет название и описание режима.
+
+**Общий каркас HP-режимов** (`hpElimination.ts`): три HP-режима (`crown-defense-half-test`,
+`weakest-link`, `king-of-the-hill-amount`) реализуют одну механику — «у активного есть HP; за ход
+наносится урон; HP 0 ⇒ выбывание; последний выживший побеждает». Общий конвейер хода вынесен в
+чистые функции: `collectHp` (шаг 1 — HP до урона), `participantHp` (ленивый вывод начального HP из
+источника режима), `computeEliminated` (шаг 4), `materializeParticipants` (шаг 5),
+`computeChanged` (шаг 6), `resolveSurvivors` (шаг 7, включая оборонительный случай «нет выживших» —
+детерминированный победитель по наибольшему HP, тай-брейк по порядку участников). Режим владеет
+только своей «дельтой»: источником HP (`initialHpOf` — `amount` / нормализованный map /
+`ceil(amount)`), правилом урона, выбором цели и ключами сообщений. Семантика `changed`
+параметризована: `includeEliminated: true` у `crown-defense-half-test`/`weakest-link` (выбывший
+входит в «изменившиеся»), `false` у `king-of-the-hill-amount` (только выжившие). Случайность
+(выбор царя / жертвы) остаётся в режимах — модуль детерминирован. Плюс `castState<T>(state)` —
+единственный каст непрозрачного состояния режима к его собственному типу (заменяет локальные
+`asGameState` в `weakest-link` и `king-of-the-hill-amount`).
 
 **NormalMode**
 - `xValue = amount` (ось шанса: больше сумма → выше шанс), заполняет ядро;
@@ -562,8 +591,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 **Не владеет:** семантикой `modeState`; она известна только режиму.
 
 **Проекции:**
-- `activeLots` / `activeCount` — активные участники, спроецированные на актуальный глобальный
-  список (без кэша-снимка);
+- `activeCount` — число активных участников (проекция, без кэша-снимка);
 - `isActive(id)` — участие;
 - `viewState` — `GameViewState` (`xValue` заполняет **ядро** — ровно то значение, что ушло в
   прокрут; `yValue`/`zValue` и `modeData` считает режим).
@@ -594,13 +622,14 @@ export function getMode(modeId) { return MODES[modeId]; }
 При успехе: режим **пинится**, строится один снимок `viewState` (он же — «before»), кандидаты
 берутся из его активных участников по `xValue` (веса **не пересчитываются** повторным вызовом
 режима), вызывается `RouletteEngine.rollWeighted`, сохраняется контекст `pendingSpin` (разыгранный
-лот + участник + режим + состояние и view «before»), затем атомарно поднимаются оба флага. При
+лот + режим + состояние и view «before»), затем атомарно поднимаются оба флага. При
 отказе флаги и `pendingSpin` **не меняются**.
 
 **`finishSpin()`** — применяет отложенный переход:
 - если `pendingSpin` нет → `null`;
 - `pendingSpin` обнуляется **до** применения;
-- вызывается пинированный `mode.processRoll(rolledLot, rolled, beforeParticipants, lots, beforeState)`;
+- строится индекс `lotId → Lot` (один раз на ход) и вызывается пинированный
+  `mode.processRoll(rolledLot, beforeParticipants, lotById, beforeState)`;
 - сессия сохраняет новые `participants` и `modeState`; при `outcome.finished` поднимается
   `gameFinished`;
 - возвращает `{ rolledLot, outcome, transition: {before, after, outcome, rolledLotId}, after }`;
@@ -631,7 +660,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 2. снимок id-множества **до** стратегии (`idsBefore`);
 3. `strategy.execute(parsedLots, lotManager)`;
 4. `gameSession.reconcileAfterBulkChange(idsBefore)`;
-5. один снимок `view` → `updateUI(view)` + `visualizationDriver.refresh(view, accents)`;
+5. `refreshAfterStateChange()` — один снимок `view`, акценты считаются один раз, список +визуализация;
 6. закрытие диалога и, при `lotsTruncated > 0`, информационный модал.
 
 ### 6.6 Вспомогательные вычисления — `utils.ts`
@@ -640,10 +669,12 @@ export function getMode(modeId) { return MODES[modeId]; }
 - `brightenColor(color, percent)` — осветляет цвет лота. Понимает `#RGB`/`#RRGGBB`,
   `rgb()/rgba()` и `hsl()/hsla()` (приложение производит `rgb()` для добавленных вручную лотов
   и `hsl()` для импортированных); неизвестный формат возвращается без изменений.
-- Геометрия ленты (strip-specific, не общий контракт): `MIN_BAND_WIDTH = 60`,
-  `BAND_WIDTH_SCALE = 400`, `getStripBandWidth(fraction) = max(60, fraction * 400)` — ширина
-  полосы из нормированной доли ШАНСА (`xValue / Σ xValue`). Используется только
-  `StripRenderer`; движок её не знает.
+- Геометрия ленты (strip-specific, не общий контракт): `MIN_BAND_WIDTH = 60` и
+  `BAND_WIDTH_SCALE = 400` — ВНУТРЕННИЕ константы модуля (не экспортируются);
+  `getStripBandWidth(fraction) = max(60, fraction * 400)` — ширина полосы из нормированной
+  доли ШАНСА (`xValue / Σ xValue`). Используется только `StripRenderer`; движок её не знает.
+- `indexLots(lots)` — `lotId → Lot`: нейтральный индекс, общий для `GameSession` (сборка view и
+  ход) и режимов (внутренние лукапы по id). Единственная реализация индекса лотов в проекте.
 - `normalizeToFractions(values)` — нейтральная нормировка набора неотрицательных величин в доли
   (Σ = 1); используется рендерерами для перевода `yValue`/`xValue` в геометрию.
 - `normalizeToRange(values, minValue, maxValue)` — min–max нормализация значений из их собственного
@@ -662,11 +693,18 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 - **Длительность**: слайдер (нелинейная шкала 1–300 с) и числовое поле; хранится в
   миллисекундах (`settings.animationDuration`); поле валидируется по `change`.
+  **Числовое поле и есть отображение длительности** (`#duration-input` в обёртке
+  `.duration-value-wrapper` рядом с `#duration-value-unit` = «s/сек», ключ `duration.unit`); отдельного
+  элемента-подписи нет. Значение обновляется в трёх местах: инициализация
+  (дефолт 3 с), `input` слайдера и `change` числового поля; все два контрола всегда
+  показывают одно и то же значение (шкала целочисленная: 1–60 напрямую, 61–68 — по `DURATION_MAP`).
 - **Easing**: реестр `EasingFunctions` (`linear`, `easeOutCubic/Quart/Quint/Expo`, кастомный
   `rouletteEaseOut` — блендинг). Выбор хранится в `App.easingFunction`.
 - **Язык (i18n)**: `i18n.ts` грузит `locales/en.json` и `locales/ru.json` параллельно, язык по
   `navigator.language`, fallback `en`. Перевод по `data-i18n`, `data-i18n-placeholder`,
-  `data-i18n-title`; синхронизируется `<html lang>`.
+  `data-i18n-title`; синхронизируется `<html lang>`. `translateDOM(root: ParentNode = document)`
+  принимает необязательный корень — модалки переводят только свой `content`
+  (`ModalDialog.retranslate()` → `translateDOM(this.content)`).
 - **Тема**: атрибут `data-theme` на `<html>`; переменные в `styles.css`; сохраняется в
   `localStorage('theme')`. Inline-скрипт в `<head>` применяет тему до первой отрисовки.
   Темы: dark, light, emerald, eucalyptus, nordic, monochrome, nebula.
@@ -682,13 +720,13 @@ export function getMode(modeId) { return MODES[modeId]; }
 
 Ключевые ссылки: `lotManager`, `gameSession`, `visualizationDriver`, `lotListView`, `settings`,
 `easingFunction`, `outcomeAccents: Map<string, LotAccent>` (акценты последнего исхода,
-принадлежат `App`),
-`hoveredLotId` (транзиентный hover), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер
-ext-колонки).
+принадлежат `App`), `outcomeInProgress`, `extEnabled` + `extToggle` (UI-тумблер ext-колонки).
+Hover-состояние `App` не хранит: его владелец — `VisualizationDriver` (см. §7.3).
 
 Основные операции:
-- `addLot()` — guard `isSessionLocked`; `LotManager.addLot` (ошибка → `ErrorDialog`);
-  `gameSession.addLot(lot)`; `updateUI(view)` + `refresh(view, …)` (один снимок на действие).
+- `addLot()` — guard `isSessionLocked`; `LotManager.addLot` (при `!success` — `addLotFailureKey(reason)`
+  → `ErrorDialog(t(key, params))`, домен текст не локализует);
+  `gameSession.addLot(lot)`; `refreshAfterStateChange()`.
 - `spin()` — `gameSession.prepareSpin()`; отказ → `alert(prepareSpinFailureKey(reason))`;
   успех → `updateControlsState()` и `visualizationDriver.spinTo({view, accents, targetLotId,
   durationMs, easing, onComplete: finishSpin})`.
@@ -697,34 +735,43 @@ ext-колонки).
   `outcome.result`; строит акценты исхода (`defaultAccentsForOutcome`), сливает их с режимными
   акцентами после-переходного view (`composeAccents` + `accentsFor`); играет переход
   (`visualizationDriver.animateOutcome`), после чего фиксирует `outcomeAccents`, вызывает
-  `updateUI(after)` + `refresh(after, …)` (снимок `after` — текущий, поэтому переиспользуется)
-  и, при `outcome.message`, показывает сообщение.
-- `reset()` — `gameSession.reset()`, очистка `outcomeAccents`, `visualizationDriver.reset(view)`,
-  текст и UI.
+  `updateUI(after)` + `refresh(after, finalAccentState)` (снимок `after` — текущий, поэтому
+  переиспользуется) и, при `outcome.message`, показывает сообщение. Акценты перехода свои,
+  поэтому единый метод здесь намеренно не используется.
+- `reset()` — `gameSession.reset()`, очистка `outcomeAccents`/hover; затем акценты считаются один раз:
+  `visualizationDriver.reset(view, vizAccents)` (именно `reset`, не `refresh`) и `updateUI(view, listAccents)`;
+  текст результата. Единый метод не используется — иной вызов драйвера и порядок.
 - `deleteLot` / `handleClearLots` / `openImportDialog` / `handleImportConflict` /
   `executeImport` — guard-ы + согласованные операции над `LotManager` и `GameSession` (§6.5).
 - `handleLotHover(id)` — hover строки списка: `visualizationDriver.setHover(id)`; чисто визуально
   и не зависит от блокировок.
-- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot`; один снимок
-  `view` на `updateUI(view)` + `refresh(view, …)`.
+- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot`;
+  `refreshAfterStateChange()`.
 - Тумблер `ext` (`#ext-toggle`, кнопка `↔️` в шапке списка) — переключает `extEnabled`, класс
   `btn-primary`/`btn-secondary` (`applyExtToggleState()`) и вызывает `updateUI()`; доступен всегда.
-- Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем один снимок: `refresh(view, …)`
-  и `updateUI(view)` (список перерисовывается, т.к. `modeData`/ext зависят от режима).
-- `updateUI(view = gameSession.viewState)` — строит `RenderableLot[]` из снимка, вызывает
-  `LotListView.render` с `accents = resolveAccents(view).list` и `extEnabled`, обновляет статистику
-  (total из `LotManager`, active из `GameSession`), затем `updateControlsState()`. Вызывающий может
-  передать уже построенный снимок, поэтому **одно действие пользователя строит view-состояние ровно
-  один раз** (до этапа осей обработчик собирал его трижды: `updateUI` + аргумент `refresh` +
-  `accentState`).
-- `resolveAccents(view, base = outcomeAccents)` — композиция акцентов: базовые (акценты исхода ⊕
-  режимные `modeData.accent`, режимный перекрывает) → две карты (`list` / `visualization`)
-  фильтром по `LotAccent.targets`. `accentState(view)` оборачивает viz-карту в `AccentState`
-  (`pulse = 1`) для всех вызовов драйвера; снимок принимается аргументом, второй сборки не делает.
+- Смена режима (`#mode-select`) — `gameSession.setMode(...)`, затем `refreshAfterStateChange()`
+  (список перерисовывается, т.к. `modeData`/ext зависят от режима).
+- `updateUI(view = gameSession.viewState, listAccents?)` — строит `RenderableLot[]` из снимка,
+  вызывает `LotListView.render` с `accents = listAccents ?? resolveAccents(view).list` и
+  `extEnabled`, обновляет статистику (total из `LotManager`, active из `GameSession`), затем
+  `updateControlsState()`. Вызывающий может передать уже построенный снимок и уже
+  посчитанные акценты, поэтому **одно действие строит view-состояние ровно один раз**.
+- `refreshAfterStateChange(view = gameSession.viewState)` — **единственная точка обновления
+  «модель → view»**: строит снимок (если не передан), считает акценты **один раз**
+  (`resolveAccents` → `composeAccents` ровно один вызов за цикл) и обновляет обе поверхности
+  (`updateUI(view, accents.list)` + `refresh(view, visualizationAccents(accents))`). Все мутации
+  состояния (add/delete/clear/import/amount/mode) идут только через него; не используется `reset`
+  (иной вызов драйвера) и спином/переходом исхода (свои акценты хода).
+- `resolveAccents(view, base = outcomeAccents) → { list, visualization }` — композиция акцентов:
+  базовые (акценты исхода ⊕ режимные `modeData.accent`, режимный перекрывает) → две карты
+  фильтром по `LotAccent.targets`. `visualizationAccents(accents)` оборачивает viz-карту в
+  `AccentState` (`pulse = 1`); `accentState(view)` = `visualizationAccents(resolveAccents(view))` для
+  мест, где есть только снимок (спин, смена визуализации).
 - `updateControlsState()` — переносит блокировки в `disabled` (см. §7.5).
 
 `App` не вычисляет курсор визуализации сам — за него это делает рендерер (§7.3, §7.4).
-`settings.modeId` — только UI/persistence-зеркало; источник правды по режиму — `GameSession`.
+Режим, с которого начинается новая сессия, задаёт константа `DEFAULT_MODE_ID` в `app.ts`
+(настройки не персистятся); источник правды по текущему режиму — `GameSession`.
 
 ### 7.2 `LotListView` — список лотов (`lotListView.ts`)
 
@@ -766,7 +813,8 @@ ext-колонки).
   интерполятор (без пересборки структур на кадр), рампить `pulse` акцентов; финальный
   кадр фиксирует стабильный `after`;
 - `reset(view, accents)` — остановить анимацию, сбросить рендерер (и hover), показать снимок;
-- `getCursorLotId()` — read-only запрос текущего лота под курсором (для UI); сам курсор внутрь
+- `getCursorLotId()` — read-only запрос текущего лота под курсором (для UI). Вызывающих в коде
+  нет — оставлен как задел на будущий UI (как `zValue`/`events`); сам курсор внутрь
   визуализации не передаётся.
 
 Драйвер не знает правил режима; математика спина и семантика курсора — внутри визуализации.
@@ -846,11 +894,21 @@ CountingRhyme — внешнее гало вокруг круга (радиус 
 
 ### 7.6 Модальные окна
 
-- `ModalManager` — синглтон: возрастающий `z-index`, стек открытых, повторный перевод.
+- `ModalManager` — синглтон: возрастающий `z-index` и стек открытых модалок.
 - `ModalDialog` — базовый класс: overlay+content, закрытие по клику вне и по `Escape`
-  (только для верхней модалки), хуки `onOpen`/`onClose`.
+  (только для верхней модалки), хук `onClose`.
 - `ErrorDialog` — заголовок + сообщение + OK (используется и как инфо-модал).
+- `ImportDialog` — импорт CSV/Link: вкладки, общий предпросмотр, счётчики. `CsvTabContent` и
+  `LinkTabContent` получают свой `container` в конструкторе и строят разметку внутрь него.
 - `ImportConflictDialog` — кнопки стратегий (replace/merge/cancel) из `IMPORT_STRATEGIES`.
+
+**Скоупинг DOM внутри модалок.** Каждый модальный компонент ищет СВОИ узлы только внутри своего
+`content`/`container` (`this.body.querySelector(...)`, `this.container.querySelector(...)`) и
+никогда — через глобальные `document.getElementById`/`document.querySelector`. Причина: поверх
+`ImportDialog` может быть открыт `ImportConflictDialog`, поэтому глобальный поиск по id рискует
+задеть чужой узел. Обработчики висят на найденных в скоупе узлах, поэтому `destroy()` снимает всё
+вместе с контейнером. Той же логике следует повторный перевод: `ModalDialog.retranslate()` зовёт
+`translateDOM(this.content)` и не переводит страницу целиком.
 
 ### 7.7 Обработка сбоев и порядок инициализации
 
@@ -927,7 +985,7 @@ addLot()
   ├─ lotManager.addLot(name, amount, color)   // ошибка → ErrorDialog
   ├─ gameSession.addLot(lot)                   // участие (+ modeState)
   ├─ сброс формы, новый цвет, фокус на имя
-  └─ updateUI() + visualizationDriver.refresh(viewState, accents)
+  └─ refreshAfterStateChange()      // снимок → акценты (один раз) → список + визуализация
 ```
 
 ### 8.4 Импорт
@@ -940,7 +998,7 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
              ├─ snapshot idsBefore
              ├─ strategy.execute(...)
              ├─ gameSession.reconcileAfterBulkChange(idsBefore)
-             ├─ updateUI() + refresh(...)
+             ├─ refreshAfterStateChange()
              └─ закрытие диалога (+ модал при усечении)
 ```
 
@@ -962,8 +1020,8 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 1. Решение принимается в `prepareSpin()` **до** анимации; анимация на результат не влияет.
 2. Режим пинится на время конкретного спина — применение (`finishSpin`) не может «уехать» от
    решения.
-3. `GameParticipantState[]` — единственное состояние участия; `activeLots`/`viewState` всегда
-   проецируются из актуального глобального списка (без кэша-снимка).
+3. `GameParticipantState[]` — единственное состояние участия: `viewState` всегда проецируется
+   из актуального глобального списка (без кэша-снимка).
 4. Глобальные лоты (`LotManager`) и игра (`GameSession`) — два независимых состояния,
    синхронизируемые `App` при add/delete/clear/import.
 5. Три блокировки: `sessionLocked` (до `reset()`), `spinInProgress` (на время спина),
@@ -1014,12 +1072,12 @@ HP = сумма» реализованы именно так** — без пра
 
 ## 11. Замечания и технический долг
 
-- **Неиспользуемая разметка длительности**: `App` ищет `#duration-value-number`, тогда как в
-  `index.html` присутствует `#duration-value-unit`; `durationValue` остаётся `null` (значение
-  доступно в поле ввода и на слайдере).
 - **Ключи локалей без реализации**: `settings.soundEffects`, `settings.soundOn/Off`,
   `importDialog.corsError`, `importDialog.fetching`, `importDialog.noValidLots`, часть
   `linkPlaceholder`/`linkTextareaPlaceholder`.
+- **`LotListView.editableAmount`/`showActions`** — `App` всегда передаёт `true` (причём дефолт
+  `showActions` — `false`, т.е. опцию нельзя просто не передавать). Решение: ОСТАВИТЬ как есть —
+  дешёвый задел на read-only-режим списка; код не менять.
 - **Два UX-паттерна ошибок**: отказ `prepareSpin()` показывается нативным `alert()`, тогда как
   импорт и путь исключения используют `ErrorDialog`.
 - **Guard-ы смены режима/визуализации** фактически недостижимы (селекты `disabled` ровно при

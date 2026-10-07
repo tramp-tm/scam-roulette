@@ -1,3 +1,5 @@
+import type { Lot } from './types.js';
+
 /**
  * Generates a random color with good contrast for white text.
  * Uses HSL to ensure colors are dark enough (lightness 20-45%).
@@ -93,10 +95,10 @@ export function brightenColor(color: string, percent: number): string {
 // ========================================
 
 /** Minimum width (px) of a strip band, regardless of its visual fraction. */
-export const MIN_BAND_WIDTH = 60;
+const MIN_BAND_WIDTH = 60;
 
 /** Multiplier applied to a band's normalized visual fraction to get its width. */
-export const BAND_WIDTH_SCALE = 400;
+const BAND_WIDTH_SCALE = 400;
 
 /**
  * Rendered width (px) of a strip band from its normalized visual fraction
@@ -105,6 +107,15 @@ export const BAND_WIDTH_SCALE = 400;
  */
 export function getStripBandWidth(fraction: number): number {
     return Math.max(MIN_BAND_WIDTH, fraction * BAND_WIDTH_SCALE);
+}
+
+/**
+ * Index lots by id (`lotId -> Lot`) — the neutral lookup map shared by the
+ * session and the modes. Lives here (not in a mode-specific module) because it
+ * carries no roulette/mode semantics.
+ */
+export function indexLots(lots: readonly Lot[]): Map<string, Lot> {
+    return new Map(lots.map(l => [l.id, l]));
 }
 
 /**
@@ -175,7 +186,7 @@ const DURATION_MAP: Record<number, number> = {
 };
 
 /** Maximum slider position value - derived from DURATION_MAP's last key */
-export const MAX_DURATION_SLIDER_VALUE = Object.keys(DURATION_MAP).reduce((max, key) => 
+const MAX_DURATION_SLIDER_VALUE = Object.keys(DURATION_MAP).reduce((max, key) => 
     Math.max(max, parseInt(key)), 0);
 
 /** Maximum duration in seconds - derived from DURATION_MAP's max value */

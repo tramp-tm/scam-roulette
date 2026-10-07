@@ -5,16 +5,18 @@ import { parseCSV } from './csvParser.js';
  * Component for CSV tab content in ImportDialog
  */
 export class CsvTabContent {
+    private container: HTMLElement;
     private textarea: HTMLTextAreaElement | null = null;
     private parsedResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
     private currentSeparator: SeparatorType = 'comma';  // Default separator
 
     constructor(container: HTMLElement) {
-        this.render(container);
+        this.container = container;
+        this.render();
         this.setupEventListeners();
     }
 
-    private render(container: HTMLElement): void {
+    private render(): void {
         const html = `
             <!-- Header row with instruction and separator switch -->
             <div class="tab-header-row">
@@ -36,16 +38,17 @@ export class CsvTabContent {
             
         `;
 
-        container.innerHTML = html;
+        this.container.innerHTML = html;
         
-        // Cache element references
-        this.textarea = container.querySelector('#import-textarea') as HTMLTextAreaElement;
+        // Cache element references — always WITHIN our own container, never via
+        // the global document (a sibling modal may be open at the same time).
+        this.textarea = this.container.querySelector('#import-textarea') as HTMLTextAreaElement;
     }
 
     private setupEventListeners(): void {
-        // Separator switch buttons
-        const sepCommaBtn = document.getElementById('sep-comma') as HTMLButtonElement;
-        const sepTabBtn = document.getElementById('sep-tab') as HTMLButtonElement;
+        // Separator switch buttons — scoped to our own container.
+        const sepCommaBtn = this.container.querySelector('#sep-comma') as HTMLButtonElement;
+        const sepTabBtn = this.container.querySelector('#sep-tab') as HTMLButtonElement;
         
         if (sepCommaBtn) {
             sepCommaBtn.addEventListener('click', () => {

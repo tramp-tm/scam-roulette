@@ -10,6 +10,17 @@ import type {
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
+import { indexLots } from './utils.js';
+import {
+    castState,
+    collectHp,
+    computeChanged,
+    computeEliminated,
+    materializeParticipants,
+    participantHp,
+    resolveSurvivors
+} from './hpElimination.js';
+import type { HpParticipantState } from './hpElimination.js';
 
 /**
  * King of the Hill: HP = amount.
@@ -48,7 +59,9 @@ import { t } from './i18n.js';
  * Stateless/shared: the initial HP and the current king live in the game state,
  * the current HP in each participant's mode state. Randomness is used only for
  * tie-breaks (which lot is king / which weakest lot is destroyed) — never for
- * the roulette selection, which stays in RouletteEngine.
+ * the roulette selection, which stays in RouletteEngine. The turn pipeline
+ * (steps 1, 4–7 of `processRoll`) is shared with the other HP-elimination modes
+ * in `hpElimination.ts`; only the round resolution below is local.
  */
 
 /** Marker prepended to the king's ext value. */
@@ -63,22 +76,6 @@ const KING_MARK = '♔';
 interface KingOfTheHillAmountGameState {
     initialHp: ReadonlyMap<string, number>;
     kingId: string | null;
-}
-
-/**
- * Per-participant state: the participant's current HP (`null` until first
- * materialized; derived from the game state's initial-HP map by `effectiveHp`).
- */
-interface KingOfTheHillAmountParticipantState {
-    hp: number | null;
-}
-
-function asGameState(state: GameModeState): KingOfTheHillAmountGameState {
-    return state as KingOfTheHillAmountGameState;
-}
-
-function asParticipantState(participant: GameParticipantState): KingOfTheHillAmountParticipantState {
-    return participant.modeState as KingOfTheHillAmountParticipantState;
 }
 
 /** HP derived from a lot's amount: the amount itself, rounded UP to a whole number. */
@@ -96,17 +93,6 @@ function buildInitialHp(lots: readonly Lot[]): Map<string, number> {
         map.set(lot.id, hpFromAmount(lot));
     }
     return map;
-}
-
-/** Current HP of a participant, deriving the initial value on first read. */
-function effectiveHp(
-    lot: Lot,
-    participant: GameParticipantState,
-    state: KingOfTheHillAmountGameState
-): number {
-    const ps = asParticipantState(participant);
-    if (typeof ps.hp === 'number') return ps.hp;
-    return state.initialHp.get(lot.id) ?? hpFromAmount(lot);
 }
 
 /**
@@ -157,26 +143,6 @@ function pickLowest(
     return tied[Math.floor(Math.random() * tied.length)];
 }
 
-/**
- * Deterministic winner for the (defensive) no-survivors case: the participant
- * with the highest HP after the round; ties broken by participant order.
- */
-function highestHpAfterRound(
-    participants: readonly GameParticipantState[],
-    hpAfter: ReadonlyMap<string, number>
-): string {
-    let bestId = participants[0].lotId;
-    let bestHp = -Infinity;
-    for (const p of participants) {
-        const hp = hpAfter.get(p.lotId) ?? 0;
-        if (hp > bestHp) {
-            bestHp = hp;
-            bestId = p.lotId;
-        }
-    }
-    return bestId;
-}
-
 export class KingOfTheHillAmountMode implements GameMode {
     readonly id: Mode = 'king-of-the-hill-amount';
 
@@ -191,7 +157,7 @@ export class KingOfTheHillAmountMode implements GameMode {
     }
 
     createParticipantState(_lot: Lot): ParticipantModeState {
-        const participant: KingOfTheHillAmountParticipantState = { hp: null };
+        const participant: HpParticipantState = { hp: null };
         return participant;
     }
 
@@ -204,7 +170,7 @@ export class KingOfTheHillAmountMode implements GameMode {
         // first spin is included. HP does not depend on the rest of the set
         // here, but the map must cover every current participant. Once a spin
         // has locked the session, participant changes are rejected.
-        const byId = new Map(lots.map(l => [l.id, l]));
+        const byId = indexLots(lots);
         const currentLots: Lot[] = [];
         for (const p of participants) {
             const lot = byId.get(p.lotId);
@@ -225,26 +191,27 @@ export class KingOfTheHillAmountMode implements GameMode {
         participant: GameParticipantState,
         state: GameModeState
     ): number {
-        return effectiveHp(lot, participant, asGameState(state));
+        const gs = castState<KingOfTheHillAmountGameState>(state);
+        return participantHp(lot, participant, l => gs.initialHp.get(l.id) ?? hpFromAmount(l));
     }
 
     processRoll(
         rolledLot: Lot,
-        _rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): { state: GameModeState; participants: GameParticipantState[]; outcome: TurnOutcome } {
-        const gs = asGameState(state);
-        const lotById = new Map(lots.map(l => [l.id, l]));
+        const gs = castState<KingOfTheHillAmountGameState>(state);
         const activeIds = participants.filter(p => p.active).map(p => p.lotId);
+        // This mode's HP source: the initial-HP map, falling back to `ceil(amount)`.
+        const initialHp = (lot: Lot): number => gs.initialHp.get(lot.id) ?? hpFromAmount(lot);
 
         // 1. HP before this round, for every participant.
-        const hpBefore = new Map<string, number>();
-        for (const p of participants) {
-            const lot = lotById.get(p.lotId);
-            hpBefore.set(p.lotId, lot ? effectiveHp(lot, p, gs) : 0);
-        }
+        const hpBefore = collectHp(
+            participants,
+            lotById,
+            (lot, p) => participantHp(lot, p, initialHp)
+        );
         const hpOf = (id: string): number => hpBefore.get(id) ?? 0;
 
         // 2. The king for this round (stored at the previous round's end;
@@ -288,40 +255,12 @@ export class KingOfTheHillAmountMode implements GameMode {
             };
         }
 
+        // 4–6. Shared pipeline (elimination, materialization, changed, winner).
+        //      This mode excludes the eliminated lots from `changed`.
         const eliminatedSet = new Set(eliminated);
-
-        // 4. New participant records: HP materialized, eliminations applied.
-        const nextParticipants: GameParticipantState[] = participants.map(p => {
-            const next: KingOfTheHillAmountParticipantState = { hp: hpAfter.get(p.lotId) ?? 0 };
-            return {
-                lotId: p.lotId,
-                active: p.active && !eliminatedSet.has(p.lotId),
-                modeState: next
-            };
-        });
-
-        // 5. Survivors whose HP changed but who were not eliminated.
-        const changed = participants
-            .filter(p => p.active && !eliminatedSet.has(p.lotId)
-                && (hpAfter.get(p.lotId) ?? 0) !== hpBefore.get(p.lotId))
-            .map(p => p.lotId);
-
-        // 6. Winner / completion.
-        const remaining = nextParticipants.filter(p => p.active);
-        let winners: string[] = [];
-        let finished: boolean;
-
-        if (remaining.length === 1) {
-            finished = true;
-            winners = [remaining[0].lotId];
-        } else if (remaining.length > 1) {
-            finished = false;
-        } else {
-            // Defensive: no survivors — impossible while the rolled lot is
-            // never damaged, but kept total and deterministic.
-            finished = true;
-            winners = [highestHpAfterRound(participants, hpAfter)];
-        }
+        const nextParticipants = materializeParticipants(participants, hpAfter, eliminatedSet);
+        const changed = computeChanged(participants, hpBefore, hpAfter, { includeEliminated: false });
+        const { winners, finished } = resolveSurvivors(nextParticipants, hpAfter);
 
         // 7. Elect the king for the NEXT round — and only if there IS a next
         //    round. A finished game has no king: the last lot standing is the
@@ -330,7 +269,7 @@ export class KingOfTheHillAmountMode implements GameMode {
         //    On a tie at the top the crown is resolved by priority: the current
         //    king first (unchanged king keeps the crown), then the round's
         //    attacker, then uniformly at random.
-        const survivorIds = remaining.map(p => p.lotId);
+        const survivorIds = nextParticipants.filter(p => p.active).map(p => p.lotId);
         const survivorHp = (id: string): number => hpAfter.get(id) ?? 0;
         const nextKingId = finished
             ? null
@@ -359,21 +298,21 @@ export class KingOfTheHillAmountMode implements GameMode {
 
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): ReadonlyMap<string, ModePresentationData> {
-        const gs = asGameState(state);
-        const byId = new Map(lots.map(l => [l.id, l]));
+        const gs = castState<KingOfTheHillAmountGameState>(state);
+        const initialHp = (lot: Lot): number => gs.initialHp.get(lot.id) ?? hpFromAmount(lot);
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             // Inactive lots are "not participating" — never stale HP.
             if (!p.active || !lot) {
                 result.set(p.lotId, { ext: { value: '—' } });
                 continue;
             }
             const isKing = p.lotId === gs.kingId;
-            const hp = Math.round(effectiveHp(lot, p, gs));
+            const hp = Math.round(participantHp(lot, p, initialHp));
             const data: ModePresentationData = {
                 ext: { value: isKing ? `${KING_MARK} ♥ ${hp}` : `♥ ${hp}` }
             };

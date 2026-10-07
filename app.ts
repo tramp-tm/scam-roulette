@@ -1,5 +1,6 @@
 import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
+import type { AddLotError } from './lotManager.js';
 
 import { EasingFunctions, DEFAULT_EASING } from './animation.js';
 import type { EasingFunction } from './animation.js';
@@ -30,11 +31,11 @@ import { ImportConflictDialog } from './importConflictDialog.js';
 import { ErrorDialog } from './errorDialog.js';
 
 
-// Оберните инициализацию приложения или просто вызовите функцию на старте:
+// Wrap the app initialisation, or simply call the function at startup:
 async function startApp() {
     try {
         await initI18n();
-        console.log('i18n готов, приложение запускается...');
+        console.log('i18n ready, starting the application...');
 
         // Initialize the app first
         const app = new App();
@@ -44,11 +45,24 @@ async function startApp() {
             app.languageSelect.value = i18n.language;
         }
     } catch (err) {
-        console.error('Ошибка инициализации приложения:', err);
+        console.error('Application initialisation failed:', err);
     }
 }
 
 
+
+/** Accent maps resolved for both surfaces in one pass (see `App.resolveAccents`). */
+type ResolvedAccents = {
+    list: Map<string, AccentKind>;
+    visualization: Map<string, AccentKind>;
+};
+
+/**
+ * Mode a new session starts in. Settings are not persisted anywhere, so this is
+ * the single source of the initial mode — it is NOT a mirror of the session's
+ * current mode (`GameSession` owns that).
+ */
+const DEFAULT_MODE_ID: Mode = 'normal';
 
 /**
  * Main application controller for the roulette game.
@@ -58,6 +72,7 @@ async function startApp() {
  * presentation model (`GameSession.viewState`) and drives the visualization
  * boundary (`VisualizationDriver`).
  */
+
 export class App {
 
 
@@ -67,7 +82,6 @@ export class App {
     private lotListView: LotListView;
 
     private settings: Settings = {
-        modeId: 'normal',
         visualization: 'wheel',
         animationDuration: 3000
     };
@@ -76,9 +90,8 @@ export class App {
     private easingFunction: EasingFunction = DEFAULT_EASING;
 
     /**
-     * Current game mode, delegated to the active GameSession. GameSession is the
-     * single source of truth for the current mode; `settings.modeId` is a UI /
-     * persistence mirror only and is never read back to drive the session.
+     * Current game mode, delegated to the active GameSession — the single source
+     * of truth for the current mode.
      */
     get mode() {
         return this.gameSession.mode;
@@ -94,13 +107,6 @@ export class App {
 
     /** True while the post-spin outcome transition is playing. */
     private outcomeInProgress = false;
-
-    /**
-     * Transient hover from the lots list: the lot id the pointer is over, or
-     * null. Purely presentational — mirrored into the visualization driver,
-     * never part of game state.
-     */
-    private hoveredLotId: string | null = null;
 
     private importDialog: ImportDialog | null = null;
 
@@ -126,7 +132,6 @@ export class App {
     private visualizationSelect: HTMLSelectElement | null = null;
     private durationSlider: HTMLInputElement | null = null;
     private durationInput: HTMLInputElement | null = null;
-    private durationValue: HTMLElement | null = null;
     private easingSelect: HTMLSelectElement | null = null;
     public languageSelect: HTMLSelectElement | null = null;
     private themeSelect: HTMLSelectElement | null = null;
@@ -147,7 +152,7 @@ export class App {
         // (mode + participation + mode state). The session reads the global list
         // through this accessor so it never caches a stale snapshot.
         this.gameSession = new GameSession(
-            this.settings.modeId,
+            DEFAULT_MODE_ID,
             () => this.lotManager.getAllLots()
         );
 
@@ -184,7 +189,6 @@ export class App {
         this.visualizationSelect = document.getElementById('visualization-select') as HTMLSelectElement;
         this.durationSlider = document.getElementById('duration-slider') as HTMLInputElement;
         this.durationInput = document.getElementById('duration-input') as HTMLInputElement;
-        this.durationValue = document.getElementById('duration-value-number');
         this.easingSelect = document.getElementById('easing-select') as HTMLSelectElement;
         this.languageSelect = document.getElementById('language-select') as HTMLSelectElement;
         this.themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
@@ -219,11 +223,6 @@ export class App {
             const initialSeconds = 3; // Default 3 SECONDS
             this.durationSlider.value = String(durationToSlider(initialSeconds));
             this.durationInput.value = String(initialSeconds);
-
-            // Update the display value as well
-            if (this.durationValue) {
-                this.durationValue.textContent = initialSeconds.toFixed(1);
-            }
         }
 
         // Set initial random color for new lot indicator
@@ -270,7 +269,12 @@ export class App {
      * filtered to the `visualization` target.
      */
     private accentState(view: GameViewState): AccentState {
-        return { accents: this.resolveAccents(view).visualization, pulse: 1 };
+        return this.visualizationAccents(this.resolveAccents(view));
+    }
+
+    /** The visualization's `AccentState` (pulse 1) from accents already resolved. */
+    private visualizationAccents(accents: ResolvedAccents): AccentState {
+        return { accents: accents.visualization, pulse: 1 };
     }
 
     /**
@@ -283,12 +287,29 @@ export class App {
     private resolveAccents(
         view: GameViewState,
         base: ReadonlyMap<string, LotAccent> = this.outcomeAccents
-    ): { list: Map<string, AccentKind>; visualization: Map<string, AccentKind> } {
+    ): ResolvedAccents {
         const composed = composeAccents(base, view);
         return {
             list: accentsFor(composed, 'list'),
             visualization: accentsFor(composed, 'visualization')
         };
+    }
+
+    /**
+     * Single model→view refresh point. Builds the snapshot once (unless the
+     * caller passes one), resolves the accent map ONCE for BOTH surfaces, then
+     * updates the lot list and the visualization. Every state mutation that must
+     * reach both surfaces goes through here, so a change to the update protocol
+     * (another surface, a different order) is made in one place.
+     *
+     * NOT used by `reset` (it calls `driver.reset`, not `refresh`, and must do so
+     * before the list re-render) nor by the spin / outcome transition (they carry
+     * their own turn accents).
+     */
+    private refreshAfterStateChange(view: GameViewState = this.gameSession.viewState): void {
+        const accents = this.resolveAccents(view);
+        this.updateUI(view, accents.list);
+        this.visualizationDriver.refresh(view, this.visualizationAccents(accents));
     }
 
     /**
@@ -314,6 +335,20 @@ export class App {
     }
 
     /**
+     * Maps a `LotManager.addLot()` failure reason to its i18n key (+ params).
+     * The three cases mirror the three refusal branches in `LotManager.addLot()`.
+     * The domain hands back a machine-readable `reason`; localizing it is the
+     * presentation layer's job, so this mapping lives here, not in `LotManager`.
+     */
+    private addLotFailureKey(reason: AddLotError['reason']): { key: string; params?: Record<string, unknown> } {
+        switch (reason) {
+            case 'invalid_name':     return { key: 'error.invalidName' };
+            case 'invalid_amount':   return { key: 'error.invalidAmount' };
+            case 'max_lots_reached': return { key: 'error.maxLotsReached', params: { max: LotManager.MAX_LOTS } };
+        }
+    }
+
+    /**
      * Handle an amount edit emitted by the LotListView. The view knows
      * nothing about the application — this is the application's job.
      */
@@ -325,10 +360,8 @@ export class App {
         this.lotManager.updateLot(id, { amount: newAmount });
         // An amount change does not affect participation, but it does change the
         // mode's view data (chance, magnitude, the ext column), so both the list
-        // and the visualization must be re-rendered. One snapshot per action.
-        const view = this.gameSession.viewState;
-        this.updateUI(view);
-        this.visualizationDriver.refresh(view, this.accentState(view));
+        // and the visualization must be re-rendered.
+        this.refreshAfterStateChange();
     }
 
     /**
@@ -348,8 +381,8 @@ export class App {
      * which Lot Representation to emphasise, by stable lot id.
      */
     private handleLotHover(lotId: string | null): void {
-        if (this.hoveredLotId === lotId) return;
-        this.hoveredLotId = lotId;
+        // The driver owns the hover state and de-duplicates repeated ids, so App
+        // keeps no copy of it.
         this.visualizationDriver.setHover(lotId);
     }
 
@@ -433,19 +466,14 @@ export class App {
 
             const newModeId = target.value as Mode;
 
-            // Single point of mode change. GameSession owns the current mode;
-            // `settings.modeId` is kept in sync only as a UI / persistence record
-            // and is never read back to drive the session.
+            // Single point of mode change. GameSession is the single source of
+            // truth for the current mode.
             this.gameSession.setMode(newModeId);
-            this.settings.modeId = newModeId;
 
-            // Re-render with the new mode's axes (chance/magnitude) — one
-            // snapshot per action. Participation is preserved across a switch.
-            const view = this.gameSession.viewState;
-            this.visualizationDriver.refresh(view, this.accentState(view));
-            // Re-render the lots list: modeData (e.g. the ext column) is
-            // mode-owned and changes with the mode.
-            this.updateUI(view);
+            // Re-render both surfaces with the new mode's axes (chance/magnitude)
+            // and its modeData (e.g. the ext column); participation is preserved
+            // across a switch.
+            this.refreshAfterStateChange();
             // Update result text to show new mode name if no highlight active
             this.updateResultTextWithModeName();
             this.updateModeHelpTooltip();
@@ -481,12 +509,11 @@ export class App {
                 const seconds = sliderToDuration(parseInt(this.durationSlider.value)); // Returns SECONDS
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
 
-                // Update number input and display value in SECONDS
+                // The number input IS the duration display (the adjacent
+                // `#duration-value-unit` span carries the unit), so updating it
+                // is what keeps the shown duration in sync with the slider.
                 if (this.durationInput) {
                     this.durationInput.value = String(Math.round(seconds));
-                }
-                if (this.durationValue) {
-                    this.durationValue.textContent = seconds.toFixed(1);
                 }
             }
         });
@@ -508,9 +535,6 @@ export class App {
                 // Update slider position using durationToSlider with SECONDS (nearest allowed position)
                 if (this.durationSlider) {
                     this.durationSlider.value = String(durationToSlider(seconds));
-                }
-                if (this.durationValue) {
-                    this.durationValue.textContent = seconds.toFixed(1);
                 }
 
                 // Update the input field to show corrected value
@@ -592,8 +616,9 @@ export class App {
         const result = this.lotManager.addLot(name, amount, color);
 
         if (!result.success) {
-            // Show error dialog with the reason
-            const errorDialog = new ErrorDialog(result.message);
+            // The domain returns a machine-readable reason; localize it here.
+            const { key, params } = this.addLotFailureKey(result.reason);
+            const errorDialog = new ErrorDialog(t(key, params));
             errorDialog.open();
 
             // Don't clear form on error - let user fix their input
@@ -613,9 +638,7 @@ export class App {
         this.lotNameInput.focus();
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
-        const view = this.gameSession.viewState;
-        this.updateUI(view);
-        this.visualizationDriver.refresh(view, this.accentState(view));
+        this.refreshAfterStateChange();
     }
 
     private spin(): void {
@@ -687,10 +710,11 @@ export class App {
         // previous behaviour 1:1) with the mode's own accents from the post-turn
         // view merged over them, filtered to the visualization surface.
         const finalAccents = defaultAccentsForOutcome(outcome);
-        const finalAccentState: AccentState = {
-            accents: this.resolveAccents(after, finalAccents).visualization,
-            pulse: 1
-        };
+        // Resolve the turn's accents ONCE and reuse both surfaces: the
+        // visualization takes `.visualization` here, the list takes `.list` in
+        // `onComplete` below (no second `composeAccents` per cycle).
+        const resolved = this.resolveAccents(after, finalAccents);
+        const finalAccentState = this.visualizationAccents(resolved);
 
         // Reflect the finished/locked state right away, and gate Spin until the
         // outcome transition has settled.
@@ -709,8 +733,11 @@ export class App {
                 this.outcomeAccents = finalAccents;
                 // `after` IS the session's current snapshot here (nothing mutates
                 // the session while the outcome transition runs), so it is reused
-                // instead of rebuilding.
-                this.updateUI(after);
+                // instead of rebuilding. Deliberately NOT routed through
+                // `refreshAfterStateChange`: the outcome transition owns its own
+                // accents: the list takes the already-resolved `.list` below and
+                // the canvas reuses `finalAccentState` verbatim.
+                this.updateUI(after, resolved.list);
                 this.visualizationDriver.refresh(after, finalAccentState);
 
                 if (outcome.message) {
@@ -731,23 +758,36 @@ export class App {
         // cursor is owned by the visualization.
         this.outcomeAccents = new Map();
         this.outcomeInProgress = false;
-        // Drop the transient hover; driver.reset() also clears it in the renderer.
-        this.hoveredLotId = null;
 
         // Reset the visualization (stops any animation, resets the renderer,
         // shows the now-reset view). The whole sequence is synchronous, so a
-        // late `onComplete` cannot replay a stale spin. One snapshot per action.
+        // late `onComplete` cannot replay a stale spin.
+        //
+        // Kept out of `refreshAfterStateChange`: this path calls `driver.reset`
+        // (not `refresh`) and must run it BEFORE the list re-render, and the
+        // hover/outcome accents were already cleared above. The accent map is
+        // still resolved once and shared by both surfaces.
         const view = this.gameSession.viewState;
-        this.visualizationDriver.reset(view, this.accentState(view));
+        const accents = this.resolveAccents(view);
+        this.visualizationDriver.reset(view, this.visualizationAccents(accents));
 
         // Update result text to show mode name after reset
         this.updateResultTextWithModeName();
 
         // Update UI
-        this.updateUI(view);
+        this.updateUI(view, accents.list);
     }
 
-    private updateUI(view: GameViewState = this.gameSession.viewState): void {
+    /**
+     * Renders the lots list (and the session counters) from a view snapshot.
+     * `listAccents` are the accents already resolved for the `list` surface by
+     * `refreshAfterStateChange`; when omitted (a list-only refresh, e.g. the ext
+     * column toggle) they are resolved here.
+     */
+    private updateUI(
+        view: GameViewState = this.gameSession.viewState,
+        listAccents?: ReadonlyMap<string, AccentKind>
+    ): void {
         // Global lot data comes from `LotManager`; participation and axes are
         // projected by the session. Sorting is delegated to the view. A caller
         // that already built the snapshot passes it in, so one user action
@@ -763,7 +803,7 @@ export class App {
 
         this.lotListView.render(renderables, {
             showActions: true,
-            accents: this.resolveAccents(view).list,
+            accents: listAccents ?? this.resolveAccents(view).list,
             editableAmount: true,
             onAmountChange: (id, amount) => this.handleAmountChange(id, amount),
             onDelete: (id) => this.deleteLot(id),
@@ -853,9 +893,7 @@ export class App {
         this.outcomeAccents.delete(id);
 
         // Update UI and redraw wheel (table editing triggers wheel redraw)
-        const view = this.gameSession.viewState;
-        this.updateUI(view);
-        this.visualizationDriver.refresh(view, this.accentState(view));
+        this.refreshAfterStateChange();
     }
 
     /** Handles clearing all lots */
@@ -888,9 +926,7 @@ export class App {
         }
 
         // Update UI and renderer
-        const view = this.gameSession.viewState;
-        this.updateUI(view);
-        this.visualizationDriver.refresh(view, this.accentState(view));
+        this.refreshAfterStateChange();
     }
 
     /** Opens the import dialog */
@@ -953,9 +989,7 @@ export class App {
         this.gameSession.reconcileAfterBulkChange(idsBefore);
 
         // Update UI and renderer after import completes
-        const view = this.gameSession.viewState;
-        this.updateUI(view);
-        this.visualizationDriver.refresh(view, this.accentState(view));
+        this.refreshAfterStateChange();
 
         // Close the import dialog after successful import (handles both conflict and no-conflict cases)
         if (this.importDialog) {

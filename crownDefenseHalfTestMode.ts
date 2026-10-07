@@ -10,6 +10,15 @@ import type {
     TurnOutcome
 } from './types.js';
 import { t } from './i18n.js';
+import {
+    collectHp,
+    computeChanged,
+    computeEliminated,
+    materializeParticipants,
+    participantHp,
+    resolveSurvivors
+} from './hpElimination.js';
+import type { HpParticipantState } from './hpElimination.js';
 
 /**
  * Crown Defense — Half Damage.
@@ -22,6 +31,9 @@ import { t } from './i18n.js';
  * Everything else (equal selection, elimination, winner, presentation) is
  * standard, as in the original fixed-damage Crown Defense. Because the rolled
  * lot is never damaged and the damage is always > 0, the game always terminates.
+ *
+ * The turn pipeline (steps 1, 4–7 of `processRoll`) is shared with the other
+ * HP-elimination modes in `hpElimination.ts`; only the damage rule below is local.
  */
 
 /** Damage precision: 1/100 = 0.01 (see `roundDamage`). */
@@ -42,43 +54,9 @@ function roundDamage(value: number): number {
     return Math.ceil(value * DAMAGE_FACTOR) / DAMAGE_FACTOR;
 }
 
-/**
- * Per-participant state: the participant's current HP (`null` until first
- * materialized; the initial value is simply the lot's `amount`).
- */
-interface CrownDefenseHalfTestParticipantState {
-    hp: number | null;
-}
-
-function asParticipantState(participant: GameParticipantState): CrownDefenseHalfTestParticipantState {
-    return participant.modeState as CrownDefenseHalfTestParticipantState;
-}
-
-/** Current HP of a participant, deriving the initial value (= amount) on first read. */
-function effectiveHp(lot: Lot, participant: GameParticipantState): number {
-    const ps = asParticipantState(participant);
-    if (typeof ps.hp === 'number') return ps.hp;
+/** This variant's HP source: a lot's raw `amount` (no normalization, no floor). */
+function initialHpOf(lot: Lot): number {
     return lot.amount;
-}
-
-/**
- * Deterministic winner for the (defensive) no-survivors case: the participant
- * with the highest HP after damage; ties broken by participant order.
- */
-function highestHpAfterDamage(
-    participants: readonly GameParticipantState[],
-    hpAfter: ReadonlyMap<string, number>
-): string {
-    let bestId = participants[0].lotId;
-    let bestHp = -Infinity;
-    for (const p of participants) {
-        const hp = hpAfter.get(p.lotId) ?? 0;
-        if (hp > bestHp) {
-            bestHp = hp;
-            bestId = p.lotId;
-        }
-    }
-    return bestId;
 }
 
 /**
@@ -110,7 +88,7 @@ export class CrownDefenseHalfTestMode implements GameMode {
     createGameState(_lots: readonly Lot[]): GameModeState { return {}; }
 
     createParticipantState(_lot: Lot): ParticipantModeState {
-        const participant: CrownDefenseHalfTestParticipantState = { hp: null };
+        const participant: HpParticipantState = { hp: null };
         return participant;
     }
 
@@ -129,25 +107,21 @@ export class CrownDefenseHalfTestMode implements GameMode {
         participant: GameParticipantState,
         _state: GameModeState
     ): number {
-        return effectiveHp(lot, participant);
+        return participantHp(lot, participant, initialHpOf);
     }
 
     processRoll(
         rolledLot: Lot,
-        _rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): { state: GameModeState; participants: GameParticipantState[]; outcome: TurnOutcome } {
-        const lotById = new Map(lots.map(l => [l.id, l]));
-
-        // 1. HP before this turn's damage, for every participant. Computed up
-        //    front so no participant's damage depends on another's outcome.
-        const hpBefore = new Map<string, number>();
-        for (const p of participants) {
-            const lot = lotById.get(p.lotId);
-            hpBefore.set(p.lotId, lot ? effectiveHp(lot, p) : 0);
-        }
+        // 1. HP before this turn's damage (this mode's HP source: the amount).
+        const hpBefore = collectHp(
+            participants,
+            lotById,
+            (lot, p) => participantHp(lot, p, initialHpOf)
+        );
 
         // 2. This variant's rule: half the rolled lot's current HP, rounded up
         //    to 0.01. The rolled lot itself never takes damage, so reading its
@@ -156,54 +130,18 @@ export class CrownDefenseHalfTestMode implements GameMode {
 
         // 3. Apply the damage to every ACTIVE participant except the rolled
         //    one; clamp at 0.
-        const hpAfter = new Map<string, number>();
+        const hpAfter = new Map<string, number>(hpBefore);
         for (const p of participants) {
-            const before = hpBefore.get(p.lotId) ?? 0;
             if (p.active && p.lotId !== rolledLot.id) {
-                hpAfter.set(p.lotId, Math.max(0, before - damage));
-            } else {
-                hpAfter.set(p.lotId, before);
+                hpAfter.set(p.lotId, Math.max(0, (hpBefore.get(p.lotId) ?? 0) - damage));
             }
         }
 
-        // 4. Eliminated = active participants whose HP reached 0.
-        const eliminated: string[] = [];
-        for (const p of participants) {
-            if (p.active && (hpAfter.get(p.lotId) ?? 0) <= 0) eliminated.push(p.lotId);
-        }
-        const eliminatedSet = new Set(eliminated);
-
-        // 5. New participant records: HP materialized, eliminations applied.
-        const nextParticipants: GameParticipantState[] = participants.map(p => {
-            const next: CrownDefenseHalfTestParticipantState = { hp: hpAfter.get(p.lotId) ?? 0 };
-            return {
-                lotId: p.lotId,
-                active: p.active && !eliminatedSet.has(p.lotId),
-                modeState: next
-            };
-        });
-
-        // 6. Participants whose HP actually changed (the rolled one did not).
-        const changed = participants
-            .filter(p => p.active && (hpAfter.get(p.lotId) ?? 0) !== (hpBefore.get(p.lotId) ?? 0))
-            .map(p => p.lotId);
-
-        // 7. Winner / completion.
-        const remaining = nextParticipants.filter(p => p.active);
-        let winners: string[] = [];
-        let finished: boolean;
-
-        if (remaining.length === 1) {
-            finished = true;
-            winners = [remaining[0].lotId];
-        } else if (remaining.length > 1) {
-            finished = false;
-        } else {
-            // Defensive: no survivors — impossible while the rolled lot is
-            // never damaged, but kept total and deterministic.
-            finished = true;
-            winners = [highestHpAfterDamage(participants, hpAfter)];
-        }
+        // 4–7. Shared pipeline (elimination, materialization, changed, winner).
+        const eliminated = computeEliminated(participants, hpAfter);
+        const nextParticipants = materializeParticipants(participants, hpAfter, new Set(eliminated));
+        const changed = computeChanged(participants, hpBefore, hpAfter, { includeEliminated: true });
+        const { winners, finished } = resolveSurvivors(nextParticipants, hpAfter);
 
         const winnerLot = winners.length > 0 ? lotById.get(winners[0]) : undefined;
 
@@ -232,16 +170,15 @@ export class CrownDefenseHalfTestMode implements GameMode {
 
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[]
+        lotById: ReadonlyMap<string, Lot>
     ): ReadonlyMap<string, ModePresentationData> {
-        const byId = new Map(lots.map(l => [l.id, l]));
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             // Inactive lots are "not participating" — never stale HP.
             let value = '—';
             if (p.active && lot) {
-                const hp = effectiveHp(lot, p);
+                const hp = participantHp(lot, p, initialHpOf);
                 value = hp < MIN_HP ? `♥ ${BELOW_MINIMUM_HP}` : `♥ ${Math.round(hp)}`;
             }
             result.set(p.lotId, { ext: { value } });

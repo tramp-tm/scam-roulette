@@ -1,13 +1,15 @@
 import type { Lot } from './types.js';
-import { t } from './i18n.js';
 
 /**
  * Error information returned when addLot fails.
+ *
+ * Machine-readable only: `reason` is a stable code, and the PRESENTATION layer
+ * (`App`) maps it to a localized message. The domain deliberately does not
+ * depend on i18n — the dependency points domain ← presentation, not the other way.
  */
 export interface AddLotError {
     success: false;
     reason: 'max_lots_reached' | 'invalid_name' | 'invalid_amount';
-    message: string;
 }
 
 /**
@@ -44,8 +46,7 @@ export class LotManager {
         if (!trimmedName) {
             return {
                 success: false,
-                reason: 'invalid_name',
-                message: t('error.invalidName')
+                reason: 'invalid_name'
             };
         }
 
@@ -53,8 +54,7 @@ export class LotManager {
         if (isNaN(amount) || amount <= 0) {
             return {
                 success: false,
-                reason: 'invalid_amount',
-                message: t('error.invalidAmount')
+                reason: 'invalid_amount'
             };
         }
 
@@ -62,8 +62,7 @@ export class LotManager {
         if (this.lots.length >= LotManager.MAX_LOTS) {
             return {
                 success: false,
-                reason: 'max_lots_reached',
-                message: t('error.maxLotsReached', { max: LotManager.MAX_LOTS })
+                reason: 'max_lots_reached'
             };
         }
 
@@ -103,10 +102,6 @@ export class LotManager {
 
         this.lots.splice(index, 1);
         return true;
-    }
-
-    getLotById(id: string): Lot | undefined {
-        return this.lots.find(lot => lot.id === id);
     }
 
     clearAll(): void {

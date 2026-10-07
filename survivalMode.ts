@@ -219,9 +219,8 @@ export class SurvivalMode implements GameMode {
 
     processRoll(
         rolledLot: Lot,
-        _rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): { state: GameModeState; participants: GameParticipantState[]; outcome: TurnOutcome } {
         // The winner is decided from the state AFTER removing the rolled lot.
@@ -234,7 +233,7 @@ export class SurvivalMode implements GameMode {
 
         if (remaining.length === 1) {
             const winnerId = remaining[0].lotId;
-            const winnerLot = lots.find(l => l.id === winnerId);
+            const winnerLot = lotById.get(winnerId);
 
             const outcome: TurnOutcome = {
                 rolledLotId: rolledLot.id,
@@ -297,17 +296,16 @@ export class SurvivalMode implements GameMode {
 
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[]
+        lotById: ReadonlyMap<string, Lot>
     ): ReadonlyMap<string, ModePresentationData> {
         // Eventual final-win probability: accounts for ALL future elimination
         // spins, not merely the next selection. Only active lots participate.
-        const byId = new Map(lots.map(l => [l.id, l]));
 
         const activeIds: string[] = [];
         const amounts: number[] = [];
         for (const p of participants) {
             if (!p.active) continue;
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             if (!lot) continue;
             activeIds.push(p.lotId);
             amounts.push(lot.amount);

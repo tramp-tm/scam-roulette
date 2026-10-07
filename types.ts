@@ -24,7 +24,6 @@ export type Mode =
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
 export interface Settings {
-    modeId: Mode;
     visualization: VisualizationType;
     animationDuration: number; // milliseconds
 }
@@ -202,14 +201,14 @@ export interface GameMode {
     ): GameModeState;
 
     /**
-     * SELECTION weight: how likely this participant is to be rolled by the
-     * roulette mechanics. Drives selection only — never visual size.
+     * SELECTION weight: how likely this lot is to be rolled by the roulette
+     * mechanics. Drives selection only — never visual size.
+     *
+     * Called with the LOT alone: no mode derives a weight from participation or
+     * game state (the two extra parameters that used to be passed were dead in
+     * every implementation).
      */
-    calculateSelectionWeight(
-        lot: Lot,
-        participant: GameParticipantState,
-        state: GameModeState
-    ): number;
+    calculateSelectionWeight(lot: Lot): number;
 
     /**
      * Axis 2 (`yValue`): the mode's abstract MAGNITUDE, used by visualizations
@@ -235,12 +234,18 @@ export interface GameMode {
         state: GameModeState
     ): number | undefined;
 
-    /** Pure turn processing: (state, rolled participant) -> (state', outcome). */
+    /**
+     * Pure turn processing: (state, rolled lot) -> (state', outcome).
+     *
+     * The rolled PARTICIPANT is not passed — no mode needs it; one that did could
+     * look it up via `lotById.get(rolledLot.id)`. `lotById` is the session's
+     * single lot index for this turn (built once per turn), replacing the array
+     * every mode used to re-index itself.
+     */
     processRoll(
         rolledLot: Lot,
-        rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): {
         state: GameModeState;
@@ -250,14 +255,17 @@ export interface GameMode {
 
     /**
      * Presentation data for the whole session, keyed by lot id. Called once per
-     * view-state build with the full context (participants + lots), so a mode
-     * can compute set-level presentation — e.g. the eventual win probability —
-     * once instead of per participant. Opaque to the core; return an empty map
-     * when there is nothing to present.
+     * view-state build with the full context (participants + the lot index), so
+     * a mode can compute set-level presentation — e.g. the eventual win
+     * probability — once instead of per participant. Opaque to the core; return
+     * an empty map when there is nothing to present.
+     *
+     * `lotById` is the same index the session built for this view state
+     * (`lotId -> Lot`), so a mode never rebuilds it.
      */
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[],
+        lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): ReadonlyMap<string, ModePresentationData>;
 }

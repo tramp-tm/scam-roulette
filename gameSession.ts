@@ -12,6 +12,7 @@ import type {
 } from './types.js';
 import { getMode } from './modes.js';
 import { RouletteEngine } from './rouletteEngine.js';
+import { indexLots } from './utils.js';
 
 /**
  * Reasons `GameSession.prepareSpin()` can refuse a spin. Exactly the four
@@ -38,7 +39,6 @@ export type PrepareSpinResult =
  */
 interface PendingSpin {
     rolledLot: Lot;
-    rolledParticipant: GameParticipantState;
     mode: GameMode;
     participantsBefore: GameParticipantState[];
     stateBefore: GameModeState;
@@ -118,23 +118,6 @@ export class GameSession {
     get isSessionLocked(): boolean { return this.sessionLocked; }
     get isSpinInProgress(): boolean { return this.spinInProgress; }
     get isGameFinished(): boolean { return this.gameFinished; }
-
-    /** All lots in the global list. */
-    get allLots(): readonly Lot[] {
-        return this.getLots();
-    }
-
-    /** Lots currently participating in the session. */
-    get activeLots(): Lot[] {
-        const byId = this.lotIndex();
-        const result: Lot[] = [];
-        for (const p of this.participants) {
-            if (!p.active) continue;
-            const lot = byId.get(p.lotId);
-            if (lot) result.push(lot);
-        }
-        return result;
-    }
 
     /** Number of lots currently participating in this session. */
     get activeCount(): number {
@@ -228,7 +211,7 @@ export class GameSession {
 
         this.currentMode = getMode(modeId);
 
-        const byId = this.lotIndex();
+        const byId = indexLots(this.getLots());
         this.participants = this.participants.map(p => {
             const lot = byId.get(p.lotId);
             return {
@@ -266,31 +249,22 @@ export class GameSession {
         // `calculateSelectionWeight` a second time: an active participant's
         // `xValue` IS that value, computed from the same mode + state.
         const snapshot = this.viewState;
-        const participantById = new Map(this.participants.map(p => [p.lotId, p]));
-        const candidates: { participant: GameParticipantState; lot: Lot; selectionWeight: number }[] = [];
+        const entries: SelectionCandidate[] = [];
         for (const r of snapshot.participants) {
             if (!r.active) continue;
-            const participant = participantById.get(r.lot.id);
-            if (!participant) continue;
-            candidates.push({ participant, lot: r.lot, selectionWeight: r.xValue });
+            entries.push({ lot: r.lot, selectionWeight: r.xValue });
         }
 
-        const entries: SelectionCandidate[] = candidates.map(c => ({
-            lot: c.lot,
-            selectionWeight: c.selectionWeight
-        }));
         const rolled = RouletteEngine.rollWeighted(entries);
         if (!rolled) return { ok: false, reason: 'noValidWeights' };
 
-        const chosen = candidates.find(c => c.lot.id === rolled.lot.id)!;
         const modeAtDecision = this.currentMode;
 
         // Pin the mode + full "before" snapshot at decision time. The snapshot
         // built above IS the decision-time image, so it is reused rather than
         // rebuilt.
         this.pendingSpin = {
-            rolledLot: chosen.lot,
-            rolledParticipant: chosen.participant,
+            rolledLot: rolled.lot,
             mode: modeAtDecision,
             participantsBefore: [...this.participants],
             stateBefore: this.modeState,
@@ -299,7 +273,7 @@ export class GameSession {
 
         this.sessionLocked = true;
         this.spinInProgress = true;
-        return { ok: true, lot: chosen.lot };
+        return { ok: true, lot: rolled.lot };
     }
 
     /**
@@ -320,14 +294,16 @@ export class GameSession {
         // call cannot process the same roll twice.
         this.pendingSpin = null;
 
-        const { rolledLot, rolledParticipant, mode, participantsBefore, stateBefore, viewBefore } = pending;
+        const { rolledLot, mode, participantsBefore, stateBefore, viewBefore } = pending;
 
         try {
+            // One lot index for the turn, built here; the modes no longer
+            // re-index the lot array themselves.
+            const byId = indexLots(this.getLots());
             const { state, participants, outcome } = mode.processRoll(
                 rolledLot,
-                rolledParticipant,
                 participantsBefore,
-                this.getLots(),
+                byId,
                 stateBefore
             );
 
@@ -356,21 +332,14 @@ export class GameSession {
         return { lotId: lot.id, active: true, modeState: this.currentMode.createParticipantState(lot) };
     }
 
-    private lotIndex(): Map<string, Lot> {
-        const map = new Map<string, Lot>();
-        for (const lot of this.getLots()) map.set(lot.id, lot);
-        return map;
-    }
-
     private buildViewState(
         participants: readonly GameParticipantState[],
         state: GameModeState
     ): GameViewState {
-        // One lot-list read per build: reuse it for both the id index and the
-        // batch presentation call (the list is copied by `getLots()`).
-        const lots = this.getLots();
-        const byId = new Map(lots.map(l => [l.id, l]));
-        const presentation = this.currentMode.getPresentationData(participants, lots, state);
+        // One lot index per build, shared by the batch presentation call and the
+        // per-participant projection below (`indexLots()` reads the list once).
+        const byId = indexLots(this.getLots());
+        const presentation = this.currentMode.getPresentationData(participants, byId, state);
         const renderables: RenderableParticipant[] = [];
 
         for (const p of participants) {
@@ -382,7 +351,7 @@ export class GameSession {
                 active: p.active,
                 // Axis 1 (chance) is filled by the CORE — the same number the
                 // roulette uses, so "what you see is what was rolled".
-                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot, p, state) : 0,
+                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot) : 0,
                 // Axis 2 (magnitude): the mode's own meaning, or undefined.
                 yValue: this.currentMode.getParticipantMagnitude(lot, p, state),
                 // Axis 3 (opacity): undefined when the mode does not fill it.

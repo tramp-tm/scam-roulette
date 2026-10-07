@@ -1,8 +1,6 @@
 // @ts-ignore
 import i18n from './i18next.js';
 
-import { ModalManager } from './modalManager.js';
-
 const userLang = navigator.language || navigator.languages[0] || 'en';
 const DEFAULT_LANG = userLang.split('-')[0];
 const FALLBACK_LANG = 'en';
@@ -42,16 +40,20 @@ export async function initI18n(): Promise<void> {
     syncDocumentLang();
 }
 
-export function translateDOM(): void {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
+/**
+ * Translates every `data-i18n*` element under `root` (default: the whole
+ * document). Pass a modal's `content` to scope a re-translation to that modal.
+ */
+export function translateDOM(root: ParentNode = document): void {
+    root.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (key) el.textContent = i18n.t(key);
     });
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
             if (key) el.setAttribute('placeholder', i18n.t(key));
         });
-            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            root.querySelectorAll('[data-i18n-title]').forEach(el => {
                 const key = el.getAttribute('data-i18n-title');
                 if (key) el.setAttribute('title', i18n.t(key));
             });
@@ -68,11 +70,6 @@ export function syncDocumentLang(): void {
     if (lang) {
         document.documentElement.setAttribute('lang', lang);
     }
-}
-
-export function retranslateAllModals(): void {
-    const manager = ModalManager.getInstance();
-    manager.retranslateAllOpenModals();
 }
 
 export default i18n;

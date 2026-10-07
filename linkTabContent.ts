@@ -6,17 +6,19 @@ import { t } from './i18n.js';
  * Component for Link tab content in ImportDialog
  */
 export class LinkTabContent {
+    private container: HTMLElement;
     private linkUrlInput: HTMLInputElement | null = null;
     private fetchBtn: HTMLButtonElement | null = null;
     private linkStatusEl: HTMLElement | null = null;
     private parseResult: { validLots: ParsedLot[]; errorCount: number } | null = null;
 
     constructor(container: HTMLElement) {
-        this.render(container);
+        this.container = container;
+        this.render();
         this.setupEventListeners();
     }
 
-    private render(container: HTMLElement): void {
+    private render(): void {
         const html = `
             <!-- Header row with instruction -->
             <div class="tab-header-row">
@@ -37,12 +39,13 @@ export class LinkTabContent {
             <div id="link-status" class="link-status"></div>
         `;
 
-        container.innerHTML = html;
+        this.container.innerHTML = html;
         
-        // Cache element references
-        this.linkUrlInput = document.getElementById('link-url-input') as HTMLInputElement | null;
-        this.fetchBtn = document.getElementById('fetch-btn') as HTMLButtonElement | null;
-        this.linkStatusEl = document.getElementById('link-status');
+        // Cache element references — always WITHIN our own container, never via
+        // the global document (a sibling modal may be open at the same time).
+        this.linkUrlInput = this.container.querySelector('#link-url-input') as HTMLInputElement | null;
+        this.fetchBtn = this.container.querySelector('#fetch-btn') as HTMLButtonElement | null;
+        this.linkStatusEl = this.container.querySelector('#link-status');
         
         // No need for manual translateDOM calls - let modal manager handle it
     }
@@ -164,10 +167,6 @@ export class LinkTabContent {
 
     public getLinkUrlInput(): HTMLInputElement | null {
         return this.linkUrlInput;
-    }
-
-    public getLinkStatusEl(): HTMLElement | null {
-        return this.linkStatusEl;
     }
 
     public getParsedResult(): { validLots: ParsedLot[]; errorCount: number } | null {

@@ -989,16 +989,6 @@ textarea:disabled {
     flex-shrink: 0; /* Number input + unit keep their natural size */
 }
 
-.slider-value {
-    min-width: 40px;
-    text-align: right;
-    font-weight: bold;
-    color: var(--accent);
-    font-size: 0.9em;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
 /* ========================================
    UTILITY CLASSES
    ======================================== */

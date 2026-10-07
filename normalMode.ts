@@ -50,9 +50,8 @@ export class NormalMode implements GameMode {
 
     processRoll(
         rolledLot: Lot,
-        _rolled: GameParticipantState,
         participants: readonly GameParticipantState[],
-        _lots: readonly Lot[],
+        _lotById: ReadonlyMap<string, Lot>,
         state: GameModeState
     ): { state: GameModeState; participants: GameParticipantState[]; outcome: TurnOutcome } {
         const result: MessageDescriptor = {
@@ -74,23 +73,22 @@ export class NormalMode implements GameMode {
 
     getPresentationData(
         participants: readonly GameParticipantState[],
-        lots: readonly Lot[]
+        lotById: ReadonlyMap<string, Lot>
     ): ReadonlyMap<string, ModePresentationData> {
         // Normal never eliminates between spins, so the eventual final-win
         // probability equals the current weighted selection probability,
         // amount_i / Σ amount(active). Inactive lots do not contribute to the
         // denominator and are shown as "not participating".
-        const byId = new Map(lots.map(l => [l.id, l]));
         let total = 0;
         for (const p of participants) {
             if (!p.active) continue;
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             if (lot) total += lot.amount;
         }
 
         const result = new Map<string, ModePresentationData>();
         for (const p of participants) {
-            const lot = byId.get(p.lotId);
+            const lot = lotById.get(p.lotId);
             const value = p.active && lot && total > 0
                 ? formatPercentFloor((lot.amount / total) * 100)
                 : '—';
