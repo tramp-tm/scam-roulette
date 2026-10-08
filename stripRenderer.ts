@@ -1,7 +1,7 @@
 import type { Lot, RenderableParticipant } from './types.js';
 import { RouletteEngine } from './rouletteEngine.js';
 import { BaseRenderer } from './baseRenderer.js';
-import { BAND_WIDTH_SCALE, brightenColor, getStripBandWidth, normalizeToFractions } from './utils.js';
+import { adaptiveBandWidths, brightenColor, DEFAULT_ADAPTIVE_STRIP, normalizeToFractions } from './utils.js';
 
 // Band geometry
 const BAND_HEIGHT = 320;
@@ -53,7 +53,10 @@ interface StripBand {
  * Two INDEPENDENT axes:
  *  - the band WIDTH comes from the participant's `xValue` (axis 1, the CHANCE —
  *    the value the roll used), normalised through `normalizeToFractions`. So
- *    equal-chance modes draw equal-width bands;
+ *    equal-chance modes draw equal-width bands. The width SCALE is adaptive
+ *    (`adaptiveBandWidths`): one cycle ≈ 90% of the viewport with a single band
+ *    clamped into [5%, 30%] of it; `realChances` drops the clamp and draws the
+ *    honest shares on the bare base scale;
  *  - the band HEIGHT comes from `yValue` (axis 2, the mode's magnitude), scaled
  *    onto `[MIN_BAND_HEIGHT, BAND_HEIGHT]`. An ABSENT magnitude (mode leaves
  *    axis 2 empty) or all-equal magnitudes are the degenerate "maximum" case:
@@ -79,10 +82,15 @@ export class StripRenderer extends BaseRenderer {
     protected override onViewStateChanged(): void {
         const drawn = this.drawableParticipants();
 
-        // Band width: axis 1 (chance). `realChances` draws the honest share (no
-        // floor, so a tiny chance is a tiny band); by default every band keeps
-        // the minimum width that makes it readable.
+        // Band width: axis 1 (chance). The scale adapts to the viewport and to the
+        // data (`adaptiveBandWidths`); `realChances` drops the clamp and draws the
+        // honest shares on the bare base scale (one cycle ≈ `peek` of the viewport).
         const fractions = normalizeToFractions(drawn.map(p => p.xValue));
+        const viewportWidth = this.getLogicalSize().width;
+        const baseScale = viewportWidth * DEFAULT_ADAPTIVE_STRIP.peek;
+        const widths = this.tuning.realChances
+            ? fractions.map(f => f * baseScale)
+            : adaptiveBandWidths(fractions, viewportWidth);
 
         // Band height: axis 2 (magnitude). No magnitude anywhere, or all equal,
         // degenerates to the full band height.
@@ -90,9 +98,7 @@ export class StripRenderer extends BaseRenderer {
 
         let x = 0;
         this.bands = drawn.map((p, i) => {
-            const width = this.tuning.realChances
-                ? fractions[i] * BAND_WIDTH_SCALE
-                : getStripBandWidth(fractions[i]);
+            const width = widths[i];
             const magnitude = Math.max(0, p.yValue ?? maxMagnitude);
             // `realMagnitudes` draws the honest ratio (a zero magnitude is a zero
             // height); by default it keeps the readable floor.

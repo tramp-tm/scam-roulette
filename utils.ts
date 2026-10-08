@@ -94,23 +94,60 @@ export function brightenColor(color: string, percent: number): string {
 // STRIP GEOMETRY
 // ========================================
 
-/** Minimum width (px) of a strip band, regardless of its visual fraction. */
-const MIN_BAND_WIDTH = 60;
+/** Tuning for the strip's adaptive band-width scale (all values are viewport shares). */
+export interface AdaptiveStripParams {
+    /** One full cycle (every lot once) spans this share of the viewport. */
+    peek: number;
+    /** Smallest share of the viewport a single band may take. */
+    minLotWidth: number;
+    /** Largest share of the viewport a single band may take. */
+    maxLotWidth: number;
+}
+
+/** Defaults: one cycle ≈ 90% of the viewport, a single band inside [5%, 30%]. */
+export const DEFAULT_ADAPTIVE_STRIP: AdaptiveStripParams = {
+    peek: 0.9,
+    minLotWidth: 0.05,
+    maxLotWidth: 0.3
+};
 
 /**
- * Multiplier applied to a band's normalized visual fraction to get its width.
- * Exported because the strip's "real chances" mode needs the bare scale: it draws
- * `fraction * BAND_WIDTH_SCALE` WITHOUT the minimum-width floor.
+ * Band widths (px) from honest chance fractions (Σ = 1) and the viewport width.
+ * The scale is adaptive — `S = min(max(S0, Smin), Smax)` with
+ *   `S0   = viewport · peek`               (one cycle ≈ `peek` of the viewport),
+ *   `Smin = viewport · minLotWidth / fMin` (narrowest lot ≈ `minLotWidth`),
+ *   `Smax = viewport · maxLotWidth / fMax` (widest lot ≈ `maxLotWidth`),
+ * and `width_i = f_i · S`. MAX is the hard limit (the outer `min`): with an
+ * extreme spread the widest lot stays at `maxLotWidth` while the narrow ones drop
+ * BELOW `minLotWidth`.
+ *
+ * Degenerate cases: no fractions, or none positive → all-zero widths; `fMin === 0`
+ * makes `Smin` infinite, and the outer `min` then settles on `Smax` (the zero lot
+ * stays 0px). Strip-specific visual geometry — not a shared roulette contract and
+ * not used by RouletteEngine.
  */
-export const BAND_WIDTH_SCALE = 400;
+export function adaptiveBandWidths(
+    fractions: readonly number[],
+    viewportWidth: number,
+    params: AdaptiveStripParams = DEFAULT_ADAPTIVE_STRIP
+): number[] {
+    const n = fractions.length;
+    if (n === 0) return [];
 
-/**
- * Rendered width (px) of a strip band from its normalized visual fraction
- * (yValue / Σ yValue). Strip-specific visual geometry — it is NOT a
- * shared roulette contract and is not used by RouletteEngine.
- */
-export function getStripBandWidth(fraction: number): number {
-    return Math.max(MIN_BAND_WIDTH, fraction * BAND_WIDTH_SCALE);
+    let fMin = Infinity;
+    let fMax = 0;
+    for (const f of fractions) {
+        if (f < fMin) fMin = f;
+        if (f > fMax) fMax = f;
+    }
+    if (!(fMax > 0)) return fractions.map(() => 0);
+
+    const s0 = viewportWidth * params.peek;
+    const sMin = (viewportWidth * params.minLotWidth) / fMin;
+    const sMax = (viewportWidth * params.maxLotWidth) / fMax;
+    const scale = Math.min(Math.max(s0, sMin), sMax);
+
+    return fractions.map(f => f * scale);
 }
 
 // ========================================
