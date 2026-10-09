@@ -334,7 +334,7 @@ export class CountingRhymeRenderer extends BaseRenderer {
         // A HELD cursor (the position has not moved) keeps the FULL emphasis on
         // its lot: no crossfade into whatever beat the frozen position happens to
         // fall in once the ring has been re-indexed. `local < 0` means the held
-        // lot no longer even covers this segment — same treatment.
+        // lot falls outside this segment — same treatment.
         if (!fresh || n === 1 || local < 0 || local >= TRANSITION_FRACTION) {
             intensities[idx] = 1;
             return intensities;

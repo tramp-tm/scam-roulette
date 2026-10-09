@@ -65,7 +65,7 @@ export interface MessageDescriptor {
  * Game-level state owned by a GameMode. The core stores it but never
  * inspects it — only the owning mode knows its shape. Treat it as a value:
  * a mode must return a NEW object when something changed, never mutate a
- * previously stored state in place.
+ * stored state in place.
  */
 export type GameModeState = unknown;
 
@@ -185,11 +185,11 @@ export interface TurnOutcome {
  *  - selection:    `calculateSelectionWeight()` — probability for the roulette.
  *                  The core transports it into the snapshot's `xValue` axis; it
  *                  never drives size/scale.
- *  - presentation: the axes `yValue` (abstract magnitude a visualization renders
- *                  as size/scale; the meaning is the mode's own — amount, HP,
- *                  score, …) and `zValue` (opacity, via the optional
- *                  `getParticipantOpacity()`), plus `getPresentationData()` for
- *                  extra mode-specific data (`modeData`).
+ *  - presentation: the axes `yValue` (magnitude → size/scale) and `zValue`
+ *                  (opacity, via the optional `getParticipantOpacity()`), plus
+ *                  `getPresentationData()` for extra mode-specific data
+ *                  (`modeData`). The meaning of each axis is the mode's own —
+ *                  see the axis definitions on `RenderableParticipant`.
  * A mode must not assume `yValue` means weight/amount/HP to the renderer, and
  * the core must not derive one axis from another.
  */
@@ -219,9 +219,8 @@ export interface GameMode {
      * SELECTION weight: how likely this lot is to be rolled by the roulette
      * mechanics. Drives selection only — never visual size.
      *
-     * Called with the LOT alone: no mode derives a weight from participation or
-     * game state (the two extra parameters that used to be passed were dead in
-     * every implementation).
+     * Called with the LOT alone: a weight depends only on the lot — no mode
+     * derives it from participation or game state.
      */
     calculateSelectionWeight(lot: Lot): number;
 
@@ -254,8 +253,7 @@ export interface GameMode {
      *
      * The rolled PARTICIPANT is not passed — no mode needs it; one that did could
      * look it up via `lotById.get(rolledLot.id)`. `lotById` is the session's
-     * single lot index for this turn (built once per turn), replacing the array
-     * every mode used to re-index itself.
+     * single lot index for this turn — a mode never rebuilds one for the roll.
      */
     processRoll(
         rolledLot: Lot,
@@ -306,7 +304,7 @@ export interface GameMode {
  * Changing one axis never changes another: probability and visual size must not
  * be derived from one another.
  *
- * `presence` is a separate visual multiplier in [0, 1] used to animate
+ * `presence` is a separate visual multiplier in [0, 1], which animates
  * eliminations by interpolating a view state (a lot leaves the view when it
  * reaches 0); together with `zValue` it forms the lot's alpha
  * (`alpha = presence × zValue`).

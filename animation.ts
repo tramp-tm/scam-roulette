@@ -3,7 +3,7 @@
  */
 
 /**
- * A pure scalar-to-scalar function used to reshape the animation's time
+ * A pure scalar-to-scalar function that reshapes the animation's time
  * axis. Convention: domain [0, 1] → [0, 1], with E(0) = 0 and E(1) = 1.
  */
 export type EasingFunction = (t: number) => number;

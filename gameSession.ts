@@ -59,7 +59,7 @@ export interface FinishSpinResult {
  * Session state for the current game.
  *
  * Responsibilities
- *  - own the current GameMode (the rules that govern this session);
+ *  - own the current GameMode;
  *  - own the participant set (`GameParticipantState[]`: lotId + active +
  *    mode-owned state) and the game-level mode state;
  *  - own the spin lifecycle — decide in `prepareSpin()`, apply the mode's
@@ -297,8 +297,8 @@ export class GameSession {
         const { rolledLot, mode, participantsBefore, stateBefore, viewBefore } = pending;
 
         try {
-            // One lot index for the turn, built here; the modes no longer
-            // re-index the lot array themselves.
+            // One lot index for the turn, built here: modes do not rebuild one
+            // for the roll.
             const byId = indexLots(this.getLots());
             const { state, participants, outcome } = mode.processRoll(
                 rolledLot,

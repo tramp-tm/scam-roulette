@@ -21,9 +21,8 @@ function survivalSelectionWeight(amount: number): number {
 }
 
 /**
- * Practical bound for the exact final-win computation (O(2^n · n)); above it
- * the deterministic trapezoidal quadrature is used instead (no UI hang, no
- * "…" placeholder, no simulation).
+ * Practical bound for the exact final-win computation (O(2^n · n)); above it the
+ * deterministic trapezoidal quadrature is used instead. No simulation.
  */
 const SURVIVAL_EXACT_MAX_ACTIVE = 18;
 
@@ -31,25 +30,19 @@ const SURVIVAL_EXACT_MAX_ACTIVE = 18;
 const SURVIVAL_QUADRATURE_STEPS = 1000;
 
 /**
- * Tail constant for the integration limit: `T_max = (ln n + c) / λ_min`. The
- * unaccounted tail mass is ≤ n·e^(−c) ≈ e^(−c) for any n, i.e. ~1.7e-5 at
- * c = 11 — well below the one-decimal display resolution (0.1%).
+ * Tail constant for the integration limit `T_max = (ln n + c) / λ_min`. The mass
+ * left outside the integral is ≤ e^(−c)/n per lot, i.e. ≤ e^(−c) ≈ 1.7e-5 in
+ * total at c = 11 — below the one-decimal display resolution (0.1%).
  */
 const SURVIVAL_QUADRATURE_TAIL_C = 11;
 
 /**
- * Exact eventual final-win (last-remaining) probabilities for the given active
- * amounts, following the mode's real elimination semantics:
+ * Exact eventual final-win (last-remaining) probabilities for the active amounts,
+ * following the mode's real elimination semantics. Deterministic and exact —
+ * memoised over subsets, never a simulation.
  *
- *   P(S, i) = 1                                if S = {i}
- *   P(S, i) = Σ_{j ∈ S, j ≠ i} p_j(S) · P(S \ {j}, i)
- *
- * where p_j(S) = w_j / Σ w(S) and w = `survivalSelectionWeight(amount)`. Being
- * selected eliminates the lot, so i's own selection contributes nothing.
- * Deterministic and exact — memoised over subsets, never a simulation.
- *
- * Exact path of `survivalWinProbabilities`; call that dispatcher, not this
- * directly — it is only valid while the active count stays small.
+ * The exact path of `survivalWinProbabilities`; call that dispatcher instead —
+ * this is only valid while the active count stays small.
  */
 function survivalWinProbabilitiesExact(amounts: readonly number[]): number[] {
     const n = amounts.length;
@@ -93,20 +86,15 @@ function survivalWinProbabilitiesExact(amounts: readonly number[]): number[] {
 }
 
 /**
- * Approximate eventual final-win probabilities for large active sets:
- * trapezoidal quadrature of
+ * Approximate path for large active sets: deterministic trapezoidal quadrature of
+ * the exponential-race (Plackett–Luce last-place) law, equal in value to the exact
+ * DP. The integration limit is `(ln n + SURVIVAL_QUADRATURE_TAIL_C) / λ_min` with
+ * `λ = survivalSelectionWeight(amount)`, so the truncated tail mass stays
+ * ≤ e^(−SURVIVAL_QUADRATURE_TAIL_C).
  *
- *   P_i = ∫₀^∞ λ_i · e^(−λ_i·t) · ∏_{j≠i} (1 − e^(−λ_j·t)) dt
- *
- * with λ = `survivalSelectionWeight(amount)` = 1/amount, over
- * `t ∈ [0, (ln n + SURVIVAL_QUADRATURE_TAIL_C) / λ_min]`. This is the
- * exponential-race / Plackett–Luce last-place law, identical in value to the
- * exact DP recursion above. Deterministic; the truncated tail mass never
- * exceeds e^(−SURVIVAL_QUADRATURE_TAIL_C) for any n.
- *
- * The per-step product ∏_{j≠i} is built from prefix/suffix products — no
- * division by the omitted factor and no epsilon hacks; intermediate underflow
- * to 0 is harmless (it happens only where the true density mass is negligible).
+ * The per-step product over the other lots uses prefix/suffix products — no
+ * division by the omitted factor, no epsilon hacks; underflow to 0 happens only
+ * where the true density mass is negligible.
  */
 function survivalWinProbabilitiesQuadrature(amounts: readonly number[]): number[] {
     const n = amounts.length;
@@ -140,7 +128,7 @@ function survivalWinProbabilitiesQuadrature(amounts: readonly number[]): number[
         const t = k * dt;
 
         for (let i = 0; i < n; i++) {
-            const e = Math.exp(-lambda[i] * t); // one exp per player per step
+            const e = Math.exp(-lambda[i] * t);
             ex[i] = e;
             om[i] = 1 - e;
         }
@@ -168,10 +156,9 @@ function survivalWinProbabilitiesQuadrature(amounts: readonly number[]): number[
 }
 
 /**
- * Eventual final-win probabilities for the active amounts (sum ≈ 1), following
- * the mode's real elimination semantics. Exact DP while the active count stays
- * small; deterministic trapezoidal quadrature beyond the exact bound. Never a
- * simulation.
+ * Eventual final-win probabilities for the active amounts (sum ≈ 1): exact DP
+ * while the active count stays small, deterministic quadrature beyond the bound.
+ * Never a simulation.
  */
 function survivalWinProbabilities(amounts: readonly number[]): number[] {
     return amounts.length <= SURVIVAL_EXACT_MAX_ACTIVE

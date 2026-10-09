@@ -79,7 +79,7 @@ export interface LotListViewOptions {
  *   - confirmation dialogs or ErrorDialog;
  *   - translated strings — the view writes only direction glyphs, and the
  *     labels are translated by translateDOM() from the DOM's `data-i18n`
- *     attributes (this file no longer imports the i18n `t` helper at all).
+ *     attributes (this file does not import the i18n `t` helper).
  *
  * User actions inside the list are surfaced back to the caller through the
  * callbacks in `LotListViewOptions`; the caller decides whether and how to
