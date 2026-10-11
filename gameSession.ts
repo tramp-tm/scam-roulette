@@ -26,10 +26,13 @@ export type PrepareSpinFailureReason =
 
 /**
  * Result of `GameSession.prepareSpin()`. The failure reason lets the caller
- * surface an accurate message.
+ * surface an accurate message. `revealFrom` is present only when the mode
+ * implements `prepareTurn`: it is the RESTING view captured just before the
+ * mode prepared its state, so the caller can animate the transition from it to
+ * the prepared snapshot instead of jumping.
  */
 export type PrepareSpinResult =
-    | { ok: true; lot: Lot }
+    | { ok: true; lot: Lot; revealFrom?: GameViewState }
     | { ok: false; reason: PrepareSpinFailureReason };
 
 /**
@@ -245,6 +248,17 @@ export class GameSession {
             return { ok: false, reason: 'noActiveLots' };
         }
 
+        // Let the mode prepare its state for this roll (e.g. draw the tournament
+        // group) before the view snapshot is taken. Optional — a no-op for modes
+        // that don't implement it. `viewState` is a fresh build, so the snapshot
+        // below already reflects the prepared state; the resting view captured
+        // here comes back as `revealFrom` for the pre-spin animation.
+        let revealFrom: GameViewState | undefined;
+        if (this.currentMode.prepareTurn) {
+            revealFrom = this.viewState;
+            this.modeState = this.currentMode.prepareTurn(this.participants);
+        }
+
         // Reuse the current snapshot for the weights instead of calling
         // `calculateSelectionWeight` a second time: an active participant's
         // `xValue` IS that value, computed from the same mode + state.
@@ -273,7 +287,7 @@ export class GameSession {
 
         this.sessionLocked = true;
         this.spinInProgress = true;
-        return { ok: true, lot: rolled.lot };
+        return { ok: true, lot: rolled.lot, revealFrom };
     }
 
     /**
@@ -351,7 +365,7 @@ export class GameSession {
                 active: p.active,
                 // Axis 1 (chance) is filled by the CORE — the same number the
                 // roulette uses, so "what you see is what was rolled".
-                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot) : 0,
+                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot, state) : 0,
                 // Axis 2 (magnitude): the mode's own meaning, or undefined.
                 yValue: this.currentMode.getParticipantMagnitude(lot, p, state),
                 // Axis 3 (opacity): undefined when the mode does not fill it.

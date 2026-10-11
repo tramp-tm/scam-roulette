@@ -23,14 +23,14 @@ import type { HpParticipantState } from './hpElimination.js';
 /**
  * Crown Defense — Half Damage.
  *
- * A copy of the former `CrownDefenseMode` with two changes:
+ * Two rules define the mode:
  *  1. a lot's HP IS its raw `amount` (no normalization, no minimum floor);
  *  2. instead of a fixed damage, every non-rolled active participant takes
  *     `ceil(HP of the rolled lot / 2)` damage, rounded up to 0.01.
  *
- * Everything else (equal selection, elimination, winner, presentation) is
- * standard, as in the original fixed-damage Crown Defense. Because the rolled
- * lot is never damaged and the damage is always > 0, the game always terminates.
+ * Selection, elimination, winner and presentation are the standard ones.
+ * Because the rolled lot is never damaged and the damage is always > 0, the
+ * game always terminates.
  *
  * The turn pipeline (steps 1, 4–7 of `processRoll`) is shared with the other
  * HP-elimination modes in `hpElimination.ts`; only the damage rule below is local.
@@ -97,7 +97,7 @@ export class CrownDefenseHalfTestMode implements GameMode {
         return state;
     }
 
-    calculateSelectionWeight(): number {
+    calculateSelectionWeight(_lot: Lot, _state: GameModeState): number {
         // Equal probability for every active participant, regardless of HP.
         return 1;
     }

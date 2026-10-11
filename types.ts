@@ -19,7 +19,8 @@ export type Mode =
     | 'survival'
     | 'crown-defense-half-test'
     | 'weakest-link'
-    | 'king-of-the-hill-amount';
+    | 'king-of-the-hill-amount'
+    | 'tournament';
 
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
@@ -216,13 +217,27 @@ export interface GameMode {
     ): GameModeState;
 
     /**
-     * SELECTION weight: how likely this lot is to be rolled by the roulette
-     * mechanics. Drives selection only — never visual size.
+     * Optional pre-roll hook: produce the game state for the upcoming roll from
+     * the current participant set. Called once in `prepareSpin`, after the
+     * active-count guard and BEFORE the view snapshot is taken, so the snapshot
+     * — and thus the roll and the "before" view — reflects the prepared state.
+     * Pure: return a new state object, never mutate the input.
      *
-     * Called with the LOT alone: a weight depends only on the lot — no mode
-     * derives it from participation or game state.
+     * E.g. the tournament mode draws its round group here; modes with no
+     * pre-roll preparation omit the hook.
      */
-    calculateSelectionWeight(lot: Lot): number;
+    prepareTurn?(participants: readonly GameParticipantState[]): GameModeState;
+
+    /**
+     * SELECTION weight: how likely this lot is to be rolled by the roulette
+     * mechanics. Drives selection only — never visual size. It IS the chance
+     * axis (`xValue`) the core shows, so "what you see is what was rolled".
+     *
+     * The weight is the mode's own semantics and MAY depend on the game state
+     * (e.g. a mode that draws a subset for the upcoming roll); modes with no
+     * state dependency ignore the parameter.
+     */
+    calculateSelectionWeight(lot: Lot, state: GameModeState): number;
 
     /**
      * Axis 2 (`yValue`): the mode's abstract MAGNITUDE, used by visualizations

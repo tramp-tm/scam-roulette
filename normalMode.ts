@@ -36,7 +36,7 @@ export class NormalMode implements GameMode {
 
     onParticipantsChanged(state: GameModeState): GameModeState { return state; }
 
-    calculateSelectionWeight(lot: Lot): number {
+    calculateSelectionWeight(lot: Lot, _state: GameModeState): number {
         return lot.amount;
     }
 

@@ -166,6 +166,7 @@ Renderer
 | `crownDefenseHalfTestMode.ts` | Режим «Защита короны: половина урона»: HP = amount, урон = ½ HP выпавшего |
 | `weakestLinkMode.ts` | Режим «Слабое звено»: HP = нормализация amount в [1..100], урон = среднее HP лотов не сильнее выпавшего |
 | `kingOfTheHillAmountMode.ts` | Режим «Царь горы: HP = сумма»: HP = ceil(amount) без нормализации, царь = макс. HP, выпавший бьёт царя своим HP |
+| `tournamentMode.ts` | Режим «Турнирное выбывание»: группа из 3 (локальный жребий в `prepareTurn`), вес `1/amount` внутри группы и `0` снаружи, выбывание, `yValue` пуст |
 | `hpElimination.ts` | Общий каркас HP-элиминационного хода трёх HP-режимов: ленивый `participantHp`, шаги 1/4–7 (`collectHp`, `computeEliminated`, `computeChanged`, `materializeParticipants`, `resolveSurvivors`) |
 | `rouletteEngine.ts` | Взвешенный выбор по selection-весам; спин-таргет по геометрии рендерера |
 | `animation.ts` | Easing-функции и `AnimationController` (requestAnimationFrame) |
@@ -298,7 +299,13 @@ interface GameMode {
 (например, вероятность финальной победы) один раз, а не на каждого участника.
 
 Поверхность контракта — только фактически используемое:
-- `calculateSelectionWeight` получает **только лот**;
+- `calculateSelectionWeight(lot, state)` — вес может зависеть от игрового состояния (режим,
+  выбирающий подмножество на ход, как турнирный); режимы без такой зависимости параметр
+  игнорируют;
+- `prepareTurn(participants)` — опциональный хук перед роллом: вызывается в `prepareSpin()`
+  после guard-а активности и **до** снапшота view-состояния, поэтому снапшот, ролл и «before»
+  отражают подготовленное состояние (турнирный режим разыгрывает здесь группу); чистый —
+  возвращает новое состояние;
 - `processRoll` **не получает разыгранного участника** (ни одному режиму он не нужен;
   при необходимости режим берёт его через `lotById.get(rolledLot.id)`);
 - `processRoll` и `getPresentationData` получают готовый индекс `lotById: ReadonlyMap<string, Lot>`
@@ -452,7 +459,8 @@ export const MODES = {
     survival: new SurvivalMode(),
     'crown-defense-half-test': new CrownDefenseHalfTestMode(),
     'weakest-link': new WeakestLinkMode(),
-    'king-of-the-hill-amount': new KingOfTheHillAmountMode()
+    'king-of-the-hill-amount': new KingOfTheHillAmountMode(),
+    tournament: new TournamentMode()
 };
 export function getMode(modeId) { return MODES[modeId]; }
 ```
@@ -471,7 +479,7 @@ export function getMode(modeId) { return MODES[modeId]; }
 параметризована: `includeEliminated: true` у `crown-defense-half-test`/`weakest-link` (выбывший
 входит в «изменившиеся»), `false` у `king-of-the-hill-amount` (только выжившие). Случайность
 (выбор царя / жертвы) остаётся в режимах — модуль детерминирован. Плюс `castState<T>(state)` —
-единственный каст непрозрачного состояния режима к его собственному типу.
+приведение непрозрачного состояния режима к его собственному типу.
 
 **NormalMode**
 - `xValue = amount` (ось шанса: больше сумма → выше шанс), заполняет ядро;
@@ -544,12 +552,29 @@ export function getMode(modeId) { return MODES[modeId]; }
 - затем определяется новый царь для следующего раунда; в **завершающей** партии царя нет
   (`kingId = null`), поэтому победитель читается как исходный `good`, а не как «царь»;
   последний оставшийся — победитель;
-- «царь горы» разыгрывается тем же способом, что и прежде: урон получает **только царь**
+- «царь горы» разыгрывается так: урон получает **только царь**
   (выпавший-не-царь бьёт его своим HP), а выпавший царь уничтожает слабейшего и поглощает его HP;
 - `getPresentationData` → ext = `♥ N`, у царя — `♔ ♥ N` и `accent = accent` (обе поверхности).
   Inactive → `—`.
 - `GameModeState = { initialHp, kingId }`, `ParticipantModeState = { hp }`.
 - `Math.random()` здесь используется только для тай-брейков (выбор царя и жертвы), не для рулетки.
+
+**TournamentMode** («Турнирное выбывание», модель B)
+- покой (группы нет): `xValue = 1` у всех активных — колесо показывает **пул** равномерно;
+- хук `prepareTurn` (вызывается в `prepareSpin()`) разыгрывает **группу из 3** активных лотов
+  локальным жребием (`Math.random`, частичный Фишер–Йетс) и кладёт её в
+  `GameModeState = { groupIds }`; группа не переживает ход;
+- во время спина `xValue = 1/amount` внутри группы и `0` снаружи — колесо показывает
+  **мини-рулетку**; ролл идёт через `RouletteEngine.rollWeighted` по тем же весам;
+- после ролла выпавший лот выбывает, группа сбрасывается, и `after`-состояние снова даёт пул;
+  «возврат в пул» анимируется существующим переходом (ось `xValue` интерполируется),
+  мгновенный скачок — только «пул → группа» в начале спина;
+- победитель определяется из состояния **после** удаления выпавшего (как Survival: последний
+  не докручивается); пул из 1 лота — вырожденный случай (выпавший объявляется победителем без
+  выбывания), пул < 3 — рулетка по всему пулу;
+- `yValue` не заполняется (`undefined`), `ParticipantModeState` пуст;
+- `getPresentationData` помечает членов группы акцентом `info` только для списка
+  (`targets: ['list']`); вне спина маркеров нет.
 
 Все режимы владеют своим состоянием и реализуют полный контракт `GameMode`, поэтому являются
 равноправными стратегиями.
@@ -689,10 +714,13 @@ export function getMode(modeId) { return MODES[modeId]; }
   (Σ = 1); используется рендерерами для перевода `yValue`/`xValue` в геометрию.
 - `normalizeChancesAffine(fractions, minSector)` + `MIN_VISUAL_SECTOR = 0.01` — «читабельный»
   режим шансов колеса: аффинная карта честных долей так, чтобы минимум стал ровно
-  `m = min(minSector, 1/n)`, сохранив Σ = 1, порядок и ОТНОСИТЕЛЬНЫЕ разности
-  (`b_i = m + k·(a_i − aMin)`, `k = (1 − n·m)/(1 − n·aMin)`). При `minSector > 1/n` деградирует
-  в равные доли `1/n` (`k = 0`); при уже выполненном флоре (`aMin ≥ m`) и любом нарушении
-  предусловий (`n ≤ 1`, Σ ≠ 1) возвращает вход как есть — минимум никогда не ОПУСКАЕТСЯ.
+  `m = min(minSector, 1/p)`, сохранив Σ = 1, порядок и ОТНОСИТЕЛЬНЫЕ разности
+  (`b_i = m + k·(a_i − aMin)`, `k = (1 − p·m)/(1 − p·aMin)`), где `p` — число ПОЛОЖИТЕЛЬНЫХ долей.
+  НУЛЕВАЯ доля остаётся нулём (флор её не поднимает): нулевой шанс = нулевой сектор, поэтому
+  не-группа турнирного режима исчезает, а не остаётся тонкой полосой. При `minSector > 1/p`
+  деградирует в равные доли `1/p` (`k = 0`); при уже выполненном флоре (`aMin ≥ m`), `p ≤ 1`,
+  `n ≤ 1` и любом нарушении предусловий (Σ ≠ 1) возвращает вход как есть — минимум никогда
+  не ОПУСКАЕТСЯ.
 - `normalizeToRange(values, minValue, maxValue)` — min–max нормализация значений из их собственного
   диапазона в `[minValue..maxValue]` (один проход на min/max, один на выход, без промежуточных
   массивов); при вырожденном размахе (все значения равны / один элемент) все результаты = `minValue`.
@@ -719,6 +747,14 @@ export function getMode(modeId) { return MODES[modeId]; }
   элемента-подписи нет. Значение обновляется в трёх местах: инициализация
   (дефолт 3 с), `input` слайдера и `change` числового поля; все два контрола всегда
   показывают одно и то же значение (шкала целочисленная: 1–60 напрямую, 61–68 — по `DURATION_MAP`).
+- **Переходы-морфинги**: `OUTCOME_TRANSITION_DURATION_MS = 600` (`presentation.ts`) — ЕДИНЫЙ
+  стандарт длительности всех resize-фаз (reveal / eliminate / return, §7.3); `REVEAL_HOLD_DURATION_MS = 1000`
+  — статичная пауза чтения тройки между reveal и прокрутом; `TRANSITION_EASING` (`animation.ts`,
+  кривая `EasingFunctions.easeInOutCubic`) — симметричная ease-in-out кривая морфингов, намеренно
+  НЕ пользовательский `easingFunction`: спин-кривая (ease-out) фронт-лоудит изменение размера,
+  из-за чего лот «проскакивал» ~¾ сектора за первые кадры. Длительность спина — из настроек
+  (`settings.animationDuration`), кривая спина — выбор пользователя; `easeInOutCubic` добавлен в
+  реестр кривых (в UI-селект не выводится).
 - **Easing**: реестр `EasingFunctions` (`linear`, `easeOutCubic/Quart/Quint/Expo`, кастомный
   `rouletteEaseOut` — блендинг). Выбор хранится в `App.easingFunction`.
 - **Язык (i18n)**: `i18n.ts` грузит `locales/en.json` и `locales/ru.json` параллельно, язык по
@@ -752,8 +788,12 @@ Hover-состояние `App` не хранит: его владелец — `V
   → `ErrorDialog(t(key, params))`, домен текст не локализует);
   `gameSession.addLot(lot)`; `refreshAfterStateChange()`.
 - `spin()` — `gameSession.prepareSpin()`; отказ → `alert(prepareSpinFailureKey(reason))`;
-  успех → `updateControlsState()` и `visualizationDriver.spinTo({view, accents, targetLotId,
-  durationMs, easing, onComplete: finishSpin})`.
+  успех → `updateControlsState()`; если режим отдал `revealFrom` (поле есть только у режимов с
+  `prepareTurn`, сейчас — турнир), идёт цепочка: пре-спиновый переход
+  `reveal({from: revealFrom, to: view, …, durationMs: OUTCOME_TRANSITION_DURATION_MS, easing:
+  TRANSITION_EASING})` → пауза чтения `hold({durationMs: REVEAL_HOLD_DURATION_MS})` → и только
+  затем `spinTo({view, accents, targetLotId, durationMs, easing: this.easingFunction,
+  onComplete: finishSpin})`; без `revealFrom` прокрут стартует сразу.
 - `finishSpin()` — `gameSession.finishSpin()` в `try/catch` (исключение →
   `ErrorDialog('error.spinProcessingFailed')`); выставляет текст результата из
   `outcome.result`; строит акценты исхода (`defaultAccentsForOutcome`), сливает их с режимными
@@ -845,10 +885,24 @@ Hover-состояние `App` не хранит: его владелец — `V
 - `spinTo({view, accents, targetLotId, durationMs, easing, onComplete})` — запросить у
   визуализации целевой скаляр (`computeSpinTarget`), вести `AnimationController`; на каждом
   кадре только `setAnimationValue` + `render` (курсор рендерер вычисляет сам);
-- `animateOutcome({transition, accents, durationMs, easing, onComplete})` — интерполировать
-  view-состояние `before → after` (presence выбывших 1 → 0) через переиспользуемый
-  интерполятор (без пересборки структур на кадр), рампить `pulse` акцентов; финальный
-  кадр фиксирует стабильный `after`;
+- `reveal({from, to, accents, durationMs, easing, onComplete})` — пре-спиновый переход:
+  интерполировать снимок от покоящегося вида к подготовленному (например, колесо турнира
+  схлопывается из пула в мини-рулетку) перед прокрутом; кривая — `TRANSITION_EASING`
+  (симметричная ease-in-out, не спин-кривая), акценты применяются без рампа `pulse`
+  (акцентов исхода ещё нет), финальный кадр фиксирует стабильный `to`;
+- `hold({durationMs, onComplete})` — статичная пауза чтения: кадр не трогается, но пауза живёт в
+  `AnimationController` (no-op-прогон скаляра), поэтому отменяется `stop()`/`reset()` вместе с
+  остальными анимациями — голый `setTimeout` пережил бы сброс и запустил спин на мёртвой сессии;
+- `animateOutcome({transition, accents, durationMs, easing, onComplete})` — исход в ДВЕ
+  последовательные фазы (обе — `durationMs`/`easing` вызывающего), через переиспользуемый
+  интерполятор (без пересборки структур на кадр): (1) **eliminate** — выбывшие схлопываются
+  (`xValue` → 0, `presence` 1 → 0) при рампе `pulse` акцентов, выжившие остаются ровно как в
+  подготовленном виде; (2) **return** — выжившие (и не-группа) растут обратно в стабильный
+  `after`, акценты уже при полном `pulse`. Промежуточный кадр — `buildEliminatedMid(before,
+  outcome.eliminated)` (`presentation.ts`). Вторая фаза ПРОПУСКАЕТСЯ, если она ничего не меняет
+  (`mid` уже равен `after` — например Survival, где веса выживших не изменились), поэтому обычный
+  режим сохраняет прежнюю суммарную длительность одного перехода; финальный кадр фиксирует
+  стабильный `after`;
 - `reset(view, accents)` — остановить анимацию, сбросить рендерер (и hover), показать снимок;
 - `getCursorLotId()` — read-only запрос текущего лота под курсором (для UI). Вызывающих в коде
   нет — оставлен как задел на будущий UI (как `zValue`/`events`); сам курсор внутрь
@@ -1018,16 +1072,19 @@ DOMContentLoaded
 spin()
   ├─ gameSession.prepareSpin()
   │     ├─ отказ? (spinInProgress / gameFinished / noActiveLots / noValidWeights) → alert, выход
-  │     └─ успех: снимок view (кандидаты по xValue) → rollWeighted, pendingSpin={лот,участник,режим,state+view before}, locks
+  │     └─ успех: [prepareTurn → revealFrom = покоящийся view]; снимок view (кандидаты по xValue) → rollWeighted, pendingSpin={лот,участник,режим,state+view before}, locks
   ├─ updateControlsState()
+  ├─ revealFrom ? reveal(«покоящийся → подготовленный») → hold(пауза чтения) : сразу прокрут
+  │     └─ интерполяция view, затем статичный кадр тройки (REVEAL_HOLD_DURATION_MS); onComplete →
   └─ visualizationDriver.spinTo({view, accents, targetLotId, ...})
         ├─ renderer.setViewState(view); end = renderer.computeSpinTarget(targetLotId, duration)
         ├─ AnimationController 0..end: setAnimationValue + render (курсор рендерер считает сам)
         └─ onComplete → finishSpin()
               ├─ outcome = gameSession.finishSpin()   // mode.processRoll → новые state/participants/outcome
               ├─ resultText = t(outcome.result)
-              ├─ visualizationDriver.animateOutcome({transition: before→after, accents, ...})
-              │     └─ интерполяция view (presence выбывших → 0), ramp pulse акцентов
+              ├─ visualizationDriver.animateOutcome({transition, accents, ...})
+              │     ├─ фаза eliminate: before → mid (выбывшие: xValue/presence → 0), ramp pulse акцентов
+              │     └─ фаза return: mid → after (xValue выживших и не-группы), пропускается если mid = after
               └─ onComplete: outcomeAccents = акценты исхода, updateUI(), refresh(after)
 ```
 
@@ -1074,7 +1131,9 @@ openImportDialog() → ImportDialog(CSV/Link) → handleImportConflict(parsedLot
 
 ## 9. Инварианты и правила (сводка)
 
-1. Решение принимается в `prepareSpin()` **до** анимации; анимация на результат не влияет.
+1. Решение принимается в `prepareSpin()` **до** анимации (сначала опциональный
+   `prepareTurn()` режима, затем снапшот view-состояния и ролл); анимация на результат
+   не влияет.
 2. Режим пинится на время конкретного спина — применение (`finishSpin`) не может «уехать» от
    решения.
 3. `GameParticipantState[]` — единственное состояние участия: `viewState` всегда проецируется

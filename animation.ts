@@ -54,6 +54,11 @@ export const EasingFunctions: Record<string, EasingFunctionDefinition> = {
      * A blend of cubic and quintic ease-out: gentler in the first half,
      * long dramatic tail at the end.
      */
+    easeInOutCubic: {
+        name: 'easeInOutCubic',
+        fn: (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+    },
+
     rouletteEaseOut: {
         name: 'rouletteEaseOut',
         fn: (t: number): number => {
@@ -68,6 +73,17 @@ export const EasingFunctions: Record<string, EasingFunctionDefinition> = {
  * Default easing function for roulette animation
  */
 export const DEFAULT_EASING: EasingFunction = EasingFunctions.rouletteEaseOut.fn;
+
+/**
+ * Easing of the view MORPH transitions (reveal / eliminate / return).
+ *
+ * Deliberately NOT the user's spin easing: a spin curve is a strong ease-out
+ * (fast unwind, gentle settle), which front-loads a SIZE change — under it a lot
+ * whose share collapses to zero loses ~3/4 of its sector in the first frames and
+ * the rest of the transition is spent on the last quarter. A symmetric curve
+ * spreads the change over the whole transition.
+ */
+export const TRANSITION_EASING: EasingFunction = EasingFunctions.easeInOutCubic.fn;
 
 /**
  * Animation controller class that manages time-based animations.

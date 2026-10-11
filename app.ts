@@ -2,7 +2,7 @@ import i18n, { t, translateDOM, initI18n, syncDocumentLang } from './i18n.js';
 import { LotManager } from './lotManager.js';
 import type { AddLotError } from './lotManager.js';
 
-import { EasingFunctions, DEFAULT_EASING } from './animation.js';
+import { EasingFunctions, DEFAULT_EASING, TRANSITION_EASING } from './animation.js';
 import type { EasingFunction } from './animation.js';
 import { VisualizationDriver } from './visualizationDriver.js';
 import { LotListView } from './lotListView.js';
@@ -14,7 +14,8 @@ import {
     accentsFor,
     composeAccents,
     defaultAccentsForOutcome,
-    OUTCOME_TRANSITION_DURATION_MS
+    OUTCOME_TRANSITION_DURATION_MS,
+    REVEAL_HOLD_DURATION_MS
 } from './presentation.js';
 import { MERGE_STRATEGY } from './importStrategies.js';
 import type { ImportStrategy } from './importStrategies.js';
@@ -758,7 +759,7 @@ export class App {
         // Hand the already-decided target to the visualization boundary.
         // App says *what* to animate; the driver/visualization decide *how*.
         const view = this.gameSession.viewState;
-        this.visualizationDriver.spinTo({
+        const spinIt = () => this.visualizationDriver.spinTo({
             view,
             accents: this.accentState(view),
             targetLotId: prepared.lot.id,
@@ -766,6 +767,26 @@ export class App {
             easing: this.easingFunction,
             onComplete: () => this.finishSpin()
         });
+
+        // A mode that prepared its state in `prepareTurn()` also handed back the
+        // resting view: morph into the prepared view (the tournament wheel
+        // collapsing from the pool to the mini-roulette), hold that frame so the
+        // group can be read, and only then start the spin.
+        if (prepared.revealFrom) {
+            this.visualizationDriver.reveal({
+                from: prepared.revealFrom,
+                to: view,
+                accents: this.accentState(view),
+                durationMs: OUTCOME_TRANSITION_DURATION_MS,
+                easing: TRANSITION_EASING,
+                onComplete: () => this.visualizationDriver.hold({
+                    durationMs: REVEAL_HOLD_DURATION_MS,
+                    onComplete: spinIt
+                })
+            });
+        } else {
+            spinIt();
+        }
     }
 
     /**
@@ -827,7 +848,7 @@ export class App {
             transition,
             accents: finalAccentState,
             durationMs: OUTCOME_TRANSITION_DURATION_MS,
-            easing: this.easingFunction,
+            easing: TRANSITION_EASING,
             onComplete: () => {
                 this.outcomeInProgress = false;
                 this.outcomeAccents = finalAccents;

@@ -181,17 +181,31 @@ export function normalizeChancesAffine(fractions: readonly number[], minSector: 
     for (const a of fractions) sum += a;
     if (Math.abs(sum - 1) > 1e-9) return [...fractions];
 
-    const aMin = Math.min(...fractions);
-    const m = Math.min(minSector, 1 / n);
+    // Zero shares stay zero: the floor exists to keep a NON-ZERO chance
+    // readable, while a zero chance must disappear (e.g. the lots outside the
+    // tournament's current group). The affine map therefore runs over the
+    // positive shares only — their sub-sum is already 1.
+    let positives = 0;
+    let aMin = Infinity;
+    for (const a of fractions) {
+        if (a > 0) {
+            positives++;
+            if (a < aMin) aMin = a;
+        }
+    }
+    if (positives <= 1) return [...fractions];
+
+    const m = Math.min(minSector, 1 / positives);
     if (!(m > 0)) return [...fractions];
     if (aMin >= m) return [...fractions];
 
     // k === 0 is the documented degenerate case (m reached the mean => every
-    // share becomes exactly 1/n); k < 0 or a non-finite k means bad input.
-    const k = (1 - n * m) / (1 - n * aMin);
+    // positive share becomes exactly 1/positives); k < 0 or a non-finite k
+    // means bad input.
+    const k = (1 - positives * m) / (1 - positives * aMin);
     if (!isFinite(k) || k < 0) return [...fractions];
 
-    return fractions.map(a => m + k * (a - aMin));
+    return fractions.map(a => (a > 0 ? m + k * (a - aMin) : 0));
 }
 
 /**

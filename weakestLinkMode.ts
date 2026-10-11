@@ -123,7 +123,7 @@ export class WeakestLinkMode implements GameMode {
         return { initialHp: buildInitialHp(currentLots), lastHitId: null };
     }
 
-    calculateSelectionWeight(): number {
+    calculateSelectionWeight(_lot: Lot, _state: GameModeState): number {
         // Equal probability for every active participant, regardless of HP.
         return 1;
     }

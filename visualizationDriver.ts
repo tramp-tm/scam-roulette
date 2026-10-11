@@ -1,7 +1,7 @@
 import { AnimationController } from './animation.js';
 import type { EasingFunction } from './animation.js';
 import { getVisualizationPackage } from './visualizationStrategy.js';
-import { createViewInterpolator } from './presentation.js';
+import { buildEliminatedMid, createViewInterpolator } from './presentation.js';
 import type {
     AccentState,
     GameViewState,
@@ -21,6 +21,27 @@ export interface SpinParams {
     onComplete: () => void;
 }
 
+/**
+ * Parameters for a pre-spin "reveal" transition: the resting view morphs into the
+ * prepared view (e.g. the tournament wheel collapsing from the pool to the
+ * mini-roulette) before the spin runs. There is no `pulse` ramp here — the
+ * outcome accents do not exist yet — so `accents` is applied unchanged.
+ */
+export interface RevealParams {
+    from: GameViewState;
+    to: GameViewState;
+    accents: AccentState;
+    durationMs: number;
+    easing: EasingFunction;
+    onComplete: () => void;
+}
+
+/** Parameters for the static "read the group" pause between reveal and spin. */
+export interface HoldParams {
+    durationMs: number;
+    onComplete: () => void;
+}
+
 /** Parameters for a post-spin outcome transition animation. */
 export interface OutcomeParams {
     transition: VisualizationTransition;
@@ -28,6 +49,23 @@ export interface OutcomeParams {
     durationMs: number;
     easing: EasingFunction;
     onComplete?: () => void;
+}
+
+/**
+ * True when two snapshots carry the same per-participant axes (id, chance,
+ * magnitude, opacity, visibility) in the same order. Used to detect an outcome
+ * phase that would change nothing, so it can be skipped instead of freezing the
+ * canvas for the whole transition duration.
+ */
+function sameView(a: GameViewState, b: GameViewState): boolean {
+    if (a.participants.length !== b.participants.length) return false;
+    for (let i = 0; i < a.participants.length; i++) {
+        const p = a.participants[i];
+        const q = b.participants[i];
+        if (p.lot.id !== q.lot.id || p.xValue !== q.xValue || p.yValue !== q.yValue
+            || p.zValue !== q.zValue || p.presence !== q.presence) return false;
+    }
+    return true;
 }
 
 /**
@@ -42,6 +80,9 @@ export interface OutcomeParams {
  *   - show a presentation snapshot (`refresh` / `setVisualization`);
  *   - run the main spin animation (target computed internally by the
  *     visualization; the driver only advances the scalar);
+ *   - run the pre-spin reveal transition by interpolating the presentation
+ *     snapshot from the resting view to the prepared view;
+ *   - hold that prepared frame for a while (read pause) before the spin;
  *   - run the post-spin outcome transition by interpolating the presentation
  *     snapshot from `before` to `after`;
  *   - reset.
@@ -179,10 +220,77 @@ export class VisualizationDriver {
      * The interpolator is built once and reused across frames, so no
      * ViewState structures are reallocated per frame.
      */
+    /**
+     * Plays the pre-spin reveal: interpolates the presentation snapshot from the
+     * resting view to the prepared view, then hands control back to the caller
+     * (which starts the spin). Same mechanism as `animateOutcome` — every frame
+     * re-pushes an interpolated snapshot, so each renderer rebuilds its own
+     * geometry — but with the accents applied unchanged (there are no outcome
+     * accents yet) and a stable `to` as the final frame.
+     */
+    reveal(params: RevealParams): void {
+        this.animationController.stop();
+
+        const interpolate = createViewInterpolator(params.from, params.to);
+
+        this.animationController.configure({
+            startValue: 0,
+            endValue: 1,
+            duration: params.durationMs,
+            easing: params.easing,
+            onUpdate: (easedProgress) => {
+                this.renderer.setViewState(interpolate(easedProgress), params.accents);
+                this.renderer.render();
+            },
+            onComplete: () => {
+                this.renderer.setViewState(params.to, params.accents);
+                this.renderer.render();
+                params.onComplete();
+            }
+        });
+
+        this.animationController.start();
+    }
+
+    /**
+     * Holds the current frame for `durationMs` without touching the renderer — a
+     * no-op scalar run, so it is owned by the controller and cancelled by
+     * `stop()` / `reset()` like any other animation. A plain `setTimeout` would
+     * survive a reset and start a spin on a discarded session.
+     */
+    hold(params: HoldParams): void {
+        this.animationController.stop();
+        this.animationController.configure({
+            startValue: 0,
+            endValue: 1,
+            duration: params.durationMs,
+            onUpdate: () => {},
+            onComplete: () => params.onComplete()
+        });
+        this.animationController.start();
+    }
+
+    /**
+     * Plays the post-spin outcome as up to TWO sequential phases, so an
+     * elimination is read before the wheel reopens:
+     *
+     *  1. eliminate — every eliminated lot collapses (`presence` 1 → 0,
+     *     `xValue` → 0) while the accent `pulse` ramps in; the survivors stay
+     *     exactly as they were in the prepared view;
+     *  2. return    — the survivors (and any zero-chance lot) grow back to the
+     *     stable `after` view; the accents are already at full pulse.
+     *
+     * The second phase is skipped when it would change nothing (the mid frame
+     * already equals `after`, e.g. Survival, where the survivors' weights are
+     * unchanged), so an ordinary mode keeps its previous single-phase total
+     * duration. Both phases use the caller's `durationMs` / `easing`.
+     */
     animateOutcome(params: OutcomeParams): void {
         this.animationController.stop();
 
-        const interpolate = createViewInterpolator(params.transition.before, params.transition.after);
+        const { before, after, outcome } = params.transition;
+        const mid = buildEliminatedMid(before, outcome.eliminated);
+        const eliminate = createViewInterpolator(before, mid);
 
         this.animationController.configure({
             startValue: 0,
@@ -191,15 +299,36 @@ export class VisualizationDriver {
             easing: params.easing,
             onUpdate: (easedProgress) => {
                 this.renderer.setViewState(
-                    interpolate(easedProgress),
+                    eliminate(easedProgress),
                     { accents: params.accents.accents, pulse: easedProgress }
                 );
                 this.renderer.render();
             },
             onComplete: () => {
-                this.renderer.setViewState(params.transition.after, params.accents);
-                this.renderer.render();
-                params.onComplete?.();
+                if (sameView(mid, after)) {
+                    this.renderer.setViewState(after, params.accents);
+                    this.renderer.render();
+                    params.onComplete?.();
+                    return;
+                }
+
+                const back = createViewInterpolator(mid, after);
+                this.animationController.configure({
+                    startValue: 0,
+                    endValue: 1,
+                    duration: params.durationMs,
+                    easing: params.easing,
+                    onUpdate: (easedProgress) => {
+                        this.renderer.setViewState(back(easedProgress), params.accents);
+                        this.renderer.render();
+                    },
+                    onComplete: () => {
+                        this.renderer.setViewState(after, params.accents);
+                        this.renderer.render();
+                        params.onComplete?.();
+                    }
+                });
+                this.animationController.start();
             }
         });
 

@@ -11,6 +11,32 @@ import type {
 export const OUTCOME_TRANSITION_DURATION_MS = 600;
 
 /**
+ * Read pause between the reveal and the spin: the drawn group stays on screen,
+ * static, so the user can read which lots are in the mini-roulette.
+ */
+export const REVEAL_HOLD_DURATION_MS = 1000;
+
+/**
+ * Mid-frame of a split outcome transition: the `before` snapshot with every
+ * eliminated lot zeroed on both its chance (`xValue`) and its visibility
+ * (`presence`). The survivors keep their `before` values — so between the
+ * eliminate and the return phases the wheel shows the survivors exactly as they
+ * were in the mini-roulette.
+ */
+export function buildEliminatedMid(
+    before: GameViewState,
+    eliminatedIds: readonly string[]
+): GameViewState {
+    const eliminated = new Set(eliminatedIds);
+    return {
+        ...before,
+        participants: before.participants.map(p =>
+            eliminated.has(p.lot.id) ? { ...p, xValue: 0, presence: 0 } : p
+        )
+    };
+}
+
+/**
  * Builds a reusable interpolator between two presentation snapshots.
  *
  * Unlike a naive per-frame linear interpolation (which would rebuild the
