@@ -181,7 +181,7 @@ export class KingOfTheHillAmountMode implements GameMode {
         return { initialHp, kingId: electKing(ids, id => initialHp.get(id) ?? 0) };
     }
 
-    calculateSelectionWeight(_lot: Lot, _state: GameModeState): number {
+    calculateSelectionWeight(): number {
         // Equal probability for every active participant, regardless of HP.
         return 1;
     }

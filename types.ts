@@ -229,15 +229,27 @@ export interface GameMode {
     prepareTurn?(participants: readonly GameParticipantState[]): GameModeState;
 
     /**
+     * The lots the VISUALIZATION shows right now, as a subset of the active
+     * participants. `null` / absent = every active participant (the default for
+     * modes without a staged subset). The roulette roll is performed over exactly
+     * this set; the lots list keeps showing the full pool regardless.
+     *
+     * E.g. the tournament returns its current round's N lots while a round is in
+     * progress, and `null` (the whole pool) between rounds.
+     */
+    getVisualizationLots?(
+        state: GameModeState,
+        participants: readonly GameParticipantState[]
+    ): ReadonlySet<string> | null;
+
+    /**
      * SELECTION weight: how likely this lot is to be rolled by the roulette
      * mechanics. Drives selection only — never visual size. It IS the chance
      * axis (`xValue`) the core shows, so "what you see is what was rolled".
      *
-     * The weight is the mode's own semantics and MAY depend on the game state
-     * (e.g. a mode that draws a subset for the upcoming roll); modes with no
-     * state dependency ignore the parameter.
+     * Depends on the LOT alone — not on participation or game state.
      */
-    calculateSelectionWeight(lot: Lot, state: GameModeState): number;
+    calculateSelectionWeight(lot: Lot): number;
 
     /**
      * Axis 2 (`yValue`): the mode's abstract MAGNITUDE, used by visualizations

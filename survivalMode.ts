@@ -193,7 +193,7 @@ export class SurvivalMode implements GameMode {
 
     onParticipantsChanged(state: GameModeState): GameModeState { return state; }
 
-    calculateSelectionWeight(lot: Lot, _state: GameModeState): number {
+    calculateSelectionWeight(lot: Lot): number {
         return survivalSelectionWeight(lot.amount);
     }
 

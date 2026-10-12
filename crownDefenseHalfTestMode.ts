@@ -97,7 +97,7 @@ export class CrownDefenseHalfTestMode implements GameMode {
         return state;
     }
 
-    calculateSelectionWeight(_lot: Lot, _state: GameModeState): number {
+    calculateSelectionWeight(): number {
         // Equal probability for every active participant, regardless of HP.
         return 1;
     }

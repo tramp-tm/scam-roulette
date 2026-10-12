@@ -17,7 +17,7 @@ const TOURNAMENT_SIZE = 3;
 /**
  * Game-level state: the lots of the CURRENT round's mini-roulette. `null` while
  * resting — the group exists only between `prepareTurn` (spin) and `processRoll`
- * (finish), so the resting view is the whole pool (uniform).
+ * (finish).
  */
 interface TournamentGameState {
     groupIds: ReadonlySet<string> | null;
@@ -52,10 +52,11 @@ function eliminate(
  * Rules:
  *  - each spin runs a MINI-ROULETTE over a group of `TOURNAMENT_SIZE` lots drawn
  *    uniformly from the active pool (`prepareTurn`, a local lottery);
- *  - inside the group the chance axis is `1 / amount` (a lower amount is more
- *    likely to go); outside the group `xValue = 0` — zero chance in this round;
- *  - at rest (no group) every active lot has `xValue = 1`, so the wheel shows
- *    the whole pool uniformly;
+ *  - the visualization shows EXACTLY that group while a round is in progress
+ *    (`getVisualizationLots`) and the whole pool between rounds: the core does
+ *    the filtering, so the mode never hides a lot through the axes;
+ *  - inside the group the selection weight is `1 / amount` — the same selection
+ *    semantics as Survival (a lower amount is more likely to go);
  *  - the rolled lot is eliminated and the group is dropped, so the next resting
  *    view is the pool minus the eliminated lot;
  *  - the winner is decided from the state AFTER removing the rolled lot (like
@@ -95,15 +96,21 @@ export class TournamentMode implements GameMode {
         return { groupIds: null };
     }
 
+    /** While a round is in progress: exactly the drawn group; otherwise the pool. */
+    getVisualizationLots(state: GameModeState): ReadonlySet<string> | null {
+        return (state as TournamentGameState).groupIds;
+    }
+
     prepareTurn(participants: readonly GameParticipantState[]): GameModeState {
         const activeIds = participants.filter(p => p.active).map(p => p.lotId);
         return { groupIds: new Set(pickTournamentGroup(activeIds, TOURNAMENT_SIZE)) };
     }
 
-    calculateSelectionWeight(lot: Lot, state: GameModeState): number {
-        const gs = state as TournamentGameState;
-        if (!gs.groupIds) return 1;                          // resting: uniform pool
-        return gs.groupIds.has(lot.id) ? 1 / lot.amount : 0; // group: inverted weight
+    calculateSelectionWeight(lot: Lot): number {
+        // Same selection semantics as Survival: a lower amount is more likely to
+        // be eliminated. No zeros anywhere — the non-group lots are simply not in
+        // the visualization view, they are not zeroed on an axis.
+        return 1 / lot.amount;
     }
 
     getParticipantMagnitude(): number | undefined {
@@ -197,7 +204,7 @@ export class TournamentMode implements GameMode {
         for (const p of participants) {
             if (p.active && gs.groupIds.has(p.lotId)) {
                 // The current mini-roulette is marked in the list only — the
-                // wheel already shows the group through its sectors.
+                // visualization already shows exactly this group.
                 result.set(p.lotId, { accent: { kind: 'info', targets: ['list'] } });
             }
         }

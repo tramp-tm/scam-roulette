@@ -758,7 +758,9 @@ export class App {
 
         // Hand the already-decided target to the visualization boundary.
         // App says *what* to animate; the driver/visualization decide *how*.
-        const view = this.gameSession.viewState;
+        // `prepared.view` is the subset staged for this roll (the tournament's
+        // group, or the full pool for other modes) — NOT the session's view state.
+        const view = prepared.view;
         const spinIt = () => this.visualizationDriver.spinTo({
             view,
             accents: this.accentState(view),

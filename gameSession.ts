@@ -26,13 +26,15 @@ export type PrepareSpinFailureReason =
 
 /**
  * Result of `GameSession.prepareSpin()`. The failure reason lets the caller
- * surface an accurate message. `revealFrom` is present only when the mode
- * implements `prepareTurn`: it is the RESTING view captured just before the
- * mode prepared its state, so the caller can animate the transition from it to
- * the prepared snapshot instead of jumping.
+ * surface an accurate message. `view` is the visualization view for this roll
+ * (the subset the mode stages, or the whole pool) — the caller must spin THAT
+ * view, not the session's `viewState`. `revealFrom` is present only when the
+ * mode implements `prepareTurn`: it is the RESTING view captured just before
+ * the mode prepared its state, so the caller can animate the transition from it
+ * to `view` instead of jumping.
  */
 export type PrepareSpinResult =
-    | { ok: true; lot: Lot; revealFrom?: GameViewState }
+    | { ok: true; lot: Lot; view: GameViewState; revealFrom?: GameViewState }
     | { ok: false; reason: PrepareSpinFailureReason };
 
 /**
@@ -136,9 +138,9 @@ export class GameSession {
     }
 
     /**
-     * Immutable presentation snapshot of the current stable state. Selection
-     * weights and per-participant presentation values/data are computed by the
-     * mode; the core never interprets them.
+     * Immutable presentation snapshot of the current stable state — the FULL
+     * pool. Feeds the lots list and the outcome transition's `after`; the
+     * visualization may show less (see `buildVisualizationView`).
      */
     get viewState(): GameViewState {
         return this.buildViewState(this.participants, this.modeState);
@@ -259,10 +261,11 @@ export class GameSession {
             this.modeState = this.currentMode.prepareTurn(this.participants);
         }
 
-        // Reuse the current snapshot for the weights instead of calling
-        // `calculateSelectionWeight` a second time: an active participant's
-        // `xValue` IS that value, computed from the same mode + state.
-        const snapshot = this.viewState;
+        // The visualization view for this roll: the mode may stage a SUBSET of
+        // the pool for the round (e.g. the tournament's group), so both the roll
+        // and the "before" view are built from exactly that subset. Reusing the
+        // snapshot's `xValue`s avoids calling `calculateSelectionWeight` twice.
+        const snapshot = this.buildVisualizationView(this.participants, this.modeState);
         const entries: SelectionCandidate[] = [];
         for (const r of snapshot.participants) {
             if (!r.active) continue;
@@ -287,7 +290,7 @@ export class GameSession {
 
         this.sessionLocked = true;
         this.spinInProgress = true;
-        return { ok: true, lot: rolled.lot, revealFrom };
+        return { ok: true, lot: rolled.lot, view: snapshot, revealFrom };
     }
 
     /**
@@ -346,6 +349,25 @@ export class GameSession {
         return { lotId: lot.id, active: true, modeState: this.currentMode.createParticipantState(lot) };
     }
 
+    /**
+     * The visualization view: the full view filtered down to the lots the mode
+     * staged for this roll (`getVisualizationLots`). No hook / `null` = the whole
+     * pool. The lots list keeps consuming the FULL `viewState`, so staging never
+     * hides a lot from the list — only from the canvas.
+     */
+    private buildVisualizationView(
+        participants: readonly GameParticipantState[],
+        state: GameModeState
+    ): GameViewState {
+        const full = this.buildViewState(participants, state);
+        const visible = this.currentMode.getVisualizationLots?.(state, participants);
+        if (!visible) return full;
+        return {
+            modeId: full.modeId,
+            participants: full.participants.filter(p => visible.has(p.lot.id))
+        };
+    }
+
     private buildViewState(
         participants: readonly GameParticipantState[],
         state: GameModeState
@@ -365,7 +387,7 @@ export class GameSession {
                 active: p.active,
                 // Axis 1 (chance) is filled by the CORE — the same number the
                 // roulette uses, so "what you see is what was rolled".
-                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot, state) : 0,
+                xValue: p.active ? this.currentMode.calculateSelectionWeight(lot) : 0,
                 // Axis 2 (magnitude): the mode's own meaning, or undefined.
                 yValue: this.currentMode.getParticipantMagnitude(lot, p, state),
                 // Axis 3 (opacity): undefined when the mode does not fill it.
