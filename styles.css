@@ -1486,8 +1486,10 @@ input[type="number"] {
 
 .risky-bet-dialog .risky-bet-zones {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 1.5fr);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(320px, 1fr) minmax(0, 1.6fr);
+    grid-template-rows: minmax(120px, 1fr) minmax(280px, 1.5fr);
+    grid-template-areas: "lots risk" "distribution risk";
+    overflow: auto;
     flex: 1;
     min-height: 0;
     gap: 18px;
@@ -1511,7 +1513,7 @@ input[type="number"] {
 .risky-bet-dialog input[readonly] { opacity: 0.75; }
 .risky-bet-dialog [aria-invalid="true"] { outline: 2px solid var(--accent-danger); }
 .risky-bet-dialog .risky-bet-error { color: var(--accent-danger); }
-.risky-bet-dialog button:not(.modal-close):not(.switch-btn):not(.btn-delete):not(.btn-add) {
+.risky-bet-dialog button:not(.modal-close):not(.switch-btn):not(.btn-delete):not(.btn-add):not(.btn-primary) {
     padding: 9px 12px;
     background: var(--btn-secondary-bg);
     color: var(--text-primary);
@@ -1519,13 +1521,39 @@ input[type="number"] {
     white-space: normal;
     overflow-wrap: anywhere;
 }
-.risky-bet-dialog button:not(.modal-close):not(.switch-btn):not(.btn-delete):not(.btn-add):hover:not(:disabled) { background: var(--surface-hover); }
+.risky-bet-dialog button:not(.modal-close):not(.switch-btn):not(.btn-delete):not(.btn-add):not(.btn-primary):hover:not(:disabled) { background: var(--surface-hover); }
 .risky-bet-dialog .risky-bet-lot[aria-pressed="true"] { border-color: var(--accent); background: var(--highlight-bg); }
 .risky-bet-dialog button:disabled { opacity: 0.55; cursor: not-allowed; }
 .risky-bet-dialog button:focus-visible,
 .risky-bet-dialog input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.risky-bet-dialog .risky-bet-lots { display: flex; flex-direction: column; overflow: hidden; }
+.risky-bet-dialog .risky-bet-lots { grid-area: lots; display: flex; flex-direction: column; overflow: hidden; }
+.risky-bet-dialog .risky-bet-risk { grid-area: risk; }
+.risky-bet-dialog .risky-bet-risk-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 12px;
+}
+.risky-bet-dialog .risky-bet-risk-controls label { min-width: 0; margin: 0; font-size: 0.875em; }
+.risky-bet-dialog .risky-bet-risk-controls .switch { align-self: end; }
+.risky-bet-dialog .risky-bet-risk > .btn-primary { display: block; margin-top: 14px; }
+.risky-bet-dialog .risky-bet-result {
+    margin-top: 18px;
+    padding: 16px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--result-bg);
+    font-variant-numeric: tabular-nums;
+}
+.risky-bet-dialog .risky-bet-result[hidden] { display: none; }
+.risky-bet-dialog .risky-bet-result-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.risky-bet-dialog .risky-bet-result-title { font-weight: 600; }
+.risky-bet-dialog .risky-bet-result-multiplier { color: var(--accent); font-size: 2em; line-height: 1.1; overflow-wrap: anywhere; }
+.risky-bet-dialog .risky-bet-result-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.risky-bet-dialog .risky-bet-result-values dt { font-size: 0.8em; opacity: 0.8; }
+.risky-bet-dialog .risky-bet-result-values dd { margin: 6px 0 0; font-size: 1.1em; font-weight: 600; overflow-wrap: anywhere; }
+.risky-bet-dialog .risky-bet-result-after dd { color: var(--accent); font-weight: 700; }
 .risky-bet-dialog .risky-bet-lot-list { display: grid; align-content: start; flex: 1; min-height: 0; gap: 8px; overflow: auto; }
 .risky-bet-dialog .risky-bet-lot {
     display: grid;
@@ -1537,15 +1565,23 @@ input[type="number"] {
 }
 .risky-bet-dialog .risky-bet-lot-name { overflow-wrap: anywhere; }
 .risky-bet-dialog .risky-bet-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.risky-bet-dialog .add-row .lot-name { flex: 1; }
-.risky-bet-dialog .risky-bet-table-scroll { overflow: auto; max-height: 44vh; margin-bottom: 12px; }
-.risky-bet-dialog table { width: 100%; min-width: 380px; border-collapse: collapse; }
-.risky-bet-dialog th,
-.risky-bet-dialog td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border-subtle); }
-.risky-bet-dialog th { font-size: 0.85em; }
-.risky-bet-dialog td input { min-width: 65px; }
-.risky-bet-dialog small { display: block; margin-top: 4px; }
-.risky-bet-dialog small[hidden] { display: none; }
+.risky-bet-dialog .risky-bet-distribution { grid-area: distribution; display: flex; flex-direction: column; overflow: hidden; }
+.risky-bet-dialog .risky-bet-distribution > h3,
+.risky-bet-dialog .risky-bet-distribution > p,
+.risky-bet-dialog .risky-bet-chart { flex-shrink: 0; }
+.risky-bet-dialog .risky-bet-table-scroll { overflow: auto; flex: 1; min-height: 0; scrollbar-gutter: stable; }
+.risky-bet-dialog .risky-bet-template { overflow: auto; flex-shrink: 0; scrollbar-gutter: stable; margin-top: 8px; }
+.risky-bet-dialog .risky-bet-table { width: 100%; min-width: 300px; table-layout: fixed; border-collapse: collapse; font-size: 0.85em; }
+.risky-bet-dialog .risky-bet-color-column { width: 20px; }
+.risky-bet-dialog .risky-bet-percent-column { width: 52px; }
+.risky-bet-dialog .risky-bet-probability-column { width: 72px; }
+.risky-bet-dialog .risky-bet-action-column { width: 36px; }
+.risky-bet-dialog .risky-bet-table td { padding: 4px; text-align: left; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.risky-bet-dialog .risky-bet-table td:nth-child(2) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.risky-bet-dialog .risky-bet-table input { width: 100%; min-width: 0; height: 30px; padding: 4px 6px; font-size: inherit; }
+.risky-bet-dialog .risky-bet-table .btn-add,
+.risky-bet-dialog .risky-bet-table .btn-delete { width: 28px; height: 28px; padding: 0; font-size: 14px; }
+.risky-bet-dialog .risky-bet-table .add-row { display: table-row; }
 .risky-bet-dialog .risky-bet-strip {
     display: block;
     width: 100%;
@@ -1568,13 +1604,13 @@ input[type="number"] {
     text-shadow: 0 1px 3px #000;
 }
 
-@media (max-width: 1000px) {
-    .risky-bet-dialog .risky-bet-zones { grid-template-columns: 1fr 1fr; grid-template-rows: minmax(360px, 1fr) auto; overflow: auto; }
-    .risky-bet-dialog .risky-bet-distribution { grid-column: 1 / -1; }
-}
-
-@media (max-width: 640px) {
+@media (max-width: 760px) {
+    .risky-bet-dialog .risky-bet-zones {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(180px, 1fr) minmax(280px, 1.5fr) auto;
+        grid-template-areas: "lots" "distribution" "risk";
+    }
     .modal-content.risky-bet-dialog { padding: 18px 12px; }
-    .risky-bet-dialog .risky-bet-zones { grid-template-columns: 1fr; grid-template-rows: minmax(220px, 1fr) auto auto; }
     .risky-bet-dialog h2 { padding-right: 24px; }
+    .risky-bet-dialog .risky-bet-risk-controls { gap: 8px; }
 }
