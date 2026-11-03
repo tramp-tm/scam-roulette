@@ -52,5 +52,8 @@
   "dependencies": {
     "i18next": "^26.3.4",
     "papaparse": "^5.5.4"
+  },
+  "directories": {
+    "doc": "docs"
   }
 }

@@ -545,13 +545,19 @@ export class App {
     private openRiskyBetDialog(): void {
         if (!this.settings.riskyBetsEnabled || this.gameSession.isSessionLocked || this.riskyBetDialog
             || this.lotManager.getTotalCount() === 0 || ModalManager.getInstance().getTopmostModal()) return;
-        this.riskyBetDialog = new RiskyBetDialog({
+        const dialog: RiskyBetDialog = new RiskyBetDialog({
             getLots: () => this.lotManager.getAllLots(),
             getDistribution: () => this.riskyBetDistribution,
             onDistributionChange: distribution => { this.riskyBetDistribution = distribution; },
+            canRisk: () => this.riskyBetDialog === dialog && this.settings.riskyBetsEnabled && !this.gameSession.isSessionLocked,
+            onCommit: request => {
+                if (this.riskyBetDialog !== dialog || !dialog.isCommitting) return { success: false, reason: 'unavailable' };
+                return this.commitRiskyBet(request);
+            },
             onClosed: () => { this.riskyBetDialog = null; this.updateControlsState(); }
         });
-        this.riskyBetDialog.open();
+        this.riskyBetDialog = dialog;
+        dialog.open();
         this.updateControlsState();
     }
 
@@ -621,7 +627,7 @@ export class App {
             // Visualization cannot change mid-animation; between spins of an unfinished
             // game it is editable, like duration and easing. Once the game has finished
             // this select is disabled, so this guard also covers the finished case.
-            if (this.gameSession.isSpinInProgress || this.gameSession.isGameFinished) {
+            if (this.riskyBetDialog || this.gameSession.isSpinInProgress || this.gameSession.isGameFinished) {
                 target.value = this.settings.visualization;
                 return;
             }
