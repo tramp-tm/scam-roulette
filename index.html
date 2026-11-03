@@ -95,11 +95,12 @@
 
             <div class="panel controls-panel">
                 <h3 data-i18n="controls.title">Controls</h3>
-                <div style="display: flex; gap: 15px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 15px;">
                     <button id="spin-btn" class="btn-primary" data-i18n="controls.spin">🎲 SPIN!</button>
                     <button id="reset-btn" class="btn-secondary" data-i18n="controls.reset">🔄 Reset</button>
                     <button id="import-btn-controls" class="btn-secondary" data-i18n="controls.import">📥 Import</button>
                     <button id="clear-btn-controls" class="btn-secondary" data-i18n="controls.clear">🗑️ Clear</button>
+                    <button id="risky-bet-btn" class="btn-secondary hidden" data-i18n="riskyBet.title">Risky bet</button>
                 </div>
             </div>
         </div>
@@ -156,6 +157,13 @@
                 <!-- Collapsible sub-block (hidden by default) -->
                 <div id="settings-subblock" class="settings-sub-block hidden">
                     <h4 data-i18n="settings.additionalOptions">Additional Options</h4>
+                    <div class="settings-group">
+                        <label data-i18n="riskyBet.enable">Enable risky bets</label>
+                        <div id="risky-bets-switch" class="switch">
+                            <button class="switch-btn active" data-value="off" data-i18n="settings.off">Off</button>
+                            <button class="switch-btn" data-value="on" data-i18n="settings.on">On</button>
+                        </div>
+                    </div>
 
                     <div class="settings-group">
                         <label for="language-select">Language 语</label>

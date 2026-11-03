@@ -1469,3 +1469,104 @@ input[type="number"] {
 .error-actions button {
     min-width: 120px;
 }
+
+/* Risky-bet dialog only: existing modal widths and controls stay unchanged. */
+.modal-content.risky-bet-dialog {
+    width: min(96vw, 1160px);
+    max-width: 1160px;
+    max-height: 90vh;
+    max-height: 90dvh;
+    color: var(--text-primary);
+}
+
+.risky-bet-dialog .risky-bet-zones {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 1.5fr);
+    gap: 18px;
+}
+
+.risky-bet-dialog section {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    background: var(--surface-bg);
+}
+
+.risky-bet-dialog h3 { margin-bottom: 12px; }
+.risky-bet-dialog p { margin-top: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.risky-bet-dialog output { margin-left: 0.5em; font-variant-numeric: tabular-nums; }
+.risky-bet-dialog label { display: grid; gap: 6px; margin: 12px 0; }
+.risky-bet-dialog input { width: 100%; min-width: 0; padding: 9px; font-variant-numeric: tabular-nums; }
+.risky-bet-dialog input[readonly] { opacity: 0.75; }
+.risky-bet-dialog [aria-invalid="true"] { outline: 2px solid var(--accent-danger); }
+.risky-bet-dialog .risky-bet-error { color: var(--accent-danger); }
+.risky-bet-dialog button:not(.modal-close) {
+    padding: 9px 12px;
+    background: var(--btn-secondary-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.risky-bet-dialog button:not(.modal-close):hover:not(:disabled) { background: var(--surface-hover); }
+.risky-bet-dialog button[aria-pressed="true"] { border-color: var(--accent); background: var(--highlight-bg); }
+.risky-bet-dialog button:disabled { opacity: 0.55; cursor: not-allowed; }
+.risky-bet-dialog button:focus-visible,
+.risky-bet-dialog input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.risky-bet-dialog .risky-bet-lot-list { display: grid; gap: 8px; max-height: 52vh; overflow: auto; }
+.risky-bet-dialog .risky-bet-lot {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+}
+.risky-bet-dialog .risky-bet-lot-name { overflow-wrap: anywhere; }
+.risky-bet-dialog .risky-bet-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+.risky-bet-dialog .risky-bet-modes { display: flex; flex-direction: column; gap: 8px; }
+.risky-bet-dialog .risky-bet-modes button { display: flex; gap: 10px; align-items: center; text-align: left; }
+.risky-bet-dialog .risky-bet-modes button > span:first-child { font-size: 1.4em; }
+.risky-bet-dialog .risky-bet-table-scroll { overflow: auto; max-height: 44vh; margin-bottom: 12px; }
+.risky-bet-dialog table { width: 100%; min-width: 380px; border-collapse: collapse; }
+.risky-bet-dialog th,
+.risky-bet-dialog td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border-subtle); }
+.risky-bet-dialog th { font-size: 0.85em; }
+.risky-bet-dialog td input { min-width: 65px; }
+.risky-bet-dialog small { display: block; margin-top: 4px; }
+.risky-bet-dialog small[hidden] { display: none; }
+.risky-bet-dialog .risky-bet-strip {
+    display: block;
+    width: 100%;
+    height: 140px;
+    min-width: 0;
+    margin-top: 14px;
+    border-radius: 8px;
+    background: #161b26;
+}
+
+.risky-bet-dialog .risky-bet-chart { display: flex; width: 100%; height: 34px; margin-top: 14px; border-radius: 6px; overflow: hidden; }
+.risky-bet-dialog .risky-bet-chart > span {
+    flex: 0 0 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 34px;
+    color: #fff;
+    text-shadow: 0 1px 3px #000;
+}
+
+@media (max-width: 1000px) {
+    .risky-bet-dialog .risky-bet-zones { grid-template-columns: 1fr 1fr; }
+    .risky-bet-dialog .risky-bet-distribution { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+    .modal-content.risky-bet-dialog { padding: 18px 12px; }
+    .risky-bet-dialog .risky-bet-zones { grid-template-columns: 1fr; }
+    .risky-bet-dialog .risky-bet-lot-list { max-height: 28vh; }
+    .risky-bet-dialog h2 { padding-right: 24px; }
+}

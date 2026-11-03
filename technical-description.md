@@ -436,6 +436,8 @@ interface VisualizationPackage {       // реестр: только фабри�
 
 ### 6.1 Управление лотами — `LotManager`
 
+Непреложное продуктовое правило для сумм: `amount` и все промежуточные суммы — стандартный `number`; рабочая точность 0.01, точность 0.001 уже избыточна. Приоритет — скорость, простота и экономное использование памяти. Формулы вычисляются обычной арифметикой `number`; точность дальних десятичных разрядов не является требованием. Не вводить высокоточные типы/библиотеки, строковые модели суммы или проверки точной представимости и не останавливать реализацию ради таких разрядов. Нормализация суммы принадлежит LotManager; проверки валидности и реального NaN/Infinity обязательны. Каноническое правило и порядок применения: `docs/tasks/risky-bet/00-concept.md`, §0. Оно не подлежит повторному согласованию агентом.
+
 `LotManager` владеет **глобальным** списком лотов и ничего не знает про режимы и участие.
 **Домен не зависит от i18n**: ошибки возвращаются машиночитаемым `reason`, а текст
 локализует презентационный слой (`App.addLotFailureKey` → `t(key, params)`); в `AddLotError` нет поля `message`.
@@ -826,8 +828,14 @@ Hover-состояние `App` не хранит: его владелец — `V
   фильтровать нечего) — в отличие от `reset()`, который его сохраняет.
 - `handleLotHover(id)` — hover строки списка: `visualizationDriver.setHover(id)`; чисто визуально
   и не зависит от блокировок.
-- `handleAmountChange(id, amount)` — guard `sessionLocked`; `LotManager.updateLot`;
-  `refreshAfterStateChange()`.
+- `handleAmountChange(id, amount)` → `applyAmountChange`: нормализация через LotManager,
+  запись через updateLot, `GameSession.refreshLotDerivedState()`, один согласованный refresh.
+  Нормализованный no-op не пересчитывает состояние режима. При исключении hook сумма откатывается;
+  при ошибке отрисовки после записи результат остаётся успешным с признаком presentationFailed.
+- `commitRiskyBet({lotId, expectedAmount, amount})` проверяет флаг включения, session lock,
+  существование лота и совпадение исходной суммы, затем использует тот же applyAmountChange.
+- `GameSession.refreshLotDerivedState()` вызывает текущий onParticipantsChanged без изменения
+  участия; под session lock возвращает false, исключение hook не заменяет прежнее modeState.
 - Тумблер `ext` (`#ext-toggle`, кнопка `↔️` в шапке списка) — переключает `extEnabled`, класс
   `btn-primary`/`btn-secondary` (`applyExtToggleState()`) и вызывает `updateUI()`; доступен всегда.
 - Фильтр «только активные» (`#active-only-toggle`, **перед свитчером сортировки**) — переключает

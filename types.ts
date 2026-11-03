@@ -25,6 +25,8 @@ export type Mode =
 export type VisualizationType = 'wheel' | 'strip' | 'counting-rhyme';
 
 export interface Settings {
+    /** Enables the optional pre-game risky-bet control. */
+    riskyBetsEnabled: boolean;
     visualization: VisualizationType;
     animationDuration: number; // milliseconds
     /** Draw the true chance share instead of the readable minimum-share floor. */
