@@ -30,6 +30,9 @@ import {
 import { ImportDialog } from './importDialog.js';
 import { ImportConflictDialog } from './importConflictDialog.js';
 import { ErrorDialog } from './errorDialog.js';
+import { ModalManager } from './modalManager.js';
+import { RiskyBetDialog } from './riskyBetDialog.js';
+import { createRiskyBetDistribution } from './riskyBetModel.js';
 
 
 // Wrap the app initialisation, or simply call the function at startup:
@@ -65,6 +68,17 @@ type ResolvedAccents = {
  */
 const DEFAULT_MODE_ID: Mode = 'normal';
 
+export type AmountChangeResult =
+    | { success: true; amount: number; presentationFailed?: boolean }
+    | { success: false; reason: 'unavailable' | 'conflict' | 'invalid_amount' | 'update_failed' };
+
+export interface RiskyBetCommit {
+    lotId: string;
+    expectedAmount: number;
+    amount: number;
+}
+
+
 /**
  * Main application controller for the roulette game.
  *
@@ -83,6 +97,7 @@ export class App {
     private lotListView: LotListView;
 
     private settings: Settings = {
+        riskyBetsEnabled: false,
         visualization: 'wheel',
         animationDuration: 3000,
         realChances: false,
@@ -112,6 +127,10 @@ export class App {
     private outcomeInProgress = false;
 
     private importDialog: ImportDialog | null = null;
+    private riskyBetDialog: RiskyBetDialog | null = null;
+    private riskyBetDistribution = createRiskyBetDistribution();
+    private riskyBetButton: HTMLButtonElement | null = null;
+    private riskyBetsSwitch: HTMLElement | null = null;
 
     // DOM elements
     private canvas: HTMLCanvasElement;
@@ -193,6 +212,8 @@ export class App {
         this.resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
         this.importBtnControls = document.getElementById('import-btn-controls') as HTMLButtonElement;
         this.clearBtnControls = document.getElementById('clear-btn-controls') as HTMLButtonElement;
+        this.riskyBetButton = document.getElementById('risky-bet-btn') as HTMLButtonElement | null;
+        this.riskyBetsSwitch = document.getElementById('risky-bets-switch');
 
         // Lots list elements
         this.lotsList = document.getElementById('lots-list') as HTMLUListElement;
@@ -389,15 +410,50 @@ export class App {
      * nothing about the application — this is the application's job.
      */
     private handleAmountChange(id: string, newAmount: number): void {
-        if (!id) return;
+        if (!id || this.riskyBetDialog) return;
         // State-level guard: rejected while the session is locked, mirroring the
         // GameSession-boundary rejection.
         if (this.gameSession.isSessionLocked) return;
-        this.lotManager.updateLot(id, { amount: newAmount });
-        // An amount change does not affect participation, but it does change the
-        // mode's view data (chance, magnitude, the ext column), so both the list
-        // and the visualization must be re-rendered.
-        this.refreshAfterStateChange();
+        this.applyAmountChange(id, newAmount);
+    }
+
+    /** One amount-write path for manual edits and risky bets. Never reinterprets mode state. */
+    private applyAmountChange(id: string, newAmount: number): AmountChangeResult {
+        if (this.gameSession.isSessionLocked) return { success: false, reason: 'unavailable' };
+        const lot = this.lotManager.getAllLots().find(item => item.id === id);
+        if (!lot) return { success: false, reason: 'conflict' };
+        const amount = LotManager.normalizeAmount(newAmount);
+        if (amount === null) return { success: false, reason: 'invalid_amount' };
+        if (amount === lot.amount) return { success: true, amount };
+        const previousAmount = lot.amount;
+        if (!this.lotManager.updateLot(id, { amount: newAmount })) return { success: false, reason: 'update_failed' };
+        try {
+            if (!this.gameSession.refreshLotDerivedState()) {
+                this.lotManager.updateLot(id, { amount: previousAmount });
+                return { success: false, reason: 'unavailable' };
+            }
+        } catch {
+            // The pure hook did not commit its state; restore the collection before reporting refusal.
+            this.lotManager.updateLot(id, { amount: previousAmount });
+            return { success: false, reason: 'update_failed' };
+        }
+        try {
+            this.refreshAfterStateChange();
+        } catch {
+            // The write has succeeded: a display error must never authorize a second application.
+            return { success: true, amount: lot.amount, presentationFailed: true };
+        }
+        return { success: true, amount: lot.amount };
+    }
+
+    /** Validate a pinned risky-bet request again at the actual write boundary. */
+    private commitRiskyBet(request: RiskyBetCommit): AmountChangeResult {
+        if (!this.settings.riskyBetsEnabled || this.gameSession.isSessionLocked) {
+            return { success: false, reason: 'unavailable' };
+        }
+        const lot = this.lotManager.getAllLots().find(item => item.id === request.lotId);
+        if (!lot || lot.amount !== request.expectedAmount) return { success: false, reason: 'conflict' };
+        return this.applyAmountChange(request.lotId, request.amount);
     }
 
     /**
@@ -470,7 +526,47 @@ export class App {
         }
     }
 
+    private setRiskyBetsEnabled(enabled: boolean): void {
+        if (this.riskyBetDialog) return;
+        this.settings.riskyBetsEnabled = enabled;
+        this.updateControlsState();
+    }
+
+    private syncRiskyBetControls(): void {
+        this.riskyBetButton?.classList.toggle('hidden', !this.settings.riskyBetsEnabled);
+        if (this.riskyBetButton) this.riskyBetButton.disabled = this.gameSession.isSessionLocked
+            || !!this.riskyBetDialog || this.lotManager.getTotalCount() === 0;
+        this.riskyBetsSwitch?.querySelectorAll<HTMLButtonElement>('.switch-btn').forEach(button => {
+            button.classList.toggle('active', (button.dataset.value === 'on') === this.settings.riskyBetsEnabled);
+            button.disabled = !!this.riskyBetDialog;
+        });
+    }
+
+    private openRiskyBetDialog(): void {
+        if (!this.settings.riskyBetsEnabled || this.gameSession.isSessionLocked || this.riskyBetDialog
+            || this.lotManager.getTotalCount() === 0 || ModalManager.getInstance().getTopmostModal()) return;
+        const dialog: RiskyBetDialog = new RiskyBetDialog({
+            getLots: () => this.lotManager.getAllLots(),
+            getDistribution: () => this.riskyBetDistribution,
+            onDistributionChange: distribution => { this.riskyBetDistribution = distribution; },
+            canRisk: () => this.riskyBetDialog === dialog && this.settings.riskyBetsEnabled && !this.gameSession.isSessionLocked,
+            onCommit: request => {
+                if (this.riskyBetDialog !== dialog || !dialog.isCommitting) return { success: false, reason: 'unavailable' };
+                return this.commitRiskyBet(request);
+            },
+            onClosed: () => { this.riskyBetDialog = null; this.updateControlsState(); }
+        });
+        this.riskyBetDialog = dialog;
+        dialog.open();
+        this.updateControlsState();
+    }
+
     private setupEventListeners(): void {
+        this.riskyBetButton?.addEventListener('click', () => this.openRiskyBetDialog());
+        this.riskyBetsSwitch?.querySelectorAll<HTMLButtonElement>('.switch-btn').forEach(button => {
+            button.addEventListener('click', () => this.setRiskyBetsEnabled(button.dataset.value === 'on'));
+        });
+        this.syncRiskyBetControls();
         // Inline add lot button (at bottom of lots table)
         this.addBtn.addEventListener('click', () => this.addLot());
 
@@ -505,7 +601,7 @@ export class App {
             // Reject the change (and restore the previous visible value) rather
             // than only relying on the disabled attribute. The session lock alone
             // gates this session-level operation.
-            if (this.gameSession.isSessionLocked) {
+            if (this.gameSession.isSessionLocked || this.riskyBetDialog) {
                 target.value = this.gameSession.mode.id;
                 return;
             }
@@ -531,7 +627,7 @@ export class App {
             // Visualization cannot change mid-animation; between spins of an unfinished
             // game it is editable, like duration and easing. Once the game has finished
             // this select is disabled, so this guard also covers the finished case.
-            if (this.gameSession.isSpinInProgress || this.gameSession.isGameFinished) {
+            if (this.riskyBetDialog || this.gameSession.isSpinInProgress || this.gameSession.isGameFinished) {
                 target.value = this.settings.visualization;
                 return;
             }
@@ -551,6 +647,7 @@ export class App {
 
         // Duration slider - uses non-linear mapping for better control at lower values
         this.durationSlider?.addEventListener('input', () => {
+            if (this.riskyBetDialog) return;
             if (this.durationSlider) {
                 const seconds = sliderToDuration(parseInt(this.durationSlider.value)); // Returns SECONDS
                 this.settings.animationDuration = Math.round(seconds * 1000); // Store as ms
@@ -566,6 +663,7 @@ export class App {
 
         // Duration number input - validate and correct on blur/enter only
         this.durationInput?.addEventListener('change', () => {
+            if (this.riskyBetDialog) return;
             if (this.durationInput) {
                 let seconds = parseFloat(this.durationInput.value);
 
@@ -592,6 +690,7 @@ export class App {
         // EasingFunctions; the entry carries both the curve and its i18n
         // name (used by the tooltip).
         this.easingSelect?.addEventListener('change', (e) => {
+            if (this.riskyBetDialog) return;
             const target = e.target as HTMLSelectElement;
             const entry = EasingFunctions[target.value];
             if (!entry) return;
@@ -621,6 +720,7 @@ export class App {
                 // so translateDOM() does not touch them — refresh explicitly.
                 this.updateModeHelpTooltip();
                 this.updateEasingHelpTooltip();
+                this.riskyBetDialog?.refreshPresentation();
 
             });
         });
@@ -632,6 +732,7 @@ export class App {
 
             // Re-render so canvas-based visuals pick up the new theme (if applicable)
             this.visualizationDriver.render();
+            this.riskyBetDialog?.refreshPresentation();
         });
 
         // Settings sub-block toggle button
@@ -705,6 +806,7 @@ export class App {
 
 
     private addLot(): void {
+        if (this.riskyBetDialog) return;
         // State-level guard at the entry point prevents even the `LotManager`
         // mutation that `GameSession` would reject its participation tracking for.
         if (this.gameSession.isSessionLocked) return;
@@ -743,6 +845,7 @@ export class App {
     }
 
     private spin(): void {
+        if (this.riskyBetDialog) return;
         // Preparation belongs to the session: validation, rolling, and remembering
         // the pending spin + before-state. The result is decided here, before any
         // animation starts.
@@ -872,6 +975,7 @@ export class App {
     }
 
     private reset(): void {
+        if (this.riskyBetDialog) return;
         // Reset the current game session: every lot currently in the global list
         // becomes an active participant again, pending spin context is cleared,
         // mode state is recreated, and every lifecycle lock is released.
@@ -962,15 +1066,17 @@ export class App {
         const finished = this.gameSession.isGameFinished;
         const outcomePlaying = this.outcomeInProgress;
         // spinInProgress ⇒ sessionLocked, so the session lock alone suffices here.
-        const sessionLevelLocked = this.gameSession.isSessionLocked;
-        const spinTimeLocked = spinning || finished || outcomePlaying;
+        const dialogOpen = !!this.riskyBetDialog;
+        const sessionLevelLocked = this.gameSession.isSessionLocked || dialogOpen;
+        const spinTimeLocked = spinning || finished || outcomePlaying || dialogOpen;
+        this.syncRiskyBetControls();
 
         // Spin: only between spins of an unfinished game, once the outcome
         // transition has settled.
-        if (this.spinBtn) this.spinBtn.disabled = spinning || finished || outcomePlaying;
+        if (this.spinBtn) this.spinBtn.disabled = spinning || finished || outcomePlaying || dialogOpen;
 
-        // Reset is always available — the user must be able to abandon the session
-        if (this.resetBtn) this.resetBtn.disabled = false;
+        // Close the pre-game risk dialog before resetting the main session.
+        if (this.resetBtn) this.resetBtn.disabled = dialogOpen;
 
         // Session-level configuration (mode, import, clear) — locked for the whole session
         if (this.modeSelect) this.modeSelect.disabled = sessionLevelLocked;
@@ -1009,6 +1115,7 @@ export class App {
     }
 
     private deleteLot(id: string): void {
+        if (this.riskyBetDialog) return;
         // State-level guard: rejected while the session is locked.
         if (this.gameSession.isSessionLocked) return;
 
@@ -1030,6 +1137,7 @@ export class App {
 
     /** Handles clearing all lots */
     private handleClearLots(): void {
+        if (this.riskyBetDialog) return;
         // State-level guard: rejected while the session is locked.
         if (this.gameSession.isSessionLocked) return;
 
@@ -1067,6 +1175,7 @@ export class App {
 
     /** Opens the import dialog */
     private openImportDialog(): void {
+        if (this.riskyBetDialog) return;
         // State-level guard: rejected while the session is locked. The button is
         // also disabled, but this makes the rejection independent of the DOM.
         if (this.gameSession.isSessionLocked) return;
@@ -1086,6 +1195,7 @@ export class App {
 
     /** Handles conflict resolution when importing lots */
     private handleImportConflict(parsedLots: ParsedLot[]): void {
+        if (this.riskyBetDialog) return;
         const existingCount = this.lotManager.getTotalCount();
 
         // If no existing lots, proceed directly with merge strategy (no conflict)
@@ -1106,6 +1216,7 @@ export class App {
 
     /** Executes the import using the selected strategy */
     private executeImport(parsedLots: ParsedLot[], strategy: ImportStrategy): void {
+        if (this.riskyBetDialog) return;
         // Also covers the case where the conflict dialog was opened *before* the
         // session locked and its callback fires afterwards.
         if (this.gameSession.isSessionLocked) {

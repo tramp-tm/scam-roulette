@@ -150,6 +150,15 @@ export class GameSession {
     // Participation mutations (explicit — never implicit getters)
     // ---------------------------------------------------------------
 
+    /** Recompute lot-derived mode state after an amount edit, without changing participation.
+     * Assignment happens only after a successful pure hook, so a thrown hook preserves state.
+     */
+    refreshLotDerivedState(): boolean {
+        if (this.sessionLocked) return false;
+        this.modeState = this.currentMode.onParticipantsChanged(this.modeState, this.participants, this.getLots());
+        return true;
+    }
+
     /** Registers a newly created lot as a participant. Rejected while locked. */
     addLot(lot: Lot): void {
         if (this.sessionLocked) return;

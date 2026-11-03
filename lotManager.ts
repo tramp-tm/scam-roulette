@@ -32,6 +32,26 @@ export class LotManager {
     
     constructor(private lots: Lot[]) {}
 
+    /**
+     * Final amount policy shared by creation and updates: finite values only,
+     * rounded UP to decimal cents, with a minimum of 0.01.
+     * Decimal digits avoid raising exact cents such as 0.07 through binary noise.
+     * Returns null when the amount cannot be stored.
+     */
+    static normalizeAmount(amount: number): number | null {
+        if (!Number.isFinite(amount)) return null;
+        const bounded = Math.max(0.01, amount);
+        const [coefficient, exponent = '0'] = bounded.toString().split('e');
+        const fractionDigits = coefficient.split('.')[1]?.length ?? 0;
+        const shift = Number(exponent) - fractionDigits + 2;
+        if (shift >= 0) return bounded;
+
+        const digits = BigInt(coefficient.replace('.', ''));
+        const divisor = 10n ** BigInt(-shift);
+        const cents = (digits + divisor - 1n) / divisor;
+        return Number(`${cents}e-2`);
+    }
+
     private static generateId(): string {
         return `lot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
@@ -50,8 +70,9 @@ export class LotManager {
             };
         }
 
-        // Validate amount - must be positive number
-        if (isNaN(amount) || amount <= 0) {
+        // Creation requires a positive amount; updates may clamp a lost stake to MIN.
+        const normalizedAmount = LotManager.normalizeAmount(amount);
+        if (normalizedAmount === null || amount <= 0) {
             return {
                 success: false,
                 reason: 'invalid_amount'
@@ -70,7 +91,7 @@ export class LotManager {
         const lot: Lot = {
             id: LotManager.generateId(),
             name: trimmedName,
-            amount: Math.max(0.01, parseFloat(amount.toString())),
+            amount: normalizedAmount,
             color
         };
 
@@ -83,11 +104,16 @@ export class LotManager {
         const lot = this.lots.find(l => l.id === id);
         if (!lot) return false;
 
+        const amount = updates.amount === undefined
+            ? undefined
+            : LotManager.normalizeAmount(updates.amount);
+        if (amount === null) return false;
+
         if (updates.name !== undefined) {
             lot.name = updates.name.trim();
         }
-        if (updates.amount !== undefined) {
-            lot.amount = Math.max(0.01, parseFloat(updates.amount.toString()));
+        if (amount !== undefined) {
+            lot.amount = amount;
         }
         if (updates.color !== undefined) {
             lot.color = updates.color;
